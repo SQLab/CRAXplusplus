@@ -57,4 +57,4 @@ private:
 
 }  // namespace s2e::plugins::requiem
 
-#endif  // S2E_PLUGINS_REQUIEM_CAPSTONE_H
+#endif  // S2E_PLUGINS_REQUIEM_DISASSEMBLER_H

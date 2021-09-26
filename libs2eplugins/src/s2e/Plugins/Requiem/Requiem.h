@@ -55,10 +55,16 @@ public:
     void initialize();
 
 private:
-    void hookInstructions(S2EExecutionState *state,
-                          uint64_t cr3,
-                          uint64_t pid,
-                          const std::string &imageFileName);
+    void onProcessLoad(S2EExecutionState *state,
+                       uint64_t cr3,
+                       uint64_t pid,
+                       const std::string &imageFileName);
+
+    void onMemoryMap(S2EExecutionState *state,
+                     uint64_t pid,
+                     uint64_t start,
+                     uint64_t size,
+                     uint64_t prot);
 
     void onRipCorrupt(S2EExecutionState *state,
                       klee::ref<klee::Expr> virtualAddress,
@@ -87,9 +93,11 @@ private:
     pybind11::scoped_interpreter m_pybind11;
     pybind11::module m_pwnlib;
 
-    OSMonitor* m_monitor;
-    Exploit m_exploit;
+    LinuxMonitor* m_monitor;
     Disassembler m_disassembler;
+    Exploit m_exploit;
+
+    uint64_t m_target_process_pid;
 };
 
 }  // namespace s2e::plugins::requiem

@@ -26,6 +26,8 @@
 
 #include "Pwnlib/ELF.h"
 
+namespace py = pybind11;
+
 namespace s2e::plugins::requiem {
 
 namespace {
@@ -61,18 +63,24 @@ public:
 S2E_DEFINE_PLUGIN(Requiem, "Automatic Exploit Generation Engine", "", );
 
 
+Requiem::Requiem(S2E *s2e)
+    : Plugin(s2e),
+      m_monitor(),
+      m_disassembler(*this),
+      m_pybind11() {}
+
 void Requiem::initialize() {
-    m_monitor = static_cast<OSMonitor *>(s2e()->getPlugin("OSMonitor"));
+    m_monitor = static_cast<OSMonitor *>(g_s2e->getPlugin("OSMonitor"));
     m_monitor->onProcessLoad.connect(sigc::mem_fun(*this, &Requiem::hookInstructions));
 
-    s2e()->getCorePlugin()->onSymbolicAddress.connect(sigc::mem_fun(*this, &Requiem::onRipCorrupt));
+    g_s2e->getCorePlugin()->onSymbolicAddress.connect(sigc::mem_fun(*this, &Requiem::onRipCorrupt));
 
     py::print("Initialized pybind11");
     py::module pwnlib = py::module::import("pwnlib.elf");
 
     ELF elf(pwnlib, "./readme");
     for (const auto& item : elf.symbols()) {
-        s2e()->getInfoStream() << item.first << ": " << item.second << "\n";
+        g_s2e->getInfoStream() << item.first << ": " << item.second << "\n";
     }
 
     py::exec("print('done')");
@@ -84,11 +92,11 @@ void Requiem::onRipCorrupt(S2EExecutionState *state,
                            uint64_t concreteAddress,
                            bool &concretize,
                            CorePlugin::symbolicAddressReason reason) {
-    s2e()->getWarningsStream(state)
+    g_s2e->getWarningsStream(state)
         << "Detected symbolic RIP: " << klee::hexval(concreteAddress)
         << ", original value is: " << klee::hexval(state->regs()->getPc()) << "\n";
 
-    s2e()->getExecutor()->terminateState(*state, "End of exploit generation");
+    g_s2e->getExecutor()->terminateState(*state, "End of exploit generation");
 }
 
 void Requiem::hookInstructions(S2EExecutionState *state,
@@ -96,9 +104,9 @@ void Requiem::hookInstructions(S2EExecutionState *state,
                                uint64_t pid,
                                const std::string &imageFileName) {
     if (imageFileName.find("readme") != imageFileName.npos) {
-        s2e()->getInfoStream() << "hooking instructions\n";
+        g_s2e->getInfoStream() << "hooking instructions\n";
 
-        s2e()->getCorePlugin()->onTranslateInstructionEnd.connect(
+        g_s2e->getCorePlugin()->onTranslateInstructionEnd.connect(
                 sigc::mem_fun(*this, &Requiem::onTranslateInstructionEnd));
     }
 }
@@ -108,7 +116,7 @@ void Requiem::onTranslateInstructionEnd(ExecutionSignal *onInstructionExecute,
                                         TranslationBlock *tb,
                                         uint64_t pc) {
     if (pc == 0x401126) {
-        s2e()->getWarningsStream(state) << "reached main()\n";
+        g_s2e->getWarningsStream(state) << "reached main()\n";
     }
 
     if (pc >= m_monitor->getKernelStart()) {
@@ -120,34 +128,11 @@ void Requiem::onTranslateInstructionEnd(ExecutionSignal *onInstructionExecute,
 
 void Requiem::instructionHook(S2EExecutionState *state,
                               uint64_t pc) {
-    uint8_t code[16] = {};
-    csh handle;
-    cs_insn *insn;
-    size_t count;
+    Instruction i = m_disassembler.disasm(state, pc);
 
-    if (!state->mem()->read(pc, code, sizeof(code) - 1)) {
-        s2e()->getWarningsStream() << "cannot read from memory at: " << klee::hexval(pc) << "\n";
-        return;
+    if (i.mnemonic == "syscall") {
+        syscallHook(state, pc);
     }
-
-    if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK) {
-        return;
-    }
-
-    count = cs_disasm(handle, code, sizeof(code) - 1, pc, 0, &insn);
-
-    if (count) {
-        //s2e()->getInfoStream() << "" << klee::hexval(insn[0].address) << ": "
-        //    << insn[0].mnemonic << " " << insn[0].op_str << "\n";
-
-        if (!strcmp(insn[0].mnemonic, "syscall")) {
-            syscallHook(state, pc);
-        }
-
-        cs_free(insn, count);
-    }
-
-    cs_close(&handle);
 }
 
 void Requiem::syscallHook(S2EExecutionState *state,
@@ -160,7 +145,7 @@ void Requiem::syscallHook(S2EExecutionState *state,
     uint64_t r8 = state->regs()->read<uint64_t>(CPU_OFFSET(regs[8]));
     uint64_t r9 = state->regs()->read<uint64_t>(CPU_OFFSET(regs[9]));
 
-    s2e()->getInfoStream(state)
+    g_s2e->getInfoStream(state)
         << "syscall: " << klee::hexval(rax) << " ("
         << klee::hexval(rdi) << ", " << klee::hexval(rsi) << ", "
         << klee::hexval(rdx) << ", " << klee::hexval(r10) << ", "

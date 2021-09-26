@@ -23,11 +23,12 @@
 
 #include <string>
 
+#include <pybind11/embed.h>
+
 #include <s2e/Plugin.h>
 #include <s2e/Plugins/Core/BaseInstructions.h>
 #include <s2e/Plugins/OSMonitors/Linux/LinuxMonitor.h>
-
-#include <pybind11/embed.h>
+#include <s2e/Plugins/Requiem/Disassembler.h>
 
 namespace s2e::plugins::requiem {
 
@@ -49,7 +50,7 @@ class Requiem : public Plugin, IPluginInvoker {
     S2E_PLUGIN
 
 public:
-    Requiem(S2E *s2e) : Plugin(s2e) {}
+    Requiem(S2E *s2e);
 
     void initialize();
 
@@ -84,6 +85,7 @@ private:
 
 
     OSMonitor* m_monitor;
+    Disassembler m_disassembler;
     pybind11::scoped_interpreter m_pybind11;
 };
 

@@ -27,6 +27,8 @@
 #include <s2e/Plugins/Core/BaseInstructions.h>
 #include <s2e/Plugins/OSMonitors/Linux/LinuxMonitor.h>
 
+#include <pybind11/embed.h>
+
 namespace s2e::plugins::requiem {
 
 enum S2E_REQUIEM_COMMANDS {
@@ -82,6 +84,7 @@ private:
 
 
     OSMonitor* m_monitor;
+    pybind11::scoped_interpreter m_pybind11;
 };
 
 }  // namespace s2e::plugins::requiem

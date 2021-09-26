@@ -22,11 +22,9 @@
 
 #include <s2e/S2E.h>
 #include <s2e/ConfigFile.h>
-
 #include <capstone/capstone.h>
-#include <pybind11/embed.h>
 
-namespace py = pybind11;
+#include "Pwnlib/ELF.h"
 
 namespace s2e::plugins::requiem {
 
@@ -62,14 +60,22 @@ public:
 
 S2E_DEFINE_PLUGIN(Requiem, "Automatic Exploit Generation Engine", "", );
 
+
 void Requiem::initialize() {
     m_monitor = static_cast<OSMonitor *>(s2e()->getPlugin("OSMonitor"));
     m_monitor->onProcessLoad.connect(sigc::mem_fun(*this, &Requiem::hookInstructions));
 
     s2e()->getCorePlugin()->onSymbolicAddress.connect(sigc::mem_fun(*this, &Requiem::onRipCorrupt));
 
-    py::scoped_interpreter guard{}; // start the interpreter and keep it alive
-    py::print("Hello, World!"); // use the Python API
+    py::print("Initialized pybind11");
+    py::module pwnlib = py::module::import("pwnlib.elf");
+
+    ELF elf(pwnlib, "./readme");
+    for (const auto& item : elf.symbols()) {
+        s2e()->getInfoStream() << item.first << ": " << item.second << "\n";
+    }
+
+    py::exec("print('done')");
 }
 
 

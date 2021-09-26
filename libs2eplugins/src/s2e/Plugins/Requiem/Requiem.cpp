@@ -24,6 +24,9 @@
 #include <s2e/ConfigFile.h>
 
 #include <capstone/capstone.h>
+#include <pybind11/embed.h>
+
+namespace py = pybind11;
 
 namespace s2e::plugins::requiem {
 
@@ -64,6 +67,9 @@ void Requiem::initialize() {
     m_monitor->onProcessLoad.connect(sigc::mem_fun(*this, &Requiem::hookInstructions));
 
     s2e()->getCorePlugin()->onSymbolicAddress.connect(sigc::mem_fun(*this, &Requiem::onRipCorrupt));
+
+    py::scoped_interpreter guard{}; // start the interpreter and keep it alive
+    py::print("Hello, World!"); // use the Python API
 }
 
 

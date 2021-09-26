@@ -18,42 +18,31 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef S2E_PLUGINS_REQUIEM_DISASSEMBLER_H
-#define S2E_PLUGINS_REQUIEM_DISASSEMBLER_H
+#ifndef S2E_PLUGINS_REQUIEM_UTIL_H
+#define S2E_PLUGINS_REQUIEM_UTIL_H
 
-#include <vector>
-
-#include <s2e/S2E.h>
-#include <s2e/S2EExecutionState.h>
+#include <cstring>
+#include <memory>
+#include <string>
 
 namespace s2e::plugins::requiem {
 
-struct Instruction {
-    uint64_t address;
-    std::string mnemonic;
-    std::string op_str;
-};
+template <typename... Args>
+std::string format(const std::string& fmt, Args&&... args) {
+  // std::snprintf(dest, n, fmt, ...) returns the number of chars
+  // that will be actually written into `dest` if `n` is large enough,
+  // not counting the terminating null character.
+  const int bufSize
+    = 1 + std::snprintf(nullptr, 0, fmt.c_str(), std::forward<Args>(args)...);
 
+  const auto buf = std::make_unique<char[]>(bufSize);
+  std::memset(buf.get(), 0x00, bufSize);
 
-// Forward declaration
-class Requiem;
-
-class Disassembler {
-public:
-    Disassembler(Requiem &ctx) : m_ctx(ctx) {}
-
-    // Disassemble one instruction at the specificed address.
-    Instruction disasm(S2EExecutionState *state,
-                       const uint64_t pc);
-
-    // Disassemble a function by its symbol.
-    std::vector<Instruction> disasm(S2EExecutionState *state,
-                                    const std::string &symbol);
-
-private:
-    Requiem& m_ctx;
-};
+  return (std::snprintf(buf.get(), bufSize, fmt.c_str(),
+          std::forward<Args>(args)...) > 0) ? std::string(buf.get()) : "";
+}
 
 }  // namespace s2e::plugins::requiem
 
-#endif  // S2E_PLUGINS_REQUIEM_DISASSEMBLER_H
+#endif  // S2E_PLUGINS_REQUIEM_UTIL_H
+

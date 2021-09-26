@@ -22,9 +22,7 @@
 
 #include <s2e/S2E.h>
 #include <s2e/ConfigFile.h>
-#include <capstone/capstone.h>
-
-#include "Pwnlib/ELF.h"
+#include <s2e/Plugins/Requiem/Pwnlib/ELF.h>
 
 namespace py = pybind11;
 
@@ -65,9 +63,12 @@ S2E_DEFINE_PLUGIN(Requiem, "Automatic Exploit Generation Engine", "", );
 
 Requiem::Requiem(S2E *s2e)
     : Plugin(s2e),
+      m_pybind11(),
+      m_pwnlib(py::module::import("pwnlib.elf")),
       m_monitor(),
-      m_disassembler(*this),
-      m_pybind11() {}
+      m_exploit(m_pwnlib, "./readme", "/lib/x86_64-linux-gnu/libc.so.6"),
+      m_disassembler(*this) {}
+
 
 void Requiem::initialize() {
     m_monitor = static_cast<OSMonitor *>(g_s2e->getPlugin("OSMonitor"));
@@ -75,15 +76,7 @@ void Requiem::initialize() {
 
     g_s2e->getCorePlugin()->onSymbolicAddress.connect(sigc::mem_fun(*this, &Requiem::onRipCorrupt));
 
-    py::print("Initialized pybind11");
-    py::module pwnlib = py::module::import("pwnlib.elf");
-
-    ELF elf(pwnlib, "./readme");
-    for (const auto& item : elf.symbols()) {
-        g_s2e->getInfoStream() << item.first << ": " << item.second << "\n";
-    }
-
-    py::exec("print('done')");
+    py::print("Initializing pybind11");
 }
 
 
@@ -129,6 +122,10 @@ void Requiem::onTranslateInstructionEnd(ExecutionSignal *onInstructionExecute,
 void Requiem::instructionHook(S2EExecutionState *state,
                               uint64_t pc) {
     Instruction i = m_disassembler.disasm(state, pc);
+
+    if (pc <= 0x500000) {
+        g_s2e->getInfoStream() << klee::hexval(i.address) << ": " << i.mnemonic << " " << i.op_str << "\n";
+    }
 
     if (i.mnemonic == "syscall") {
         syscallHook(state, pc);

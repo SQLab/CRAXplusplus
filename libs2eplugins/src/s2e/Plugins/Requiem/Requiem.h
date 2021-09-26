@@ -29,6 +29,7 @@
 #include <s2e/Plugins/Core/BaseInstructions.h>
 #include <s2e/Plugins/OSMonitors/Linux/LinuxMonitor.h>
 #include <s2e/Plugins/Requiem/Disassembler.h>
+#include <s2e/Plugins/Requiem/Exploit.h>
 
 namespace s2e::plugins::requiem {
 
@@ -51,7 +52,6 @@ class Requiem : public Plugin, IPluginInvoker {
 
 public:
     Requiem(S2E *s2e);
-
     void initialize();
 
 private:
@@ -84,9 +84,12 @@ private:
                                         uint64_t guestDataSize);
 
 
-    OSMonitor* m_monitor;
-    Disassembler m_disassembler;
     pybind11::scoped_interpreter m_pybind11;
+    pybind11::module m_pwnlib;
+
+    OSMonitor* m_monitor;
+    Exploit m_exploit;
+    Disassembler m_disassembler;
 };
 
 }  // namespace s2e::plugins::requiem

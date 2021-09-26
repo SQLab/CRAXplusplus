@@ -30,6 +30,7 @@
 #include <s2e/Plugins/OSMonitors/Linux/LinuxMonitor.h>
 #include <s2e/Plugins/Requiem/Disassembler.h>
 #include <s2e/Plugins/Requiem/Exploit.h>
+#include <s2e/Plugins/Requiem/VMMap.h>
 
 namespace s2e::plugins::requiem {
 
@@ -96,6 +97,7 @@ private:
     LinuxMonitor* m_monitor;
     Disassembler m_disassembler;
     Exploit m_exploit;
+    VMMap m_vmmap;
 
     uint64_t m_target_process_pid;
 };

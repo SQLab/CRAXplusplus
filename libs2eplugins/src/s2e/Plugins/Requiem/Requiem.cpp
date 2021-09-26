@@ -72,6 +72,7 @@ Requiem::Requiem(S2E *s2e)
       m_exploit(m_pwnlib,
                 g_s2e->getConfig()->getString(getConfigKey() + ".elfFilename"),
                 g_s2e->getConfig()->getString(getConfigKey() + ".libcFilename")),
+      m_vmmap(),
       m_target_process_pid() {}
 
 
@@ -102,6 +103,17 @@ void Requiem::onRipCorrupt(S2EExecutionState *state,
         << "Detected symbolic RIP: " << klee::hexval(concreteAddress)
         << ", original value is: " << klee::hexval(state->regs()->getPc()) << "\n";
 
+    // Dump virtual memory mappings.
+    g_s2e->getWarningsStream(state)
+        << "Start" << "\t" << "End" << "\t" << "Prot" << "\n";
+
+    for (const auto& region : m_vmmap.getRegions()) {
+        g_s2e->getWarningsStream(state)
+            << klee::hexval(region.start) << "\t"
+            << klee::hexval(region.size) << "\t"
+            << klee::hexval(region.prot) << "\n";
+    }
+
     g_s2e->getExecutor()->terminateState(*state, "End of exploit generation");
 }
 
@@ -124,9 +136,7 @@ void Requiem::onMemoryMap(S2EExecutionState *state,
                           uint64_t prot) {
     // Is the target process running?
     if (m_target_process_pid && m_target_process_pid == pid) {
-        g_s2e->getInfoStream()
-            << "section: " << klee::hexval(start) << " "
-            << klee::hexval(size) << "\n";
+        m_vmmap.mapRegion(start, size, prot);
     }
 }
 

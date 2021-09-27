@@ -24,6 +24,8 @@
 
 #include <s2e/S2E.h>
 #include <s2e/ConfigFile.h>
+#include <s2e/Plugins/OSMonitors/Support/ProcessExecutionDetector.h>
+#include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
 #include <s2e/Plugins/Requiem/Pwnlib/ELF.h>
 
 namespace py = pybind11;
@@ -65,25 +67,27 @@ S2E_DEFINE_PLUGIN(Requiem, "Automatic Exploit Generation Engine", "", );
 
 Requiem::Requiem(S2E *s2e)
     : Plugin(s2e),
+      m_linuxMonitor(),
+      m_stackMonitor(),
       m_pybind11(),
       m_pwnlib(py::module::import("pwnlib.elf")),
-      m_monitor(),
       m_disassembler(*this),
       m_exploit(m_pwnlib,
                 g_s2e->getConfig()->getString(getConfigKey() + ".elfFilename"),
                 g_s2e->getConfig()->getString(getConfigKey() + ".libcFilename")),
-      m_vmmap(),
       m_target_process_pid() {}
 
 
 void Requiem::initialize() {
-    m_monitor = static_cast<LinuxMonitor *>(g_s2e->getPlugin("OSMonitor"));
+    m_linuxMonitor = g_s2e->getPlugin<LinuxMonitor>();
+    m_stackMonitor = g_s2e->getPlugin<StackMonitor>();
 
-    m_monitor->onProcessLoad.connect(
+    if (!m_stackMonitor) {
+        g_s2e->getWarningsStream() << "stack monitor unavailable!\n";
+    }
+
+    m_linuxMonitor->onProcessLoad.connect(
             sigc::mem_fun(*this, &Requiem::onProcessLoad));
-
-    m_monitor->onMemoryMap.connect(
-            sigc::mem_fun(*this, &Requiem::onMemoryMap));
 
     g_s2e->getCorePlugin()->onSymbolicAddress.connect(
             sigc::mem_fun(*this, &Requiem::onRipCorrupt));
@@ -101,17 +105,39 @@ void Requiem::onRipCorrupt(S2EExecutionState *state,
 
     g_s2e->getWarningsStream(state)
         << "Detected symbolic RIP: " << klee::hexval(concreteAddress)
-        << ", original value is: " << klee::hexval(state->regs()->getPc()) << "\n";
+        << ", original value is: " << klee::hexval(state->regs()->getPc())
+        << "\n";
+
+    g_s2e->getWarningsStream(state)
+        << "RSP = "
+        << klee::hexval(state->regs()->read<uint64_t>(CPU_OFFSET(regs[R_ESP])))
+        << "\n";
 
     // Dump virtual memory mappings.
-    g_s2e->getWarningsStream(state)
-        << "Start" << "\t" << "End" << "\t" << "Prot" << "\n";
+    MemoryMap* m = g_s2e->getPlugin<MemoryMap>();
 
-    for (const auto& region : m_vmmap.getRegions()) {
+    auto dump_vmmap = [state](uint64_t start, uint64_t stop, const MemoryMapRegionType &r) {
         g_s2e->getWarningsStream(state)
-            << klee::hexval(region.start) << "\t"
-            << klee::hexval(region.size) << "\t"
-            << klee::hexval(region.prot) << "\n";
+            << klee::hexval(start) << " - "
+            << klee::hexval(stop) << " "
+            << (r & MM_READ ? 'R' : '-')
+            << (r & MM_WRITE ? 'W' : '-')
+            << (r & MM_EXEC ? 'X' : '-')
+            << "\n";
+        return true;
+    };
+
+    m->iterateRegions(state, m_target_process_pid, dump_vmmap);
+
+    uint64_t base, size;
+    if (m_linuxMonitor->getCurrentStack(state, &base, &size)) {
+        g_s2e->getWarningsStream(state)
+            << "stack:\n"
+            << klee::hexval(base) << " - "
+            << klee::hexval(base + size) << "\n";
+    } else {
+        g_s2e->getWarningsStream(state)
+            << "Unable to get stack mapping\n";
     }
 
     g_s2e->getExecutor()->terminateState(*state, "End of exploit generation");
@@ -121,22 +147,13 @@ void Requiem::onProcessLoad(S2EExecutionState *state,
                             uint64_t cr3,
                             uint64_t pid,
                             const std::string &imageFileName) {
+    g_s2e->getWarningsStream() << "onProcessLoad: " << imageFileName << "\n";
+
     if (imageFileName.find(m_exploit.getElfFilename()) != imageFileName.npos) {
         m_target_process_pid = pid;
 
         g_s2e->getCorePlugin()->onTranslateInstructionEnd.connect(
                 sigc::mem_fun(*this, &Requiem::onTranslateInstructionEnd));
-    }
-}
-
-void Requiem::onMemoryMap(S2EExecutionState *state,
-                          uint64_t pid,
-                          uint64_t start,
-                          uint64_t size,
-                          uint64_t prot) {
-    // Is the target process running?
-    if (m_target_process_pid && m_target_process_pid == pid) {
-        m_vmmap.mapRegion(start, size, prot);
     }
 }
 
@@ -148,7 +165,7 @@ void Requiem::onTranslateInstructionEnd(ExecutionSignal *onInstructionExecute,
         g_s2e->getWarningsStream(state) << "reached main()\n";
     }
 
-    if (pc >= m_monitor->getKernelStart()) {
+    if (pc >= m_linuxMonitor->getKernelStart()) {
         return;
     }
 

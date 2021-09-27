@@ -27,7 +27,6 @@ add_library(
     s2e/Plugins/Requiem/Requiem.cpp
     s2e/Plugins/Requiem/Disassembler.cpp
     s2e/Plugins/Requiem/Exploit.cpp
-    s2e/Plugins/Requiem/VMMap.cpp
     s2e/Plugins/Requiem/Pwnlib/ELF.cpp
 
     # Core plugins

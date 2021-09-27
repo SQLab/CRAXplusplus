@@ -28,9 +28,9 @@
 #include <s2e/Plugin.h>
 #include <s2e/Plugins/Core/BaseInstructions.h>
 #include <s2e/Plugins/OSMonitors/Linux/LinuxMonitor.h>
+#include <s2e/Plugins/ExecutionMonitors/StackMonitor.h>
 #include <s2e/Plugins/Requiem/Disassembler.h>
 #include <s2e/Plugins/Requiem/Exploit.h>
-#include <s2e/Plugins/Requiem/VMMap.h>
 
 namespace s2e::plugins::requiem {
 
@@ -61,12 +61,6 @@ private:
                        uint64_t pid,
                        const std::string &imageFileName);
 
-    void onMemoryMap(S2EExecutionState *state,
-                     uint64_t pid,
-                     uint64_t start,
-                     uint64_t size,
-                     uint64_t prot);
-
     void onRipCorrupt(S2EExecutionState *state,
                       klee::ref<klee::Expr> virtualAddress,
                       uint64_t concreteAddress,
@@ -91,14 +85,13 @@ private:
                                         uint64_t guestDataSize);
 
 
+    LinuxMonitor* m_linuxMonitor;
+    StackMonitor* m_stackMonitor;
+
     pybind11::scoped_interpreter m_pybind11;
     pybind11::module m_pwnlib;
-
-    LinuxMonitor* m_monitor;
     Disassembler m_disassembler;
     Exploit m_exploit;
-    VMMap m_vmmap;
-
     uint64_t m_target_process_pid;
 };
 

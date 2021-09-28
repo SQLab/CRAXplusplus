@@ -68,7 +68,6 @@ S2E_DEFINE_PLUGIN(Requiem, "Automatic Exploit Generation Engine", "", );
 Requiem::Requiem(S2E *s2e)
     : Plugin(s2e),
       m_linuxMonitor(),
-      m_stackMonitor(),
       m_pybind11(),
       m_pwnlib(py::module::import("pwnlib.elf")),
       m_disassembler(*this),
@@ -80,11 +79,6 @@ Requiem::Requiem(S2E *s2e)
 
 void Requiem::initialize() {
     m_linuxMonitor = g_s2e->getPlugin<LinuxMonitor>();
-    m_stackMonitor = g_s2e->getPlugin<StackMonitor>();
-
-    if (!m_stackMonitor) {
-        g_s2e->getWarningsStream() << "stack monitor unavailable!\n";
-    }
 
     m_linuxMonitor->onProcessLoad.connect(
             sigc::mem_fun(*this, &Requiem::onProcessLoad));
@@ -103,22 +97,21 @@ void Requiem::onRipCorrupt(S2EExecutionState *state,
         return;
     }
 
-    g_s2e->getWarningsStream(state)
-        << "Detected symbolic RIP: " << klee::hexval(concreteAddress)
+    auto &os = g_s2e->getWarningsStream(state);
+
+    os << "Detected symbolic RIP: " << klee::hexval(concreteAddress)
         << ", original value is: " << klee::hexval(state->regs()->getPc())
         << "\n";
 
-    g_s2e->getWarningsStream(state)
-        << "RSP = "
+    os << "RSP = "
         << klee::hexval(state->regs()->read<uint64_t>(CPU_OFFSET(regs[R_ESP])))
         << "\n";
 
     // Dump virtual memory mappings.
     MemoryMap* m = g_s2e->getPlugin<MemoryMap>();
 
-    auto dump_vmmap = [state](uint64_t start, uint64_t stop, const MemoryMapRegionType &r) {
-        g_s2e->getWarningsStream(state)
-            << klee::hexval(start) << " - "
+    auto dump_vmmap = [&os](uint64_t start, uint64_t stop, const MemoryMapRegionType &r) {
+        os << klee::hexval(start) << " - "
             << klee::hexval(stop) << " "
             << (r & MM_READ ? 'R' : '-')
             << (r & MM_WRITE ? 'W' : '-')
@@ -129,17 +122,6 @@ void Requiem::onRipCorrupt(S2EExecutionState *state,
 
     m->iterateRegions(state, m_target_process_pid, dump_vmmap);
 
-    uint64_t base, size;
-    if (m_linuxMonitor->getCurrentStack(state, &base, &size)) {
-        g_s2e->getWarningsStream(state)
-            << "stack:\n"
-            << klee::hexval(base) << " - "
-            << klee::hexval(base + size) << "\n";
-    } else {
-        g_s2e->getWarningsStream(state)
-            << "Unable to get stack mapping\n";
-    }
-
     g_s2e->getExecutor()->terminateState(*state, "End of exploit generation");
 }
 
@@ -147,7 +129,7 @@ void Requiem::onProcessLoad(S2EExecutionState *state,
                             uint64_t cr3,
                             uint64_t pid,
                             const std::string &imageFileName) {
-    g_s2e->getWarningsStream() << "onProcessLoad: " << imageFileName << "\n";
+    g_s2e->getWarningsStream(state) << "onProcessLoad: " << imageFileName << "\n";
 
     if (imageFileName.find(m_exploit.getElfFilename()) != imageFileName.npos) {
         m_target_process_pid = pid;
@@ -165,7 +147,7 @@ void Requiem::onTranslateInstructionEnd(ExecutionSignal *onInstructionExecute,
         g_s2e->getWarningsStream(state) << "reached main()\n";
     }
 
-    if (pc >= m_linuxMonitor->getKernelStart()) {
+    if (m_linuxMonitor->isKernelAddress(pc)) {
         return;
     }
 

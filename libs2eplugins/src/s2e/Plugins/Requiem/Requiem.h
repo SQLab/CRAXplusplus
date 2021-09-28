@@ -85,9 +85,10 @@ private:
                                         uint64_t guestDataSize);
 
 
+    // S2E built-in plugins
     LinuxMonitor* m_linuxMonitor;
-    StackMonitor* m_stackMonitor;
 
+    // Requiem's own attributes
     pybind11::scoped_interpreter m_pybind11;
     pybind11::module m_pwnlib;
     Disassembler m_disassembler;

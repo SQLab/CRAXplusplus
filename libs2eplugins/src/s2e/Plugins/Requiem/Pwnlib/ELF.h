@@ -21,23 +21,28 @@
 #ifndef S2E_PLUGINS_REQUIEM_ELF_H
 #define S2E_PLUGINS_REQUIEM_ELF_H
 
+#include <s2e/Plugins/Requiem/Pwnlib/Function.h>
+#include <pybind11/embed.h>
+
 #include <map>
 #include <string>
-
-#include <pybind11/embed.h>
 
 namespace s2e::plugins::requiem {
 
 class ELF {
 public:
-   ELF(pybind11::module pwnlib,
+    using SymbolMap = std::map<std::string, uint64_t>;
+    using FunctionMap = std::map<std::string, Function>;
+
+    ELF(pybind11::module pwnlib,
        const std::string &filename); 
 
-   std::map<std::string, int> symbols() const;
+    SymbolMap symbols() const;
+    FunctionMap functions() const;
 
 private:
-   pybind11::module m_pwnlib;
-   pybind11::object m_elf;
+    pybind11::module m_pwnlib;
+    pybind11::object m_elf;
 };
 
 }  // namespace s2e::plugins::requiem

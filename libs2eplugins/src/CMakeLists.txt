@@ -25,10 +25,10 @@ add_library(
 
     # Exploit generation
     s2e/Plugins/Requiem/Requiem.cpp
-    s2e/Plugins/Requiem/RegisterManager.cpp
-    s2e/Plugins/Requiem/MemoryManager.cpp
     s2e/Plugins/Requiem/Disassembler.cpp
     s2e/Plugins/Requiem/Exploit.cpp
+    s2e/Plugins/Requiem/Core/RegisterManager.cpp
+    s2e/Plugins/Requiem/Core/MemoryManager.cpp
     s2e/Plugins/Requiem/Pwnlib/ELF.cpp
 
     # Core plugins

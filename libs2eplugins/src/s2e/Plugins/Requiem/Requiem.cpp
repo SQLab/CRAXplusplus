@@ -90,6 +90,13 @@ void Requiem::onRipCorrupt(S2EExecutionState *state,
     // Dump virtual memory mappings.
     mem().showMapInfo(state, m_target_process_pid);
 
+    // Disassembler test.
+    os << "main = " << hexval(m_exploit.getElf().symbols()["main"]) << "\n";
+
+    for (auto insn : m_disassembler.disasm(state, "main")) {
+        os << hexval(insn.address) << ": " << insn.mnemonic << " " << insn.op_str << "\n";
+    }
+
     g_s2e->getExecutor()->terminateState(*state, "End of exploit generation");
 }
 

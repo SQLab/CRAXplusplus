@@ -25,8 +25,8 @@
 #include <s2e/Plugins/Core/BaseInstructions.h>
 #include <s2e/Plugins/OSMonitors/Linux/LinuxMonitor.h>
 #include <s2e/Plugins/ExecutionMonitors/StackMonitor.h>
-#include <s2e/Plugins/Requiem/RegisterManager.h>
-#include <s2e/Plugins/Requiem/MemoryManager.h>
+#include <s2e/Plugins/Requiem/Core/RegisterManager.h>
+#include <s2e/Plugins/Requiem/Core/MemoryManager.h>
 #include <s2e/Plugins/Requiem/Disassembler.h>
 #include <s2e/Plugins/Requiem/Exploit.h>
 
@@ -59,6 +59,8 @@ public:
 
     RegisterManager &reg() { return m_registerManager; }
     MemoryManager &mem() { return m_memoryManager; }
+    Disassembler &getDisassembler() { return m_disassembler; }
+    Exploit &getExploit() { return m_exploit; }
 
 private:
     void onProcessLoad(S2EExecutionState *state,

@@ -18,43 +18,19 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <pybind11/embed.h>
-#include <pybind11/stl.h>
+#ifndef S2E_PLUGINS_REQUIEM_FUNCTION_H
+#define S2E_PLUGINS_REQUIEM_FUNCTION_H
 
-#include "ELF.h"
-
-namespace py = pybind11;
+#include <string>
 
 namespace s2e::plugins::requiem {
 
-ELF::ELF(py::module pwnlib,
-         const std::string &filename)
-    : m_pwnlib(pwnlib),
-      m_elf(pwnlib.attr("elf").attr("ELF").call(filename)) {}
-
-
-ELF::SymbolMap ELF::symbols() const {
-    return m_elf.attr("symbols").cast<ELF::SymbolMap>();
-}
-
-ELF::FunctionMap ELF::functions() const {
-    // The ELF class from pwntools is huge and I don't want to
-    // introduce the entire of it into requiem, so I'll perform
-    // manual conversion here.
-    ELF::FunctionMap ret;
-    py::dict functionDict = m_elf.attr("functions");
-
-    for (const auto &item : functionDict) {
-        auto name = item.first.cast<std::string>();
-        auto func = item.second.cast<py::object>();
-
-        ret[name] = {
-            func.attr("name").cast<std::string>(),
-            func.attr("address").cast<uint64_t>(),
-            func.attr("size").cast<uint64_t>()
-        };
-    }
-    return ret;
-}
+struct Function {
+    std::string name;
+    uint64_t address;
+    uint64_t size;
+};
 
 }  // namespace s2e::plugins::requiem
+
+#endif  // S2E_PLUGINS_REQUIEM_FUNCTION_H

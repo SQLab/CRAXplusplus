@@ -47,9 +47,7 @@ Instruction Disassembler::disasm(S2EExecutionState *state,
     count = cs_disasm(handle, code->data(), code->size(), pc, 0, &insn);
 
     if (count) {
-        ret.address = pc;
-        ret.mnemonic = insn[0].mnemonic;
-        ret.op_str = insn[0].op_str;
+        ret = {pc, std::move(insn[0].mnemonic), std::move(insn[0].op_str)};
         cs_free(insn, count);
     }
 
@@ -59,7 +57,34 @@ Instruction Disassembler::disasm(S2EExecutionState *state,
 
 std::vector<Instruction> Disassembler::disasm(S2EExecutionState *state,
                                               const std::string &symbol) {
-    return {};
+    csh handle;
+    cs_insn *insn;
+    size_t count;
+    std::vector<Instruction> ret;
+
+    auto f = m_ctx.getExploit().getElf().functions()[symbol];
+    auto code = m_ctx.mem().read(state, f.address, f.size);
+
+    if (!code) {
+        return ret;
+    }
+
+    if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK) {
+        return ret;
+    }
+
+    count = cs_disasm(handle, code->data(), code->size(), f.address, 0, &insn);
+
+    if (count) {
+        ret.resize(count);
+        for (size_t i = 0; i < count; i++) {
+            ret[i] = {insn[i].address, insn[i].mnemonic, insn[i].op_str};
+        }
+        cs_free(insn, count);
+    }
+
+    cs_close(&handle);
+    return ret;
 }
 
 }  // namespace s2e::plugins::requiem

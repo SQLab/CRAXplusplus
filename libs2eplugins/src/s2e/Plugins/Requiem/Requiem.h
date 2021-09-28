@@ -21,16 +21,18 @@
 #ifndef S2E_PLUGINS_REQUIEM_H
 #define S2E_PLUGINS_REQUIEM_H
 
-#include <string>
-
-#include <pybind11/embed.h>
-
 #include <s2e/Plugin.h>
 #include <s2e/Plugins/Core/BaseInstructions.h>
 #include <s2e/Plugins/OSMonitors/Linux/LinuxMonitor.h>
 #include <s2e/Plugins/ExecutionMonitors/StackMonitor.h>
+#include <s2e/Plugins/Requiem/RegisterManager.h>
+#include <s2e/Plugins/Requiem/MemoryManager.h>
 #include <s2e/Plugins/Requiem/Disassembler.h>
 #include <s2e/Plugins/Requiem/Exploit.h>
+
+#include <pybind11/embed.h>
+
+#include <string>
 
 namespace s2e::plugins::requiem {
 
@@ -55,6 +57,9 @@ public:
     Requiem(S2E *s2e);
     void initialize();
 
+    RegisterManager &reg() { return m_registerManager; }
+    MemoryManager &mem() { return m_memoryManager; }
+
 private:
     void onProcessLoad(S2EExecutionState *state,
                        uint64_t cr3,
@@ -73,11 +78,8 @@ private:
                                    TranslationBlock *tb,
                                    uint64_t pc);
 
-    void instructionHook(S2EExecutionState *state,
-                         uint64_t pc);
-
-    void syscallHook(S2EExecutionState *state,
-                     uint64_t pc);
+    void instructionHook(S2EExecutionState *state, uint64_t pc);
+    void syscallHook(S2EExecutionState *state, uint64_t pc);
 
     // Allow the guest to communicate with this plugin using s2e_invoke_plugin
     virtual void handleOpcodeInvocation(S2EExecutionState *state,
@@ -85,12 +87,16 @@ private:
                                         uint64_t guestDataSize);
 
 
-    // S2E built-in plugins
+    // S2E built-in plugins.
     LinuxMonitor* m_linuxMonitor;
 
-    // Requiem's own attributes
+    // Embedded Python interpreter from pybind11 library.
     pybind11::scoped_interpreter m_pybind11;
     pybind11::module m_pwnlib;
+
+    // Requiem's attributes.
+    RegisterManager m_registerManager;
+    MemoryManager m_memoryManager;
     Disassembler m_disassembler;
     Exploit m_exploit;
     uint64_t m_target_process_pid;

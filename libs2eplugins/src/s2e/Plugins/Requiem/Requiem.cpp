@@ -22,45 +22,19 @@
 
 #include <string>
 
+#include <cpu/i386/cpu.h>
 #include <s2e/S2E.h>
 #include <s2e/ConfigFile.h>
 #include <s2e/Plugins/OSMonitors/Support/ProcessExecutionDetector.h>
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
 #include <s2e/Plugins/Requiem/Pwnlib/ELF.h>
 
+using namespace klee;
 namespace py = pybind11;
 
 namespace s2e::plugins::requiem {
 
-namespace {
-
-// This class can optionally be used to store per-state plugin data.
-//
-// Use it as follows:
-// void ExploitGenerator::onEvent(S2EExecutionState *state, ...) {
-//     DECLARE_PLUGINSTATE(RequiemState, state);
-//     plgState->...
-// }
-
-class RequiemState: public PluginState {
-    // Declare any methods and fields you need here
-
-public:
-    static PluginState *factory(Plugin *p, S2EExecutionState *s) {
-        return new RequiemState();
-    }
-
-    virtual ~RequiemState() {
-        // Destroy any object if needed
-    }
-
-    virtual RequiemState *clone() const {
-        return new RequiemState(*this);
-    }
-};
-
-}  // namespace
-
+using Register = RegisterManager::Register;
 
 S2E_DEFINE_PLUGIN(Requiem, "Automatic Exploit Generation Engine", "", );
 
@@ -70,6 +44,8 @@ Requiem::Requiem(S2E *s2e)
       m_linuxMonitor(),
       m_pybind11(),
       m_pwnlib(py::module::import("pwnlib.elf")),
+      m_registerManager(),
+      m_memoryManager(),
       m_disassembler(*this),
       m_exploit(m_pwnlib,
                 g_s2e->getConfig()->getString(getConfigKey() + ".elfFilename"),
@@ -79,6 +55,9 @@ Requiem::Requiem(S2E *s2e)
 
 void Requiem::initialize() {
     m_linuxMonitor = g_s2e->getPlugin<LinuxMonitor>();
+
+    m_registerManager.initialize();
+    m_memoryManager.initialize();
 
     m_linuxMonitor->onProcessLoad.connect(
             sigc::mem_fun(*this, &Requiem::onProcessLoad));
@@ -103,24 +82,13 @@ void Requiem::onRipCorrupt(S2EExecutionState *state,
         << ", original value is: " << klee::hexval(state->regs()->getPc())
         << "\n";
 
-    os << "RSP = "
-        << klee::hexval(state->regs()->read<uint64_t>(CPU_OFFSET(regs[R_ESP])))
-        << "\n";
+    reg().setRipSymbolic(virtualAddress);
+
+    // Dump CPU registers.
+    reg().showRegInfo(state);
 
     // Dump virtual memory mappings.
-    MemoryMap* m = g_s2e->getPlugin<MemoryMap>();
-
-    auto dump_vmmap = [&os](uint64_t start, uint64_t stop, const MemoryMapRegionType &r) {
-        os << klee::hexval(start) << " - "
-            << klee::hexval(stop) << " "
-            << (r & MM_READ ? 'R' : '-')
-            << (r & MM_WRITE ? 'W' : '-')
-            << (r & MM_EXEC ? 'X' : '-')
-            << "\n";
-        return true;
-    };
-
-    m->iterateRegions(state, m_target_process_pid, dump_vmmap);
+    mem().showMapInfo(state, m_target_process_pid);
 
     g_s2e->getExecutor()->terminateState(*state, "End of exploit generation");
 }
@@ -155,34 +123,30 @@ void Requiem::onTranslateInstructionEnd(ExecutionSignal *onInstructionExecute,
             sigc::mem_fun(*this, & Requiem::instructionHook));
 }
 
-void Requiem::instructionHook(S2EExecutionState *state,
-                              uint64_t pc) {
+void Requiem::instructionHook(S2EExecutionState *state, uint64_t pc) {
     Instruction i = m_disassembler.disasm(state, pc);
 
-    //if (pc <= 0x500000) {
-    //    g_s2e->getInfoStream() << klee::hexval(i.address) << ": " << i.mnemonic << " " << i.op_str << "\n";
-    //}
+    /*
+    if (pc <= 0x500000) {
+        g_s2e->getInfoStream()
+            << klee::hexval(i.address) << ": " << i.mnemonic << " " << i.op_str << "\n";
+    }
+    */
 
     if (i.mnemonic == "syscall") {
         syscallHook(state, pc);
     }
 }
 
-void Requiem::syscallHook(S2EExecutionState *state,
-                          uint64_t pc) {
-    uint64_t rax = state->regs()->read<uint64_t>(CPU_OFFSET(regs[R_EAX]));
-    uint64_t rdi = state->regs()->read<uint64_t>(CPU_OFFSET(regs[R_EDI]));
-    uint64_t rsi = state->regs()->read<uint64_t>(CPU_OFFSET(regs[R_ESI]));
-    uint64_t rdx = state->regs()->read<uint64_t>(CPU_OFFSET(regs[R_EDX]));
-    uint64_t r10 = state->regs()->read<uint64_t>(CPU_OFFSET(regs[10]));
-    uint64_t r8 = state->regs()->read<uint64_t>(CPU_OFFSET(regs[8]));
-    uint64_t r9 = state->regs()->read<uint64_t>(CPU_OFFSET(regs[9]));
-
+void Requiem::syscallHook(S2EExecutionState *state, uint64_t pc) {
     g_s2e->getInfoStream(state)
-        << "syscall: " << klee::hexval(rax) << " ("
-        << klee::hexval(rdi) << ", " << klee::hexval(rsi) << ", "
-        << klee::hexval(rdx) << ", " << klee::hexval(r10) << ", "
-        << klee::hexval(r8) << ", " << klee::hexval(r9) << ")\n";
+        << "syscall: " << hexval(reg().readConcrete(state, Register::RAX)) << " ("
+        << hexval(reg().readConcrete(state, Register::RDI)) << ", "
+        << hexval(reg().readConcrete(state, Register::RSI)) << ", "
+        << hexval(reg().readConcrete(state, Register::RDX)) << ", "
+        << hexval(reg().readConcrete(state, Register::R10)) << ", "
+        << hexval(reg().readConcrete(state, Register::R8)) << ", "
+        << hexval(reg().readConcrete(state, Register::R9)) << ")\n";
 }
 
 

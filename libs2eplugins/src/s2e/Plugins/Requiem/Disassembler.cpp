@@ -18,9 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "Disassembler.h"
-
+#include <s2e/Plugins/Requiem/Requiem.h>
 #include <capstone/capstone.h>
+
+#include "Disassembler.h"
 
 #define X86_64_INSN_MAX_NR_BYTES 15
 
@@ -28,14 +29,14 @@ namespace s2e::plugins::requiem {
 
 Instruction Disassembler::disasm(S2EExecutionState *state,
                                  uint64_t pc) {
-    uint8_t code[X86_64_INSN_MAX_NR_BYTES] = {};
     csh handle;
     cs_insn *insn;
     size_t count;
     Instruction ret;
 
-    if (!state->mem()->read(pc, code, sizeof(code) - 1)) {
-        g_s2e->getWarningsStream() << "cannot read from memory at: " << klee::hexval(pc) << "\n";
+    auto code = m_ctx.mem().read(state, pc, X86_64_INSN_MAX_NR_BYTES);
+
+    if (!code) {
         return ret;
     }
 
@@ -43,7 +44,7 @@ Instruction Disassembler::disasm(S2EExecutionState *state,
         return ret;
     }
 
-    count = cs_disasm(handle, code, sizeof(code) - 1, pc, 0, &insn);
+    count = cs_disasm(handle, code->data(), code->size(), pc, 0, &insn);
 
     if (count) {
         ret.address = pc;
@@ -51,8 +52,6 @@ Instruction Disassembler::disasm(S2EExecutionState *state,
         ret.op_str = insn[0].op_str;
         cs_free(insn, count);
     }
-
-    static_cast<void>(m_ctx);
 
     cs_close(&handle);
     return ret;

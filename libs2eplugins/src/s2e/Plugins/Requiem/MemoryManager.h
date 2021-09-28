@@ -18,42 +18,49 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef S2E_PLUGINS_REQUIEM_DISASSEMBLER_H
-#define S2E_PLUGINS_REQUIEM_DISASSEMBLER_H
+#ifndef S2E_PLUGINS_REQUIEM_MEMORY_MANAGER_H
+#define S2E_PLUGINS_REQUIEM_MEMORY_MANAGER_H
 
-#include <vector>
-
-#include <s2e/S2E.h>
 #include <s2e/S2EExecutionState.h>
+#include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
+
+#include <optional>
+#include <vector>
 
 namespace s2e::plugins::requiem {
 
-struct Instruction {
-    uint64_t address;
-    std::string mnemonic;
-    std::string op_str;
-};
-
-
-// Forward declaration
-class Requiem;
-
-class Disassembler {
+class MemoryManager {
 public:
-    Disassembler(Requiem &ctx) : m_ctx(ctx) {}
+    MemoryManager();
+    void initialize();
 
-    // Disassemble one instruction at the specificed address.
-    Instruction disasm(S2EExecutionState *state,
-                       const uint64_t pc);
+    // Read from a memory address.
+    [[nodiscard]]
+    std::optional<std::vector<uint8_t>> read(S2EExecutionState *state,
+                                             uint64_t virtAddr,
+                                             uint64_t size);
 
-    // Disassemble a function by its symbol.
-    std::vector<Instruction> disasm(S2EExecutionState *state,
-                                    const std::string &symbol);
+    // Write to a memory address.
+    void write(S2EExecutionState *state,
+               uint64_t virtAddr,
+               const std::vector<uint8_t> &data);
+
+    // Find symbolic (user-controllable) memory region(s).
+    [[nodiscard]]
+    std::vector<std::pair<uint64_t, uint64_t>>
+    findSymbolicArrays(S2EExecutionState *state,
+                       uint64_t start,
+                       uint64_t end);
+
+    // Show all the mapped area.
+    // XXX: The MemoryMap plugin cannot intercept the stack mapping.
+    void showMapInfo(S2EExecutionState *state,
+                     uint64_t pid) const;
 
 private:
-    Requiem &m_ctx;
+    MemoryMap *m_map;
 };
 
 }  // namespace s2e::plugins::requiem
 
-#endif  // S2E_PLUGINS_REQUIEM_DISASSEMBLER_H
+#endif  // S2E_PLUGINS_REQUIEM_MEMORY_MANAGER_H

@@ -36,9 +36,10 @@ void MemoryManager::initialize() {
 }
 
 
-std::optional<std::vector<uint8_t>> MemoryManager::read(S2EExecutionState *state,
-                                                        uint64_t virtAddr,
-                                                        uint64_t size) {
+std::optional<std::vector<uint8_t>>
+MemoryManager::read(S2EExecutionState *state,
+                    uint64_t virtAddr,
+                    uint64_t size) {
     std::vector<uint8_t> ret(size);
 
     if (!state->mem()->read(virtAddr, ret.data(), size)) {
@@ -57,10 +58,10 @@ void MemoryManager::write(S2EExecutionState *state,
     }
 }
 
-std::vector<std::pair<uint64_t, uint64_t>>
-MemoryManager::findSymbolicArrays(S2EExecutionState *state,
-                                  uint64_t start,
-                                  uint64_t end) {
+std::map<uint64_t, uint64_t>
+MemoryManager::getSymbolicMemory(S2EExecutionState *state,
+                                 uint64_t start,
+                                 uint64_t end) {
     return {};
 }
 

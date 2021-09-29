@@ -18,10 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "Requiem.h"
-
-#include <string>
-
 #include <cpu/i386/cpu.h>
 #include <s2e/S2E.h>
 #include <s2e/ConfigFile.h>
@@ -29,8 +25,16 @@
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
 #include <s2e/Plugins/Requiem/Pwnlib/ELF.h>
 
+#include <string>
+#include <fstream>
+
+#include "Requiem.h"
+
 using namespace klee;
 namespace py = pybind11;
+
+typedef std::pair<std::string, std::vector<unsigned char>> VarValuePair;
+typedef std::vector<VarValuePair> ConcreteInputs;
 
 namespace s2e::plugins::requiem {
 
@@ -91,10 +95,53 @@ void Requiem::onRipCorrupt(S2EExecutionState *state,
     mem().showMapInfo(state, m_target_process_pid);
 
     // Disassembler test.
-    os << "main = " << hexval(m_exploit.getElf().symbols()["main"]) << "\n";
+    os << "__libc_csu_init = " << hexval(m_exploit.getElf().symbols()["__libc_csu_init"]) << "\n";
 
-    for (auto insn : m_disassembler.disasm(state, "main")) {
+    for (auto insn : m_disassembler.disasm(state, "__libc_csu_init")) {
         os << hexval(insn.address) << ": " << insn.mnemonic << " " << insn.op_str << "\n";
+    }
+
+    // Constraints test
+    os << "dumping input constraints...\n";
+    for (auto expr : state->constraints().getConstraintSet()) {
+        os << expr << "\n";
+    }
+
+    // RBP constraint
+    klee::ref<klee::Expr> rbpConstraint
+        = klee::EqExpr::create(reg().readSymbolic(state, Register::RBP),
+                               klee::ConstantExpr::create(0xaabbccdd, klee::Expr::Int64));
+
+    // Adding RIP constraint to the current execution state.
+    klee::ref<klee::Expr> ripConstraint
+        = klee::EqExpr::create(virtualAddress,
+                               klee::ConstantExpr::create(0xdeadbeef, klee::Expr::Int64));
+
+    klee::ref<klee::Expr> rspConstraint
+        = klee::EqExpr::create(state->mem()->read(reg().readConcrete(state, Register::RSP), klee::Expr::Int64),
+                               klee::ConstantExpr::create(0xcafebabe, klee::Expr::Int64));
+
+    /*
+    bool isSym = state->mem()->symbolic(rspConcrete, 8);
+    os << "RSP = " << hexval(rspConcrete) << "\n";
+    os << "is *RSP symbolic ? " << isSym << "\n";
+    */
+
+    (void) state->addConstraint(rbpConstraint, /*recomputeConcolics=*/true);
+    (void) state->addConstraint(ripConstraint, /*recomputeConcolics=*/true);
+    (void) state->addConstraint(rspConstraint, /*recomputeConcolics=*/true);
+
+    ConcreteInputs newInput;
+
+    if (state->getSymbolicSolution(newInput)) {
+        os << "here's your payload:\n";
+        std::ofstream ofs("exploit.bin", std::ios::binary);
+        const VarValuePair &vp = newInput.front();
+        for (const auto _byte : vp.second) {
+            ofs << _byte;
+        }
+    } else {
+        os << "Could not get symbolic solutions\n";
     }
 
     g_s2e->getExecutor()->terminateState(*state, "End of exploit generation");

@@ -24,8 +24,8 @@
 #include <s2e/S2EExecutionState.h>
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
 
+#include <map>
 #include <optional>
-#include <vector>
 
 namespace s2e::plugins::requiem {
 
@@ -36,26 +36,25 @@ public:
 
     // Read from a memory address.
     [[nodiscard]]
-    std::optional<std::vector<uint8_t>> read(S2EExecutionState *state,
-                                             uint64_t virtAddr,
-                                             uint64_t size);
+    std::optional<std::vector<uint8_t>>
+    read(S2EExecutionState *state,
+         uint64_t virtAddr,
+         uint64_t size);
 
     // Write to a memory address.
     void write(S2EExecutionState *state,
                uint64_t virtAddr,
                const std::vector<uint8_t> &data);
 
-    // Find symbolic (user-controllable) memory region(s).
+    // Returns the map<addr, size> of symbolic memory.
     [[nodiscard]]
-    std::vector<std::pair<uint64_t, uint64_t>>
-    findSymbolicArrays(S2EExecutionState *state,
-                       uint64_t start,
-                       uint64_t end);
+    std::map<uint64_t, uint64_t> getSymbolicMemory(S2EExecutionState *state,
+                                                   uint64_t start,
+                                                   uint64_t end);
 
     // Show all the mapped area.
     // XXX: The MemoryMap plugin cannot intercept the stack mapping.
-    void showMapInfo(S2EExecutionState *state,
-                     uint64_t pid) const;
+    void showMapInfo(S2EExecutionState *state, uint64_t pid) const;
 
 private:
     MemoryMap *m_map;

@@ -81,6 +81,12 @@ std::vector<Instruction> Disassembler::disasm(S2EExecutionState *state,
             ret[i] = {insn[i].address, insn[i].mnemonic, insn[i].op_str};
         }
         cs_free(insn, count);
+    } else {
+        g_s2e->getWarningsStream(state)
+            << "disassemble failed: "
+            << f.name << " ("
+            << hexval(f.address) << ", "
+            << hexval(f.size) ")\n";
     }
 
     cs_close(&handle);

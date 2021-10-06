@@ -28,52 +28,62 @@
 
 namespace s2e::plugins::requiem {
 
+// Forward declaration.
+class Requiem;
+
+// libcpu/include/cpu/i386/defs.h
+enum Register {
+    RAX,  // 0
+    RCX,  // 1
+    RDX,  // 2
+    RBX,  // 3
+    RSP,  // 4
+    RBP,  // 5
+    RSI,  // 6
+    RDI,  // 7
+    R8,   // 8
+    R9,   // 9
+    R10,  // 10
+    R11,  // 11
+    R12,  // 12
+    R13,  // 13
+    R14,  // 14
+    R15,  // 15
+    LAST,
+    RIP
+};
+
+
 // x86_64 Register Manager.
 class RegisterManager {
 public:
-    RegisterManager();
+    RegisterManager(Requiem &ctx);
     void initialize();
 
-    // libcpu/include/cpu/i386/defs.h
-    enum Register {
-        RAX,  // 0
-        RCX,  // 1
-        RDX,  // 2
-        RBX,  // 3
-        RSP,  // 4
-        RBP,  // 5
-        RSI,  // 6
-        RDI,  // 7
-        R8,   // 8
-        R9,   // 9
-        R10,  // 10
-        R11,  // 11
-        R12,  // 12
-        R13,  // 13
-        R14,  // 14
-        R15,  // 15
-        LAST,
-        RIP
-    };
 
-
+    // Determine if the given register contains symbolic data.
     [[nodiscard]]
-    bool isSymbolic(S2EExecutionState *state, Register reg);
+    bool isSymbolic(Register reg);
 
+    // Read symbolic data from the register file.
     [[nodiscard]]
-    klee::ref<klee::Expr> readSymbolic(S2EExecutionState *state, Register reg);
+    klee::ref<klee::Expr> readSymbolic(Register reg);
 
+    // Read concrete data from the register file.
     [[nodiscard]]
-    uint64_t readConcrete(S2EExecutionState *state, Register reg);
+    uint64_t readConcrete(Register reg);
 
     // Dump all register values.
-    void showRegInfo(S2EExecutionState *state);
+    void showRegInfo();
 
     void setRipSymbolic(klee::ref<klee::Expr> ripExpr);
 
 private:
     static const std::array<std::string, 10> s_regs32;
     static const std::array<std::string, 18> s_regs64;
+
+    // Requiem's attributes.
+    Requiem &m_ctx;
 
     // libcpu mandates that RIP should never become symbolic,
     // hence we'll maintain an extra flag.

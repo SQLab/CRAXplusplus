@@ -18,13 +18,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <s2e/Plugins/Requiem/Requiem.h>
+
 #include "MemoryManager.h"
 
 using namespace klee;
 
 namespace s2e::plugins::requiem {
 
-MemoryManager::MemoryManager() : m_map() {}
+MemoryManager::MemoryManager(Requiem &ctx)
+    : m_map(),
+      m_ctx(ctx) {}
 
 void MemoryManager::initialize() {
     m_map = g_s2e->getPlugin<MemoryMap>();
@@ -36,36 +40,33 @@ void MemoryManager::initialize() {
 }
 
 
-std::optional<std::vector<uint8_t>>
-MemoryManager::read(S2EExecutionState *state,
-                    uint64_t virtAddr,
-                    uint64_t size) {
+bool MemoryManager::isSymbolic(uint64_t virtAddr, uint64_t size) const {
+    return !isa<klee::ConstantExpr>(readSymbolic(virtAddr, size));
+}
+
+ref<Expr> MemoryManager::readSymbolic(uint64_t virtAddr, uint64_t size) const {
+    return m_ctx.state()->mem()->read(virtAddr, size);
+}
+
+std::vector<uint8_t> MemoryManager::readConcrete(uint64_t virtAddr, uint64_t size) const {
     std::vector<uint8_t> ret(size);
-
-    if (!state->mem()->read(virtAddr, ret.data(), size)) {
-        g_s2e->getWarningsStream() << "Cannot read from memory: " << hexval(virtAddr) << "\n";
-        return std::nullopt;
+    if (!m_ctx.state()->mem()->read(virtAddr, ret.data(), size)) {
+        g_s2e->getWarningsStream()
+            << "Cannot read from memory: " << hexval(virtAddr) << "\n";
     }
-
     return ret;
 }
 
-void MemoryManager::write(S2EExecutionState *state,
-                          uint64_t virtAddr,
-                          const std::vector<uint8_t> &data) {
-    if (!state->mem()->write(virtAddr, data.data(), data.size())) {
-        g_s2e->getWarningsStream() << "Cannot write to memory: " << hexval(virtAddr) << "\n";
-    }
+bool MemoryManager::isMapped(uint64_t virtAddr) const {
+    return m_ctx.state()->mem()->getHostAddress(virtAddr) != -1;
 }
 
 std::map<uint64_t, uint64_t>
-MemoryManager::getSymbolicMemory(S2EExecutionState *state,
-                                 uint64_t start,
-                                 uint64_t end) {
+MemoryManager::getSymbolicMemory(uint64_t start, uint64_t end) const {
     return {};
 }
 
-void MemoryManager::showMapInfo(S2EExecutionState *state, uint64_t pid) const {
+void MemoryManager::showMapInfo(uint64_t pid) const {
     auto &os = g_s2e->getWarningsStream();
     os << "--------------- [VMMAP] ---------------\n"
         << "Start\t\tEnd\t\tPerm\n";
@@ -83,7 +84,30 @@ void MemoryManager::showMapInfo(S2EExecutionState *state, uint64_t pid) const {
         return true;
     };
 
-    m_map->iterateRegions(state, pid, callback);
+    m_map->iterateRegions(m_ctx.state(), pid, callback);
+
+    // Find stack mapping.
+    uint64_t rsp = m_ctx.reg().readConcrete(Register::RSP);
+    uint64_t page_mask = ~(TARGET_PAGE_SIZE - 1);
+    uint64_t stackBegin = 0;
+    uint64_t stackEnd = 0;
+
+    stackBegin = rsp & page_mask;
+    while (isMapped(stackBegin)) {
+        stackBegin -= TARGET_PAGE_SIZE;
+    }
+    stackBegin += TARGET_PAGE_SIZE;
+
+    stackEnd = rsp & page_mask;
+    while (isMapped(stackEnd)) {
+        stackEnd += TARGET_PAGE_SIZE;
+    }
+    stackEnd -= TARGET_PAGE_SIZE;
+
+    os << hexval(stackBegin) << "\t"
+        << hexval(stackEnd) << "\t"
+        << "RW-"
+        << "\n";
 }
 
 }  // namespace s2e::plugins::requiem

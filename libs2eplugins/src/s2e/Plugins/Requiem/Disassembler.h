@@ -43,12 +43,10 @@ public:
     Disassembler(Requiem &ctx) : m_ctx(ctx) {}
 
     // Disassemble one instruction at the specificed address.
-    Instruction disasm(S2EExecutionState *state,
-                       const uint64_t pc);
+    Instruction disasm(const uint64_t pc);
 
     // Disassemble a function by its symbol.
-    std::vector<Instruction> disasm(S2EExecutionState *state,
-                                    const std::string &symbol);
+    std::vector<Instruction> disasm(const std::string &symbol);
 
 private:
     Requiem &m_ctx;

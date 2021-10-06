@@ -27,6 +27,7 @@
 
 #include <string>
 #include <fstream>
+#include <sstream>
 
 #include "Requiem.h"
 
@@ -38,18 +39,17 @@ typedef std::vector<VarValuePair> ConcreteInputs;
 
 namespace s2e::plugins::requiem {
 
-using Register = RegisterManager::Register;
-
 S2E_DEFINE_PLUGIN(Requiem, "Automatic Exploit Generation Engine", "", );
 
 
 Requiem::Requiem(S2E *s2e)
     : Plugin(s2e),
+      m_state(),
       m_linuxMonitor(),
       m_pybind11(),
       m_pwnlib(py::module::import("pwnlib.elf")),
-      m_registerManager(),
-      m_memoryManager(),
+      m_registerManager(*this),
+      m_memoryManager(*this),
       m_disassembler(*this),
       m_exploit(m_pwnlib,
                 g_s2e->getConfig()->getString(getConfigKey() + ".elfFilename"),
@@ -67,59 +67,73 @@ void Requiem::initialize() {
             sigc::mem_fun(*this, &Requiem::onProcessLoad));
 
     g_s2e->getCorePlugin()->onSymbolicAddress.connect(
-            sigc::mem_fun(*this, &Requiem::onRipCorrupt));
+            sigc::mem_fun(*this, &Requiem::onSymbolicRip));
 }
 
 
-void Requiem::onRipCorrupt(S2EExecutionState *state,
-                           klee::ref<klee::Expr> virtualAddress,
-                           uint64_t concreteAddress,
-                           bool &concretize,
-                           CorePlugin::symbolicAddressReason reason) {
+void Requiem::onSymbolicRip(S2EExecutionState *state,
+                            klee::ref<klee::Expr> symbolicRip,
+                            uint64_t concreteRip,
+                            bool &concretize,
+                            CorePlugin::symbolicAddressReason reason) {
     if (reason != CorePlugin::symbolicAddressReason::PC) {
         return;
     }
 
+    m_state = state;
+
     auto &os = g_s2e->getWarningsStream(state);
 
-    os << "Detected symbolic RIP: " << klee::hexval(concreteAddress)
-        << ", original value is: " << klee::hexval(state->regs()->getPc())
+    os << "Detected symbolic RIP: " << hexval(concreteRip)
+        << ", original value is: " << hexval(state->regs()->getPc())
         << "\n";
 
-    reg().setRipSymbolic(virtualAddress);
+    reg().setRipSymbolic(symbolicRip);
 
     // Dump CPU registers.
-    reg().showRegInfo(state);
+    reg().showRegInfo();
 
     // Dump virtual memory mappings.
-    mem().showMapInfo(state, m_target_process_pid);
+    mem().showMapInfo(m_target_process_pid);
 
     // Disassembler test.
+    /*
     os << "__libc_csu_init = " << hexval(m_exploit.getElf().symbols()["__libc_csu_init"]) << "\n";
 
     for (auto insn : m_disassembler.disasm(state, "__libc_csu_init")) {
         os << hexval(insn.address) << ": " << insn.mnemonic << " " << insn.op_str << "\n";
     }
+    */
 
     // Constraints test
+    /*
     os << "dumping input constraints...\n";
     for (auto expr : state->constraints().getConstraintSet()) {
         os << expr << "\n";
     }
+    */
 
     // RBP constraint
     klee::ref<klee::Expr> rbpConstraint
-        = klee::EqExpr::create(reg().readSymbolic(state, Register::RBP),
-                               klee::ConstantExpr::create(0xaabbccdd, klee::Expr::Int64));
+        = klee::EqExpr::create(
+                reg().readSymbolic(Register::RBP),
+                klee::ConstantExpr::create(0xaabbccdd, klee::Expr::Int64));
 
     // Adding RIP constraint to the current execution state.
     klee::ref<klee::Expr> ripConstraint
-        = klee::EqExpr::create(virtualAddress,
-                               klee::ConstantExpr::create(0xdeadbeef, klee::Expr::Int64));
+        = klee::EqExpr::create(
+                symbolicRip,
+                klee::ConstantExpr::create(0xdeadbeef, klee::Expr::Int64));
 
     klee::ref<klee::Expr> rspConstraint
-        = klee::EqExpr::create(state->mem()->read(reg().readConcrete(state, Register::RSP), klee::Expr::Int64),
-                               klee::ConstantExpr::create(0xcafebabe, klee::Expr::Int64));
+        = klee::EqExpr::create(
+                mem().readSymbolic(reg().readConcrete(Register::RSP), klee::Expr::Int64),
+                klee::ConstantExpr::create(0xcafebabe, klee::Expr::Int64));
+
+    klee::ref<klee::Expr> rsp8Constraint
+        = klee::EqExpr::create(
+                mem().readSymbolic(reg().readConcrete(Register::RSP) + 8, klee::Expr::Int64),
+                klee::ConstantExpr::create(0x77885566, klee::Expr::Int64));
 
     /*
     bool isSym = state->mem()->symbolic(rspConcrete, 8);
@@ -127,19 +141,27 @@ void Requiem::onRipCorrupt(S2EExecutionState *state,
     os << "is *RSP symbolic ? " << isSym << "\n";
     */
 
-    (void) state->addConstraint(rbpConstraint, /*recomputeConcolics=*/true);
-    (void) state->addConstraint(ripConstraint, /*recomputeConcolics=*/true);
-    (void) state->addConstraint(rspConstraint, /*recomputeConcolics=*/true);
+    (void) m_state->addConstraint(rbpConstraint, /*recomputeConcolics=*/true);
+    (void) m_state->addConstraint(ripConstraint, /*recomputeConcolics=*/true);
+    //(void) state->addConstraint(rspConstraint, /*recomputeConcolics=*/true);
+    //(void) state->addConstraint(rsp8Constraint, /*recomputeConcolics=*/true);
 
     ConcreteInputs newInput;
 
-    if (state->getSymbolicSolution(newInput)) {
-        os << "here's your payload:\n";
-        std::ofstream ofs("exploit.bin", std::ios::binary);
+    if (m_state->getSymbolicSolution(newInput)) {
+        static int counter = 0;
+        std::string filename = "exploit" + std::to_string(counter++) + ".bin";
+
+        os << "Generated exploit: " << filename << "\n";
+        std::stringstream ss;
+
         const VarValuePair &vp = newInput.front();
         for (const auto _byte : vp.second) {
-            ofs << _byte;
+            ss << _byte;
         }
+
+        std::ofstream ofs("exploit.bin", std::ios::binary);
+        ofs << ss.rdbuf();
     } else {
         os << "Could not get symbolic solutions\n";
     }
@@ -178,7 +200,9 @@ void Requiem::onTranslateInstructionEnd(ExecutionSignal *onInstructionExecute,
 }
 
 void Requiem::instructionHook(S2EExecutionState *state, uint64_t pc) {
-    Instruction i = m_disassembler.disasm(state, pc);
+    m_state = state;
+
+    Instruction i = m_disassembler.disasm(pc);
 
     /*
     if (pc <= 0x500000) {
@@ -193,14 +217,16 @@ void Requiem::instructionHook(S2EExecutionState *state, uint64_t pc) {
 }
 
 void Requiem::syscallHook(S2EExecutionState *state, uint64_t pc) {
+    m_state = state;
+
     g_s2e->getInfoStream(state)
-        << "syscall: " << hexval(reg().readConcrete(state, Register::RAX)) << " ("
-        << hexval(reg().readConcrete(state, Register::RDI)) << ", "
-        << hexval(reg().readConcrete(state, Register::RSI)) << ", "
-        << hexval(reg().readConcrete(state, Register::RDX)) << ", "
-        << hexval(reg().readConcrete(state, Register::R10)) << ", "
-        << hexval(reg().readConcrete(state, Register::R8)) << ", "
-        << hexval(reg().readConcrete(state, Register::R9)) << ")\n";
+        << "syscall: " << hexval(reg().readConcrete(Register::RAX)) << " ("
+        << hexval(reg().readConcrete(Register::RDI)) << ", "
+        << hexval(reg().readConcrete(Register::RSI)) << ", "
+        << hexval(reg().readConcrete(Register::RDX)) << ", "
+        << hexval(reg().readConcrete(Register::R10)) << ", "
+        << hexval(reg().readConcrete(Register::R8)) << ", "
+        << hexval(reg().readConcrete(Register::R9)) << ")\n";
 }
 
 

@@ -57,8 +57,10 @@ public:
     Requiem(S2E *s2e);
     void initialize();
 
+    S2EExecutionState *state() { return m_state; }
     RegisterManager &reg() { return m_registerManager; }
     MemoryManager &mem() { return m_memoryManager; }
+
     Disassembler &getDisassembler() { return m_disassembler; }
     Exploit &getExploit() { return m_exploit; }
 
@@ -68,11 +70,11 @@ private:
                        uint64_t pid,
                        const std::string &imageFileName);
 
-    void onRipCorrupt(S2EExecutionState *state,
-                      klee::ref<klee::Expr> virtualAddress,
-                      uint64_t concreteAddress,
-                      bool &concretize,
-                      CorePlugin::symbolicAddressReason reason);
+    void onSymbolicRip(S2EExecutionState *state,
+                       klee::ref<klee::Expr> symbolicRip,
+                       uint64_t concreteRip,
+                       bool &concretize,
+                       CorePlugin::symbolicAddressReason reason);
 
 
     void onTranslateInstructionEnd(ExecutionSignal *onInstructionExecute,
@@ -89,8 +91,11 @@ private:
                                         uint64_t guestDataSize);
 
 
+    // S2E
+    S2EExecutionState *m_state;
+
     // S2E built-in plugins.
-    LinuxMonitor* m_linuxMonitor;
+    LinuxMonitor *m_linuxMonitor;
 
     // Embedded Python interpreter from pybind11 library.
     pybind11::scoped_interpreter m_pybind11;

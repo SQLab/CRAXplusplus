@@ -25,39 +25,47 @@
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
 
 #include <map>
-#include <optional>
 
 namespace s2e::plugins::requiem {
 
+// Forward declaration
+class Requiem;
+
 class MemoryManager {
 public:
-    MemoryManager();
+    MemoryManager(Requiem &ctx);
     void initialize();
 
-    // Read from a memory address.
+    // Determine if the given memory area contains symbolic data.
     [[nodiscard]]
-    std::optional<std::vector<uint8_t>>
-    read(S2EExecutionState *state,
-         uint64_t virtAddr,
-         uint64_t size);
+    bool isSymbolic(uint64_t virtAddr, uint64_t size) const;
 
-    // Write to a memory address.
-    void write(S2EExecutionState *state,
-               uint64_t virtAddr,
-               const std::vector<uint8_t> &data);
+    // Read symbolic data from memory.
+    [[nodiscard]]
+    klee::ref<klee::Expr> readSymbolic(uint64_t virtAddr, uint64_t size) const;
+
+    // Read concrete data from memory.
+    [[nodiscard]]
+    std::vector<uint8_t> readConcrete(uint64_t virtAddr, uint64_t size) const;
+
+    // Determine if the given virtual memory address is mapped.
+    [[nodiscard]]
+    bool isMapped(uint64_t virtAddr) const;
 
     // Returns the map<addr, size> of symbolic memory.
     [[nodiscard]]
-    std::map<uint64_t, uint64_t> getSymbolicMemory(S2EExecutionState *state,
-                                                   uint64_t start,
-                                                   uint64_t end);
+    std::map<uint64_t, uint64_t> getSymbolicMemory(uint64_t start, uint64_t end) const;
 
     // Show all the mapped area.
     // XXX: The MemoryMap plugin cannot intercept the stack mapping.
-    void showMapInfo(S2EExecutionState *state, uint64_t pid) const;
+    void showMapInfo(uint64_t pid) const;
 
 private:
+    // S2E built-in Plugins.
     MemoryMap *m_map;
+
+    // Requiem's attributes.
+    Requiem &m_ctx;
 };
 
 }  // namespace s2e::plugins::requiem

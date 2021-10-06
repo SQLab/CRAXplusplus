@@ -27,16 +27,16 @@
 
 namespace s2e::plugins::requiem {
 
-Instruction Disassembler::disasm(S2EExecutionState *state,
-                                 uint64_t pc) {
+Instruction Disassembler::disasm(uint64_t pc) {
     csh handle;
     cs_insn *insn;
     size_t count;
     Instruction ret;
 
-    auto code = m_ctx.mem().read(state, pc, X86_64_INSN_MAX_NR_BYTES);
+    std::vector<uint8_t> code
+        = m_ctx.mem().readConcrete(pc, X86_64_INSN_MAX_NR_BYTES);
 
-    if (!code) {
+    if (code.empty()) {
         return ret;
     }
 
@@ -44,13 +44,13 @@ Instruction Disassembler::disasm(S2EExecutionState *state,
         return ret;
     }
 
-    count = cs_disasm(handle, code->data(), code->size(), pc, 0, &insn);
+    count = cs_disasm(handle, code.data(), code.size(), pc, 0, &insn);
 
     if (count) {
         ret = {pc, std::move(insn[0].mnemonic), std::move(insn[0].op_str)};
         cs_free(insn, count);
     } else {
-        g_s2e->getWarningsStream(state)
+        g_s2e->getWarningsStream(m_ctx.state())
             << "disassemble failed: " << hexval(pc) << "\n";
     }
 
@@ -58,17 +58,18 @@ Instruction Disassembler::disasm(S2EExecutionState *state,
     return ret;
 }
 
-std::vector<Instruction> Disassembler::disasm(S2EExecutionState *state,
-                                              const std::string &symbol) {
+std::vector<Instruction> Disassembler::disasm(const std::string &symbol) {
     csh handle;
     cs_insn *insn;
     size_t count;
     std::vector<Instruction> ret;
 
     auto f = m_ctx.getExploit().getElf().functions()[symbol];
-    auto code = m_ctx.mem().read(state, f.address, f.size);
 
-    if (!code) {
+    std::vector<uint8_t> code
+        = m_ctx.mem().readConcrete(f.address, f.size);
+
+    if (code.empty()) {
         return ret;
     }
 
@@ -76,7 +77,7 @@ std::vector<Instruction> Disassembler::disasm(S2EExecutionState *state,
         return ret;
     }
 
-    count = cs_disasm(handle, code->data(), code->size(), f.address, 0, &insn);
+    count = cs_disasm(handle, code.data(), code.size(), f.address, 0, &insn);
 
     if (count) {
         ret.resize(count);
@@ -85,7 +86,7 @@ std::vector<Instruction> Disassembler::disasm(S2EExecutionState *state,
         }
         cs_free(insn, count);
     } else {
-        g_s2e->getWarningsStream(state)
+        g_s2e->getWarningsStream(m_ctx.state())
             << "disassemble failed: "
             << f.name << " ("
             << hexval(f.address) << ", "

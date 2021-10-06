@@ -51,7 +51,7 @@ Requiem::Requiem(S2E *s2e)
       m_registerManager(*this),
       m_memoryManager(*this),
       m_disassembler(*this),
-      m_exploit(m_pwnlib,
+      m_exploit(*this,
                 g_s2e->getConfig()->getString(getConfigKey() + ".elfFilename"),
                 g_s2e->getConfig()->getString(getConfigKey() + ".libcFilename")),
       m_target_process_pid() {}
@@ -82,9 +82,8 @@ void Requiem::onSymbolicRip(S2EExecutionState *state,
 
     m_state = state;
 
-    auto &os = g_s2e->getWarningsStream(state);
-
-    os << "Detected symbolic RIP: " << hexval(concreteRip)
+    log<WARN>()
+        << "Detected symbolic RIP: " << hexval(concreteRip)
         << ", original value is: " << hexval(state->regs()->getPc())
         << "\n";
 
@@ -152,7 +151,7 @@ void Requiem::onSymbolicRip(S2EExecutionState *state,
         static int counter = 0;
         std::string filename = "exploit" + std::to_string(counter++) + ".bin";
 
-        os << "Generated exploit: " << filename << "\n";
+        log<WARN>() << "Generated exploit: " << filename << "\n";
         std::stringstream ss;
 
         const VarValuePair &vp = newInput.front();
@@ -163,7 +162,7 @@ void Requiem::onSymbolicRip(S2EExecutionState *state,
         std::ofstream ofs("exploit.bin", std::ios::binary);
         ofs << ss.rdbuf();
     } else {
-        os << "Could not get symbolic solutions\n";
+        log<WARN>() << "Could not get symbolic solutions\n";
     }
 
     g_s2e->getExecutor()->terminateState(*state, "End of exploit generation");
@@ -173,7 +172,9 @@ void Requiem::onProcessLoad(S2EExecutionState *state,
                             uint64_t cr3,
                             uint64_t pid,
                             const std::string &imageFileName) {
-    g_s2e->getWarningsStream(state) << "onProcessLoad: " << imageFileName << "\n";
+    m_state = state;
+
+    log<WARN>() << "onProcessLoad: " << imageFileName << "\n";
 
     if (imageFileName.find(m_exploit.getElfFilename()) != imageFileName.npos) {
         m_target_process_pid = pid;
@@ -187,8 +188,10 @@ void Requiem::onTranslateInstructionEnd(ExecutionSignal *onInstructionExecute,
                                         S2EExecutionState *state,
                                         TranslationBlock *tb,
                                         uint64_t pc) {
+    m_state = state;
+
     if (pc == m_exploit.getElf().symbols()["main"]) {
-        g_s2e->getWarningsStream(state) << "reached main()\n";
+        log<WARN>() << "reached main()\n";
     }
 
     if (m_linuxMonitor->isKernelAddress(pc)) {
@@ -219,7 +222,7 @@ void Requiem::instructionHook(S2EExecutionState *state, uint64_t pc) {
 void Requiem::syscallHook(S2EExecutionState *state, uint64_t pc) {
     m_state = state;
 
-    g_s2e->getInfoStream(state)
+    log<INFO>()
         << "syscall: " << hexval(reg().readConcrete(Register::RAX)) << " ("
         << hexval(reg().readConcrete(Register::RDI)) << ", "
         << hexval(reg().readConcrete(Register::RSI)) << ", "

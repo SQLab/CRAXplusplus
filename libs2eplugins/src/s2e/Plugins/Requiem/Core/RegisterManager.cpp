@@ -61,14 +61,14 @@ ref<Expr> RegisterManager::readSymbolic(Register reg) {
 uint64_t RegisterManager::readConcrete(Register reg) {
     uint64_t ret;
     if (!m_ctx.state()->regs()->read(CPU_OFFSET(regs[reg]), &ret, sizeof(ret))) {
-        g_s2e->getWarningsStream()
+        m_ctx.log<WARN>()
             << "Cannot read from register: " << RegisterManager::s_regs64[reg] << "\n";
     }
     return ret;
 }
 
 void RegisterManager::showRegInfo() {
-    auto &os = g_s2e->getWarningsStream(m_ctx.state());
+    auto &os = m_ctx.log<WARN>();
     os << "---------- [REGISTERS] ----------\n";
 
     for (int reg = 0; reg < Register::LAST; reg++) {

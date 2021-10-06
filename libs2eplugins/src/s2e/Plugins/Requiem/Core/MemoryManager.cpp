@@ -34,8 +34,7 @@ void MemoryManager::initialize() {
     m_map = g_s2e->getPlugin<MemoryMap>();
 
     if (!m_map) {
-        g_s2e->getWarningsStream()
-            << "MemoryManager::showMapInfo() requires MemoryMap plugin.\n";
+        m_ctx.log<WARN>() << "MemoryManager::showMapInfo() requires MemoryMap plugin.\n";
     }
 }
 
@@ -51,8 +50,7 @@ ref<Expr> MemoryManager::readSymbolic(uint64_t virtAddr, uint64_t size) const {
 std::vector<uint8_t> MemoryManager::readConcrete(uint64_t virtAddr, uint64_t size) const {
     std::vector<uint8_t> ret(size);
     if (!m_ctx.state()->mem()->read(virtAddr, ret.data(), size)) {
-        g_s2e->getWarningsStream()
-            << "Cannot read from memory: " << hexval(virtAddr) << "\n";
+        m_ctx.log<WARN>() << "Cannot read from memory: " << hexval(virtAddr) << "\n";
     }
     return ret;
 }
@@ -67,7 +65,8 @@ MemoryManager::getSymbolicMemory(uint64_t start, uint64_t end) const {
 }
 
 void MemoryManager::showMapInfo(uint64_t pid) const {
-    auto &os = g_s2e->getWarningsStream();
+    auto &os = m_ctx.log<WARN>();
+
     os << "--------------- [VMMAP] ---------------\n"
         << "Start\t\tEnd\t\tPerm\n";
 

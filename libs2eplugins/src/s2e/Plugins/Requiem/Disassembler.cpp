@@ -50,7 +50,7 @@ Instruction Disassembler::disasm(uint64_t pc) {
         ret = {pc, std::move(insn[0].mnemonic), std::move(insn[0].op_str)};
         cs_free(insn, count);
     } else {
-        g_s2e->getWarningsStream(m_ctx.state())
+        m_ctx.log<WARN>()
             << "disassemble failed: " << hexval(pc) << "\n";
     }
 
@@ -86,7 +86,7 @@ std::vector<Instruction> Disassembler::disasm(const std::string &symbol) {
         }
         cs_free(insn, count);
     } else {
-        g_s2e->getWarningsStream(m_ctx.state())
+        m_ctx.log<WARN>()
             << "disassemble failed: "
             << f.name << " ("
             << hexval(f.address) << ", "

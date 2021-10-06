@@ -50,6 +50,14 @@ struct S2E_REQUIEM_COMMAND {
 };
 
 
+// Logging
+enum LogLevel {
+    INFO,
+    DEBUG,
+    WARN,
+};
+
+
 class Requiem : public Plugin, IPluginInvoker {
     S2E_PLUGIN
 
@@ -57,7 +65,21 @@ public:
     Requiem(S2E *s2e);
     void initialize();
 
+    template <enum LogLevel T>
+    llvm::raw_ostream &log() const;
+
+    template <>
+    llvm::raw_ostream &log<LogLevel::INFO>() const { return g_s2e->getInfoStream(m_state); }
+
+    template <>
+    llvm::raw_ostream &log<LogLevel::DEBUG>() const { return g_s2e->getDebugStream(m_state); }
+
+    template <>
+    llvm::raw_ostream &log<LogLevel::WARN>() const { return g_s2e->getWarningsStream(m_state); }
+
+
     S2EExecutionState *state() { return m_state; }
+    pybind11::module &pwnlib() { return m_pwnlib; }
     RegisterManager &reg() { return m_registerManager; }
     MemoryManager &mem() { return m_memoryManager; }
 

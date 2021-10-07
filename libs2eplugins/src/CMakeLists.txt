@@ -30,6 +30,7 @@ add_library(
     s2e/Plugins/Requiem/Core/RegisterManager.cpp
     s2e/Plugins/Requiem/Core/MemoryManager.cpp
     s2e/Plugins/Requiem/Pwnlib/ELF.cpp
+    s2e/Plugins/Requiem/Utils/StringUtil.cpp
 
     # Core plugins
     s2e/Plugins/Core/BaseInstructions.cpp

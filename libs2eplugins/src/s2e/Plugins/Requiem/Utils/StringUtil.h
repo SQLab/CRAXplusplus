@@ -18,17 +18,20 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef S2E_PLUGINS_REQUIEM_UTIL_H
-#define S2E_PLUGINS_REQUIEM_UTIL_H
+#ifndef S2E_PLUGINS_REQUIEM_STRING_UTIL_H
+#define S2E_PLUGINS_REQUIEM_STRING_UTIL_H
 
 #include <cstring>
 #include <memory>
+#include <istream>
+#include <sstream>
 #include <string>
+#include <vector>
 
 namespace s2e::plugins::requiem {
 
 template <typename... Args>
-std::string format(const std::string& fmt, Args&&... args) {
+std::string format(const std::string &fmt, Args &&...args) {
   // std::snprintf(dest, n, fmt, ...) returns the number of chars
   // that will be actually written into `dest` if `n` is large enough,
   // not counting the terminating null character.
@@ -42,7 +45,11 @@ std::string format(const std::string& fmt, Args&&... args) {
           std::forward<Args>(args)...) > 0) ? std::string(buf.get()) : "";
 }
 
+std::string toString(const std::istream &is);
+std::vector<std::string> split(const std::string &s, const char delim);
+std::string join(const std::vector<std::string> &strings, const char delim);
+void strip(std::string &s);
+
 }  // namespace s2e::plugins::requiem
 
-#endif  // S2E_PLUGINS_REQUIEM_UTIL_H
-
+#endif  // S2E_PLUGINS_REQUIEM_STRING_UTIL_H

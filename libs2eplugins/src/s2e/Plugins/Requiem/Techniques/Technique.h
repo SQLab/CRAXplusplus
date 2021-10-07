@@ -33,7 +33,7 @@ class Requiem;
 // e.g., stack pivoting, ret2csu, orw, etc.
 class Technique {
 public:
-    Technique(Requiem &ctx) : m_ctx(ctx) {}
+    explicit Technique(Requiem &ctx) : m_ctx(ctx) {}
     virtual ~Technique() = default;
 
     virtual bool checkRequirements() const = 0;

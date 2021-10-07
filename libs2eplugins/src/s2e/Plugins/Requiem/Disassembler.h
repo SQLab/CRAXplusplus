@@ -40,7 +40,7 @@ class Requiem;
 
 class Disassembler {
 public:
-    Disassembler(Requiem &ctx) : m_ctx(ctx) {}
+    explicit Disassembler(Requiem &ctx) : m_ctx(ctx) {}
 
     // Disassemble one instruction at the specificed address.
     Instruction disasm(const uint64_t pc);

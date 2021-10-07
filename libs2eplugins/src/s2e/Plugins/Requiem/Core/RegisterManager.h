@@ -57,7 +57,7 @@ enum Register {
 // x86_64 Register Manager.
 class RegisterManager {
 public:
-    RegisterManager(Requiem &ctx);
+    explicit RegisterManager(Requiem &ctx);
     void initialize();
 
 

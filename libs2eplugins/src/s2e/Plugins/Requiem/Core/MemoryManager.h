@@ -33,7 +33,7 @@ class Requiem;
 
 class MemoryManager {
 public:
-    MemoryManager(Requiem &ctx);
+    explicit MemoryManager(Requiem &ctx);
     void initialize();
 
     // Determine if the given memory area contains symbolic data.

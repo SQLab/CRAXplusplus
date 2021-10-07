@@ -18,50 +18,25 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef S2E_PLUGINS_REQUIEM_STRATEGY_H
-#define S2E_PLUGINS_REQUIEM_STRATEGY_H
+/*
+#include <s2e/Plugins/Requiem/Techniques/Ret2csu.h>
+#include <s2e/Plugins/Requiem/Techniques/StackPivot.h>
+#include <s2e/Plugins/Requiem/Techniques/GotPartialOverwrite.h>
+*/
 
-#include <s2e/Plugins/Requiem/Techniques/Technique.h>
-
-#include <memory>
-#include <vector>
+#include "DefaultStrategy.h"
 
 namespace s2e::plugins::requiem {
 
-// Forward declaration
-class Requiem;
+DefaultStrategy::DefaultStrategy(Requiem &ctx) : Strategy(ctx) {
+    /*
+    // Register auxiliary techniques>
+    addAuxiliaryTechnique(std::make_unique<Ret2csu>(ctx));
 
-// The base class for all exploitation strategy.
-class Strategy {
-public:
-    Strategy(Requiem &ctx) : m_ctx(ctx) {}
-
-
-    void add_auxiliary_technique(std::unique_ptr<Technique> t) {
-        m_auxiliaryTechniques.push_back(std::move(t));
-    }
-
-    void add_primary_technique(std::unique_ptr<Technique> t) {
-        m_primaryTechniques.push_back(std::move(t));
-    }
-
-    const std::vector<std::unique_ptr<Technique>> &getAuxiliaryTechniques() const {
-        return m_auxiliaryTechniques;
-    }
-
-    const std::vector<std::unique_ptr<Technique>> &getPrimaryTechniques() const {
-        return m_primaryTechniques;
-    }
-
-protected:
-    // Requiem's attributes.
-    Requiem &m_ctx;
-
-private:
-    std::vector<std::unique_ptr<Technique>> m_auxiliaryTechniques;
-    std::vector<std::unique_ptr<Technique>> m_primaryTechniques;
-};
+    // Register primary techniques.
+    addPrimaryTechnique(std::make_unique<AdvancedStackPivot>(ctx));
+    addPrimaryTechnique(std::make_unique<GotPartialOverwrite>(ctx));
+    */
+}
 
 }  // namespace s2e::plugins::requiem
-
-#endif  // S2E_PLUGINS_REQUIEM_STRATEGY_H

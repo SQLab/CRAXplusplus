@@ -59,33 +59,30 @@ bool MemoryManager::isMapped(uint64_t virtAddr) const {
     return m_ctx.state()->mem()->getHostAddress(virtAddr) != -1;
 }
 
+std::vector<uint64_t> MemoryManager::search(const std::vector<uint64_t> &bytes) const {
+    return {};
+}
+
+
 std::map<uint64_t, uint64_t>
 MemoryManager::getSymbolicMemory(uint64_t start, uint64_t end) const {
     return {};
 }
 
-void MemoryManager::showMapInfo(uint64_t pid) const {
-    auto &os = m_ctx.log<WARN>();
+std::set<MemoryRegion, MemoryRegionCmp> MemoryManager::getMapInfo(uint64_t pid) const {
+    std::set<MemoryRegion, MemoryRegionCmp> ret;
 
-    os << "--------------- [VMMAP] ---------------\n"
-        << "Start\t\tEnd\t\tPerm\n";
-
-    auto callback = [&os](uint64_t start,
-                          uint64_t end,
-                          const MemoryMapRegionType &prot) -> bool {
-        // XXX: what about label and image name?
-        os << hexval(start) << "\t"
-            << hexval(end) << "\t"
-            << (prot & MM_READ ? 'R' : '-')
-            << (prot & MM_WRITE ? 'W' : '-')
-            << (prot & MM_EXEC ? 'X' : '-')
-            << "\n";
+    auto callback = [&ret](uint64_t start,
+                           uint64_t end,
+                           const MemoryMapRegionType &prot) -> bool {
+        ret.insert({start, end, prot});
         return true;
     };
-
+    
     m_map->iterateRegions(m_ctx.state(), pid, callback);
 
-    // Find stack mapping.
+    // The MemoryMap plugin cannot keep track of the stack mapping,
+    // so we have to find it by ourselves.
     uint64_t rsp = m_ctx.reg().readConcrete(Register::RSP);
     uint64_t page_mask = ~(TARGET_PAGE_SIZE - 1);
     uint64_t stackBegin = 0;
@@ -103,10 +100,24 @@ void MemoryManager::showMapInfo(uint64_t pid) const {
     }
     stackEnd -= TARGET_PAGE_SIZE;
 
-    os << hexval(stackBegin) << "\t"
-        << hexval(stackEnd) << "\t"
-        << "RW-"
-        << "\n";
+    ret.insert({stackBegin, stackEnd, MM_READ | MM_WRITE});
+    return ret;
+}
+
+void MemoryManager::showMapInfo(uint64_t pid) const {
+    auto &os = m_ctx.log<WARN>();
+
+    os << "--------------- [VMMAP] ---------------\n"
+        << "Start\t\tEnd\t\tPerm\n";
+
+    for (const auto &region : getMapInfo(pid)) {
+        os << hexval(region.start) << "\t"
+            << hexval(region.end) << "\t"
+            << (region.prot & MM_READ ? 'R' : '-')
+            << (region.prot & MM_WRITE ? 'W' : '-')
+            << (region.prot & MM_EXEC ? 'X' : '-')
+            << "\n";
+    }
 }
 
 }  // namespace s2e::plugins::requiem

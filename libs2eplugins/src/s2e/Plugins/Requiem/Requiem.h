@@ -27,6 +27,7 @@
 #include <s2e/Plugins/ExecutionMonitors/StackMonitor.h>
 #include <s2e/Plugins/Requiem/Core/RegisterManager.h>
 #include <s2e/Plugins/Requiem/Core/MemoryManager.h>
+#include <s2e/Plugins/Requiem/Strategies/DefaultStrategy.h>
 #include <s2e/Plugins/Requiem/Disassembler.h>
 #include <s2e/Plugins/Requiem/Exploit.h>
 
@@ -107,6 +108,8 @@ private:
     void instructionHook(S2EExecutionState *state, uint64_t pc);
     void syscallHook(S2EExecutionState *state, uint64_t pc);
 
+    void generateExploit();
+
     // Allow the guest to communicate with this plugin using s2e_invoke_plugin
     virtual void handleOpcodeInvocation(S2EExecutionState *state,
                                         uint64_t guestDataPtr,
@@ -127,6 +130,7 @@ private:
     RegisterManager m_registerManager;
     MemoryManager m_memoryManager;
     Disassembler m_disassembler;
+    Strategy m_strategy;
     Exploit m_exploit;
     uint64_t m_target_process_pid;
 };

@@ -52,6 +52,26 @@ std::string join(const std::vector<std::string> &strings, const char delim) {
     return ss.str();
 }
 
+void replace(std::string &s, const std::string &keyword, const std::string &newword) {
+    std::string::size_type pos = s.find(keyword);
+
+    while (pos != std::string::npos) {
+        s.replace(pos, keyword.size(), newword);
+        pos = s.find(keyword, pos + newword.size());
+    }
+}
+
+std::string slice(const std::string &s, size_t start, size_t end) {
+    // If `start` is out-of-bound, just let it fail,
+    // since it indicates a programming error.
+    size_t len;
+    if (end != std::string::npos && end >= s.size()) {
+        len = std::string::npos;
+    }
+    len = end - start;
+    return s.substr(start, len);
+}
+
 void strip(std::string &s) {
   static const char* whitespace = " \n\r\t";
   s.erase(0, s.find_first_not_of(whitespace));

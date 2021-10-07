@@ -39,7 +39,7 @@ public:
     virtual bool checkRequirements() const = 0;
     virtual void resolveRequiredGadgets() = 0;
     virtual std::string getAuxiliaryFunctions() const = 0;
-    virtual std::vector<std::vector<std::string> getRopChainsList() const = 0;
+    virtual std::vector<std::vector<std::string>> getRopChainsList() const = 0;
     virtual std::vector<std::string> getExtraPayload() const = 0;
 
 protected:

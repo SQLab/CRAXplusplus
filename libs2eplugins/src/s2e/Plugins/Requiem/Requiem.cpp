@@ -23,7 +23,7 @@
 #include <s2e/ConfigFile.h>
 #include <s2e/Plugins/OSMonitors/Support/ProcessExecutionDetector.h>
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
-#include <s2e/Plugins/Requiem/Pwnlib/ELF.h>
+#include <s2e/Plugins/Requiem/Utils/StringUtil.h>
 
 #include <string>
 #include <fstream>
@@ -51,6 +51,7 @@ Requiem::Requiem(S2E *s2e)
       m_registerManager(*this),
       m_memoryManager(*this),
       m_disassembler(*this),
+      m_strategy(*this),
       m_exploit(*this,
                 g_s2e->getConfig()->getString(getConfigKey() + ".elfFilename"),
                 g_s2e->getConfig()->getString(getConfigKey() + ".libcFilename")),
@@ -165,6 +166,8 @@ void Requiem::onSymbolicRip(S2EExecutionState *state,
         log<WARN>() << "Could not get symbolic solutions\n";
     }
 
+    generateExploit();
+
     g_s2e->getExecutor()->terminateState(*state, "End of exploit generation");
 }
 
@@ -230,6 +233,58 @@ void Requiem::syscallHook(S2EExecutionState *state, uint64_t pc) {
         << hexval(reg().readConcrete(Register::R10)) << ", "
         << hexval(reg().readConcrete(Register::R8)) << ", "
         << hexval(reg().readConcrete(Register::R9)) << ")\n";
+}
+
+
+void Requiem::generateExploit() {
+    m_exploit.resolveGadget("pop rbp ; ret");
+
+    // Write exploit shebang.
+    m_exploit.writeline(Exploit::s_shebang);
+
+    // Pwntools stuff.
+    m_exploit.writelines({
+        "from pwn import *",
+        "context.update(arch = 'amd64', os = 'linux', log_level = 'info')",
+        "",
+        format("elf = ELF('%s', checksec=False)", m_exploit.getElfFilename().c_str()),
+        "A8 = 8 * b'A'",
+    });
+
+    // Declare gadgets.
+    for (const auto &entry : m_exploit.getGadgets()) {
+        const std::string &assembly = entry.first;
+        const uint64_t addr = entry.second;
+        m_exploit.writeline(format("%s = 0x%x", assembly.c_str(), addr));
+    }
+
+    // Declare useful memory locations.
+    for (const auto &entry : m_exploit.getMemLocations()) {
+        const std::string &name = entry.first;
+        const uint64_t addr = entry.second;
+        m_exploit.writeline(format("%s = 0x%x", name.c_str(), addr));
+    }
+
+    // Define auxiliary functions.
+
+    // Write exploit body.
+    m_exploit.writelines({
+        "if __name__ == '__main__':",
+        "    proc = elf.process()",
+    });
+
+    // IOStates.
+
+    // Generate the payload based on the strategy chosen by the user.
+
+    // Write exploit trailer.
+    m_exploit.writeline("    proc.interactive()");
+
+    // Write the buffered content to the file.
+    std::ofstream ofs(m_exploit.getOutputFilename());
+    ofs << m_exploit.getContent();
+
+    log<WARN>() << "Generated exploit: " << m_exploit.getOutputFilename() << "\n";
 }
 
 

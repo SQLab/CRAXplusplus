@@ -25,11 +25,27 @@
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
 
 #include <map>
+#include <set>
 
 namespace s2e::plugins::requiem {
 
 // Forward declaration
 class Requiem;
+
+// XXX: The MemoryMap plugin also has a similar structure
+// called "MemoryMapRegion" (an interval map),
+// and maybe we can use that structure instead.
+struct MemoryRegion {
+    uint64_t start;
+    uint64_t end;
+    const MemoryMapRegionType &prot;
+};
+
+struct MemoryRegionCmp {
+    bool operator ()(const MemoryRegion &r1, const MemoryRegion &r2) const {
+        return r1.start < r2.start;
+    }
+};
 
 class MemoryManager {
 public:
@@ -52,12 +68,19 @@ public:
     [[nodiscard]]
     bool isMapped(uint64_t virtAddr) const;
 
+    // Search bytes pattern from memory.
+    [[nodiscard]]
+    std::vector<uint64_t> search(const std::vector<uint64_t> &bytes) const;
+
     // Returns the map<addr, size> of symbolic memory.
     [[nodiscard]]
     std::map<uint64_t, uint64_t> getSymbolicMemory(uint64_t start, uint64_t end) const;
 
-    // Show all the mapped area.
-    // XXX: The MemoryMap plugin cannot intercept the stack mapping.
+    // Get all the mapped memory region.
+    [[nodiscard]]
+    std::set<MemoryRegion, MemoryRegionCmp> getMapInfo(uint64_t pid) const;
+
+    // Show all the mapped memory region.
     void showMapInfo(uint64_t pid) const;
 
 private:

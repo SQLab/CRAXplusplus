@@ -34,7 +34,11 @@ class Requiem;
 
 class Ret2csu : public Technique {
 public:
-    explicit Ret2csu(Requiem &ctx);
+    explicit Ret2csu(Requiem &ctx,
+                     std::string arg1 = "",
+                     std::string arg2 = "",
+                     std::string arg3 = "",
+                     std::string addr = "");
     virtual ~Ret2csu() = default;
 
     virtual bool checkRequirements() const override;

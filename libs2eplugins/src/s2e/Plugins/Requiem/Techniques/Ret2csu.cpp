@@ -30,12 +30,20 @@
 
 namespace s2e::plugins::requiem {
 
-Ret2csu::Ret2csu(Requiem &ctx) : Technique(ctx) {
+Ret2csu::Ret2csu(Requiem &ctx,
+                 std::string arg1,
+                 std::string arg2,
+                 std::string arg3,
+                 std::string addr)
+    : Technique(ctx),
+      m_arg1(arg1),
+      m_arg2(arg2),
+      m_arg3(arg3),
+      m_addr(addr) {
     parseLibcCsuInit();
     searchGadget2CallTarget();
     buildRopChainsList();
     buildAuxiliaryFunction();
-
     resolveRequiredGadgets();
 }
 
@@ -82,17 +90,13 @@ Ret2csu::getRopChainsListWithArgs(const std::string &arg1,
 
     for (auto s : m_ropChainsList.front()) {
         if (s.find("arg1") != std::string::npos) {
-            replace(s, "arg1", arg1);
-            rop.push_back(s);
+            rop.push_back(replace(s, "arg1", arg1));
         } else if (s.find("arg2") != std::string::npos) {
-            replace(s, "arg2", arg2);
-            rop.push_back(s);
+            rop.push_back(replace(s, "arg2", arg2));
         } else if (s.find("arg3") != std::string::npos) {
-            replace(s, "arg3", arg3);
-            rop.push_back(s);
+            rop.push_back(replace(s, "arg3", arg3));
         } else if (s.find("addr") != std::string::npos) {
-            replace(s, "addr", addr);
-            rop.push_back(s);
+            rop.push_back(replace(s, "addr", addr));
         } else {
             rop.push_back(s);
         }
@@ -166,12 +170,8 @@ void Ret2csu::parseLibcCsuInit() {
 
         // Parse call qword ptr [a + b*8]
         std::string op_str = insns[i].op_str;
-
-        std::string trash1 = "qword ptr [";
-        std::string trash2 = "*8]";
-        replace(op_str, trash1, "");
-        replace(op_str, trash2, "");
-
+        op_str = replace(op_str, "qword ptr [", "");
+        op_str = replace(op_str, "*8]", "");
         m_gadget2CallReg1 = op_str.substr(op_str.find_first_of(' '));
         m_gadget2CallReg2 = op_str.substr(op_str.find_last_of('+') + 2);
         break;
@@ -208,17 +208,13 @@ void Ret2csu::buildRopChainsList() {
     std::vector<std::string> &rop = m_ropChainsList.front();
 
     rop.push_back("p64(__libc_csu_init_gadget1)");
-
     for (int i = 0; i < 7; i++) {
         rop.push_back(transform[m_gadget1Regs[i]]);
     }
-
     rop.push_back("p64(__libc_csu_init_gadget2)");
-
     for (int i = 0; i < 7; i++) {
         rop.push_back("A8");
     }
-
     rop.push_back("p64(addr)");
 }
 

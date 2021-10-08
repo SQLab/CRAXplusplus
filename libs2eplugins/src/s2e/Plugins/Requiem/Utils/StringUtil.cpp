@@ -52,16 +52,16 @@ std::string join(const std::vector<std::string> &strings, const char delim) {
     return ss.str();
 }
 
-void replace(std::string &s, const std::string &keyword, const std::string &newword) {
+std::string replace(std::string s, const std::string &keyword, const std::string &newword) {
     std::string::size_type pos = s.find(keyword);
-
     while (pos != std::string::npos) {
         s.replace(pos, keyword.size(), newword);
         pos = s.find(keyword, pos + newword.size());
     }
+    return s;
 }
 
-std::string slice(const std::string &s, size_t start, size_t end) {
+std::string slice(std::string s, size_t start, size_t end) {
     // If `start` is out-of-bound, just let it fail,
     // since it indicates a programming error.
     size_t len;
@@ -72,10 +72,11 @@ std::string slice(const std::string &s, size_t start, size_t end) {
     return s.substr(start, len);
 }
 
-void strip(std::string &s) {
+std::string strip(std::string s) {
   static const char* whitespace = " \n\r\t";
   s.erase(0, s.find_first_not_of(whitespace));
   s.erase(s.find_last_not_of(whitespace) + 1);
+  return s;
 }
 
 }  // namespace s2e::plugins::requiem

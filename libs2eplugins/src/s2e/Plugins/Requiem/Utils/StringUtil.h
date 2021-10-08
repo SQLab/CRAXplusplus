@@ -48,9 +48,9 @@ std::string format(const std::string &fmt, Args &&...args) {
 std::string toString(const std::istream &is);
 std::vector<std::string> split(const std::string &s, const char delim);
 std::string join(const std::vector<std::string> &strings, const char delim);
-void replace(std::string &s, const std::string &keyword, const std::string &newword);
-std::string slice(const std::string &s, size_t start, size_t end = std::string::npos);  // [start, end)
-void strip(std::string &s);
+std::string replace(std::string s, const std::string &keyword, const std::string &newword);
+std::string slice(std::string s, size_t start, size_t end = std::string::npos);  // [start, end)
+std::string strip(std::string s);
 
 }  // namespace s2e::plugins::requiem
 

@@ -34,14 +34,11 @@ class Requiem;
 // The base class for all exploitation strategy.
 class Strategy {
 public:
-    Strategy(Requiem &ctx) : m_ctx(ctx) {}
-
-
-    void add_auxiliary_technique(std::unique_ptr<Technique> t) {
+    void addAuxiliaryTechnique(std::unique_ptr<Technique> t) {
         m_auxiliaryTechniques.push_back(std::move(t));
     }
 
-    void add_primary_technique(std::unique_ptr<Technique> t) {
+    void addPrimaryTechnique(std::unique_ptr<Technique> t) {
         m_primaryTechniques.push_back(std::move(t));
     }
 
@@ -54,6 +51,10 @@ public:
     }
 
 protected:
+    // Mark the constructor protected so that
+    // it becomes an abstract base class.
+    Strategy(Requiem &ctx) : m_ctx(ctx) {}
+
     // Requiem's attributes.
     Requiem &m_ctx;
 

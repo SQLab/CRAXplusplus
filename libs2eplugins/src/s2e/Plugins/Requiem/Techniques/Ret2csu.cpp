@@ -162,7 +162,7 @@ void Ret2csu::parseLibcCsuInit() {
         for (int j = i - 3; j < i; j++) {
             const std::string &op_str = insns[j].op_str;
             size_t dstRegEndIdx = op_str.find_first_of(',');
-            size_t srcRegStartIdx = dstRegEndIdx + 3;  // skips ", "
+            size_t srcRegStartIdx = dstRegEndIdx + 2;  // skips ","
             std::string dstReg = op_str.substr(0, dstRegEndIdx);
             std::string srcReg = op_str.substr(srcRegStartIdx);
             m_gadget2Regs[dstReg] = srcReg;
@@ -172,7 +172,7 @@ void Ret2csu::parseLibcCsuInit() {
         std::string op_str = insns[i].op_str;
         op_str = replace(op_str, "qword ptr [", "");
         op_str = replace(op_str, "*8]", "");
-        m_gadget2CallReg1 = op_str.substr(op_str.find_first_of(' '));
+        m_gadget2CallReg1 = op_str.substr(0, op_str.find_first_of(' '));
         m_gadget2CallReg2 = op_str.substr(op_str.find_last_of('+') + 2);
         break;
     }
@@ -201,7 +201,7 @@ void Ret2csu::buildRopChainsList() {
         {slice(m_gadget2Regs["edi"], 0, 3), "p64(arg1)"},
         {slice(m_gadget2Regs["rsi"], 0, 3), "p64(arg2)"},
         {slice(m_gadget2Regs["rdx"], 0, 3), "p64(arg3)"},
-        {m_gadget2CallReg1, format("p64(0x%x)", m_libcCsuInitCallTarget)}
+        {m_gadget2CallReg1, "p64(__libc_csu_init_call_target)"}
     };
 
     m_ropChainsList.resize(1);

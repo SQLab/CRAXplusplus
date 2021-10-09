@@ -42,12 +42,29 @@ public:
         m_primaryTechniques.push_back(std::move(t));
     }
 
-    const std::vector<std::unique_ptr<Technique>> &getAuxiliaryTechniques() const {
-        return m_auxiliaryTechniques;
+    std::vector<Technique*> getAuxiliaryTechniques() const {
+        std::vector<Technique*> ret;
+        ret.reserve(m_auxiliaryTechniques.size());
+        for (const auto &t : m_auxiliaryTechniques) {
+            ret.push_back(t.get());
+        }
+        return ret;
     }
 
-    const std::vector<std::unique_ptr<Technique>> &getPrimaryTechniques() const {
-        return m_primaryTechniques;
+    std::vector<Technique*> getPrimaryTechniques() const {
+        std::vector<Technique*> ret;
+        ret.reserve(m_primaryTechniques.size());
+        for (const auto &t : m_primaryTechniques) {
+            ret.push_back(t.get());
+        }
+        return ret;
+    }
+
+    std::vector<Technique*> getTechniques() const {
+        std::vector<Technique*> ret = getAuxiliaryTechniques();
+        std::vector<Technique*> prm = getPrimaryTechniques();
+        ret.insert(ret.end(), prm.begin(), prm.end());
+        return ret;
     }
 
 protected:

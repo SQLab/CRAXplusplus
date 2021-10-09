@@ -23,11 +23,13 @@
 #include <s2e/ConfigFile.h>
 #include <s2e/Plugins/OSMonitors/Support/ProcessExecutionDetector.h>
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
+#include <s2e/Plugins/Requiem/Strategies/DefaultStrategy.h>
 #include <s2e/Plugins/Requiem/Utils/StringUtil.h>
 
-#include <string>
 #include <fstream>
 #include <sstream>
+#include <string>
+#include <vector>
 
 #include "Requiem.h"
 
@@ -50,11 +52,11 @@ Requiem::Requiem(S2E *s2e)
       m_pwnlib(py::module::import("pwnlib.elf")),
       m_registerManager(*this),
       m_memoryManager(*this),
-      m_disassembler(*this),
-      m_strategy(*this),
       m_exploit(*this,
                 g_s2e->getConfig()->getString(getConfigKey() + ".elfFilename"),
                 g_s2e->getConfig()->getString(getConfigKey() + ".libcFilename")),
+      m_disassembler(*this),
+      m_strategy(),
       m_target_process_pid() {}
 
 
@@ -237,7 +239,8 @@ void Requiem::syscallHook(S2EExecutionState *state, uint64_t pc) {
 
 
 void Requiem::generateExploit() {
-    m_exploit.resolveGadget("pop rbp ; ret");
+    // Determine exploit strategy.
+    m_strategy = std::make_unique<DefaultStrategy>(*this);
 
     // Write exploit shebang.
     m_exploit.writeline(Exploit::s_shebang);
@@ -265,7 +268,14 @@ void Requiem::generateExploit() {
         m_exploit.writeline(format("%s = 0x%x", name.c_str(), addr));
     }
 
+    m_exploit.writeline();
+
     // Define auxiliary functions.
+    for (auto technique : m_strategy->getTechniques()) {
+        m_exploit.writeline(technique->getAuxiliaryFunctions());
+    }
+
+    m_exploit.writeline();
 
     // Write exploit body.
     m_exploit.writelines({
@@ -275,7 +285,53 @@ void Requiem::generateExploit() {
 
     // IOStates.
 
+    //XXX:lines = ["    payload  = b'A' * {}".format(self._exploit._padding)]
+    std::vector<std::string> lines;
+
     // Generate the payload based on the strategy chosen by the user.
+    bool hasWrittenFirstRbp = false;
+    for (auto technique : m_strategy->getPrimaryTechniques()) {
+        std::vector<std::vector<std::string>> ropChainsList = technique->getRopChainsList();
+
+        if (ropChainsList.empty()) {
+            continue;
+        }
+        
+        if (!hasWrittenFirstRbp) {
+            hasWrittenFirstRbp = true;
+        } else {
+            // Slice off saved rbp
+            ropChainsList.front().erase(ropChainsList.front().begin());
+        }
+
+        for (const auto &payloadList : ropChainsList) {
+            for (const auto &payload : payloadList) {
+                if (lines.empty()) {
+                    lines.push_back(format("    payload  = %s", payload.c_str()));
+                } else {
+                    lines.push_back(format("    payload += %s", payload.c_str()));
+                }
+            }
+
+            m_exploit.writeline(join(lines, '\n'));
+
+            m_exploit.writelines({
+                "    proc.send(payload)",
+                "    time.sleep(0.2)",
+                ""
+            });
+
+            lines.clear();
+        }
+
+        for (const auto &payload : technique->getExtraPayload()) {
+            if (lines.empty()) {
+                lines.push_back(format("    payload  = %s", payload.c_str()));
+            } else {
+                lines.push_back(format("    payload += %s", payload.c_str()));
+            }
+        }
+    }
 
     // Write exploit trailer.
     m_exploit.writeline("    proc.interactive()");

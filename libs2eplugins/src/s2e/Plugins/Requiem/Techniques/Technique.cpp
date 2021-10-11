@@ -18,39 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef S2E_PLUGINS_REQUIEM_TECHNIQUE_H
-#define S2E_PLUGINS_REQUIEM_TECHNIQUE_H
-
-#include <map>
-#include <string>
-#include <vector>
+#include "Technique.h"
 
 namespace s2e::plugins::requiem {
 
-// Forward declaration
-class Requiem;
-
-// The abstract base class of all concrete exploitation techniques,
-// e.g., stack pivoting, ret2csu, orw, etc.
-class Technique {
-public:
-    explicit Technique(Requiem &ctx) : m_ctx(ctx) {}
-    virtual ~Technique() = default;
-
-    virtual bool checkRequirements() const = 0;
-    virtual void resolveRequiredGadgets() = 0;
-    virtual std::string getAuxiliaryFunctions() const = 0;
-    virtual std::vector<std::vector<std::string>> getRopChainsList() const = 0;
-    virtual std::vector<std::string> getExtraPayload() const = 0;
-    virtual std::string toString() const = 0;
-
-    static std::map<std::string, Technique*> mapper;
-
-protected:
-    // Requiem's attributes.
-    Requiem &m_ctx;
-};
+std::map<std::string, Technique*> Technique::mapper;
 
 }  // namespace s2e::plugins::requiem
-
-#endif  // S2E_PLUGINS_REQUIEM_TECHNIQUE_H

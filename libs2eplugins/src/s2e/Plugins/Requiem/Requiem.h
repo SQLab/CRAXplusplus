@@ -38,27 +38,12 @@
 
 namespace s2e::plugins::requiem {
 
-enum S2E_REQUIEM_COMMANDS {
-    // TODO: customize list of commands here
-    COMMAND_1
-};
-
-struct S2E_REQUIEM_COMMAND {
-    S2E_REQUIEM_COMMANDS Command;
-    union {
-        // Command parameters go here
-        uint64_t param;
-    };
-};
-
-
 // Logging
 enum LogLevel {
     INFO,
     DEBUG,
     WARN,
 };
-
 
 class Requiem : public Plugin, IPluginInvoker {
     S2E_PLUGIN
@@ -88,7 +73,15 @@ public:
     Disassembler &getDisassembler() { return m_disassembler; }
     Exploit &getExploit() { return m_exploit; }
 
+    const std::vector<uint64_t> &getReadPrimitives() const { return m_readPrimitives; }
+    const std::vector<uint64_t> &getWritePrimitives() const { return m_writePrimitives; }
+
 private:
+    // Allow the guest to communicate with this plugin using s2e_invoke_plugin
+    virtual void handleOpcodeInvocation(S2EExecutionState *state,
+                                        uint64_t guestDataPtr,
+                                        uint64_t guestDataSize) {}
+
     void onProcessLoad(S2EExecutionState *state,
                        uint64_t cr3,
                        uint64_t pid,
@@ -111,11 +104,6 @@ private:
 
     void generateExploit();
 
-    // Allow the guest to communicate with this plugin using s2e_invoke_plugin
-    virtual void handleOpcodeInvocation(S2EExecutionState *state,
-                                        uint64_t guestDataPtr,
-                                        uint64_t guestDataSize);
-
 
     // S2E
     S2EExecutionState *m_state;
@@ -132,9 +120,16 @@ private:
     MemoryManager m_memoryManager;
     Exploit m_exploit;
     Disassembler m_disassembler;
-    std::unique_ptr<Strategy> m_strategy;
-
     uint64_t m_target_process_pid;
+
+    std::unique_ptr<Strategy> m_strategy;
+    std::vector<uint64_t> m_readPrimitives;
+    std::vector<uint64_t> m_writePrimitives;
+
+public:
+    uint64_t m_padding;
+    uint64_t m_sysReadBuf;
+    uint64_t m_sysReadSize;
 };
 
 }  // namespace s2e::plugins::requiem

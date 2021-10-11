@@ -18,24 +18,32 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-/*
+#include <s2e/Plugins/Requiem/Requiem.h>
 #include <s2e/Plugins/Requiem/Techniques/Ret2csu.h>
 #include <s2e/Plugins/Requiem/Techniques/StackPivot.h>
 #include <s2e/Plugins/Requiem/Techniques/GotPartialOverwrite.h>
-*/
+
+#include <memory>
 
 #include "DefaultStrategy.h"
 
 namespace s2e::plugins::requiem {
 
 DefaultStrategy::DefaultStrategy(Requiem &ctx) : Strategy(ctx) {
-    /*
     // Register auxiliary techniques>
     addAuxiliaryTechnique(std::make_unique<Ret2csu>(ctx));
 
     // Register primary techniques.
     addPrimaryTechnique(std::make_unique<AdvancedStackPivot>(ctx));
     addPrimaryTechnique(std::make_unique<GotPartialOverwrite>(ctx));
+
+    /*
+    addPrimaryTechnique(
+            std::make_unique<Ret2csu>(ctx,
+                                      "0xdeadbeefdeadbeef",
+                                      "0xcafebabecafebabe",
+                                      "0xd00df00dd00df00d",
+                                      "elf.sym['ret2win']"));
     */
 }
 

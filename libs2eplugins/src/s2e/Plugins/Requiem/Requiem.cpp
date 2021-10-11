@@ -56,8 +56,13 @@ Requiem::Requiem(S2E *s2e)
                 g_s2e->getConfig()->getString(getConfigKey() + ".elfFilename"),
                 g_s2e->getConfig()->getString(getConfigKey() + ".libcFilename")),
       m_disassembler(*this),
+      m_target_process_pid(),
       m_strategy(),
-      m_target_process_pid() {}
+      m_readPrimitives(),
+      m_writePrimitives(),
+      m_padding(),
+      m_sysReadBuf(),
+      m_sysReadSize() {}
 
 
 void Requiem::initialize() {
@@ -98,6 +103,10 @@ void Requiem::onSymbolicRip(S2EExecutionState *state,
     // Dump virtual memory mappings.
     mem().showMapInfo(m_target_process_pid);
 
+    // Calculate padding from user input's base addr to saved rbp.
+    // XXX: use symbolic execution instead.
+    m_padding = reg().readConcrete(Register::RSP) - m_sysReadBuf - 16;
+
     // Disassembler test.
     /*
     os << "__libc_csu_init = " << hexval(m_exploit.getElf().symbols()["__libc_csu_init"]) << "\n";
@@ -115,6 +124,7 @@ void Requiem::onSymbolicRip(S2EExecutionState *state,
     }
     */
 
+    /*
     // RBP constraint
     klee::ref<klee::Expr> rbpConstraint
         = klee::EqExpr::create(
@@ -136,18 +146,19 @@ void Requiem::onSymbolicRip(S2EExecutionState *state,
         = klee::EqExpr::create(
                 mem().readSymbolic(reg().readConcrete(Register::RSP) + 8, klee::Expr::Int64),
                 klee::ConstantExpr::create(0x77885566, klee::Expr::Int64));
-
+    */
     /*
     bool isSym = state->mem()->symbolic(rspConcrete, 8);
     os << "RSP = " << hexval(rspConcrete) << "\n";
     os << "is *RSP symbolic ? " << isSym << "\n";
     */
 
-    (void) m_state->addConstraint(rbpConstraint, /*recomputeConcolics=*/true);
-    (void) m_state->addConstraint(ripConstraint, /*recomputeConcolics=*/true);
+    //(void) m_state->addConstraint(rbpConstraint, /*recomputeConcolics=*/true);
+    //(void) m_state->addConstraint(ripConstraint, /*recomputeConcolics=*/true);
     //(void) state->addConstraint(rspConstraint, /*recomputeConcolics=*/true);
     //(void) state->addConstraint(rsp8Constraint, /*recomputeConcolics=*/true);
 
+    /*
     ConcreteInputs newInput;
 
     if (m_state->getSymbolicSolution(newInput)) {
@@ -167,6 +178,7 @@ void Requiem::onSymbolicRip(S2EExecutionState *state,
     } else {
         log<WARN>() << "Could not get symbolic solutions\n";
     }
+    */
 
     generateExploit();
 
@@ -222,6 +234,21 @@ void Requiem::instructionHook(S2EExecutionState *state, uint64_t pc) {
     if (i.mnemonic == "syscall") {
         syscallHook(state, pc);
     }
+
+    if (pc <= 0x500000 && i.mnemonic == "call" && i.op_str.find("0x") == 0) {
+        log<WARN>() << i.mnemonic << " " << std::stoull(i.op_str, nullptr, 16) << "\n";
+
+        const auto &sym = m_exploit.getElf().symbols();
+        auto it = sym.find("read");
+
+        if (it != sym.end()) {
+            log<WARN>() << "from pwntools: " << it->second << "\n";
+            if (std::stoull(i.op_str, nullptr, 16) == it->second) {
+                log<WARN>() << "discovered a call site of read@libc.\n";
+                m_writePrimitives.push_back(i.address);
+            }
+        }
+    }
 }
 
 void Requiem::syscallHook(S2EExecutionState *state, uint64_t pc) {
@@ -235,14 +262,23 @@ void Requiem::syscallHook(S2EExecutionState *state, uint64_t pc) {
         << hexval(reg().readConcrete(Register::R10)) << ", "
         << hexval(reg().readConcrete(Register::R8)) << ", "
         << hexval(reg().readConcrete(Register::R9)) << ")\n";
+
+    // sys_read from stdin?
+    if (reg().readConcrete(Register::RAX) == 0 &&
+        reg().readConcrete(Register::RDI) == 0) {
+        m_sysReadBuf = reg().readConcrete(Register::RSI);
+        m_sysReadSize = reg().readConcrete(Register::RDX);
+    }
 }
 
 
 void Requiem::generateExploit() {
     // Determine exploit strategy.
-    m_strategy = std::make_unique<DefaultStrategy>(*this);
+    if (!m_strategy) {
+        m_strategy = std::make_unique<DefaultStrategy>(*this);
+    }
 
-    // Write exploit shebang.
+        // Write exploit shebang.
     m_exploit.writeline(Exploit::s_shebang);
 
     // Pwntools stuff.
@@ -285,23 +321,21 @@ void Requiem::generateExploit() {
 
     // IOStates.
 
-    //XXX:lines = ["    payload  = b'A' * {}".format(self._exploit._padding)]
-    std::vector<std::string> lines;
-
     // Generate the payload based on the strategy chosen by the user.
+    std::vector<std::string> lines = {
+        format("    payload  = b'A' * %d", m_padding)
+    };
+
     bool hasWrittenFirstRbp = false;
+
     for (auto technique : m_strategy->getPrimaryTechniques()) {
         std::vector<std::vector<std::string>> ropChainsList = technique->getRopChainsList();
 
-        if (ropChainsList.empty()) {
-            continue;
-        }
-        
-        if (!hasWrittenFirstRbp) {
-            hasWrittenFirstRbp = true;
-        } else {
+        if (hasWrittenFirstRbp) {
             // Slice off saved rbp
             ropChainsList.front().erase(ropChainsList.front().begin());
+        } else {
+            hasWrittenFirstRbp = true;
         }
 
         for (const auto &payloadList : ropChainsList) {
@@ -341,32 +375,6 @@ void Requiem::generateExploit() {
     ofs << m_exploit.getContent();
 
     log<WARN>() << "Generated exploit: " << m_exploit.getOutputFilename() << "\n";
-}
-
-
-void Requiem::handleOpcodeInvocation(S2EExecutionState *state,
-                                     uint64_t guestDataPtr,
-                                     uint64_t guestDataSize) {
-    S2E_REQUIEM_COMMAND command;
-
-    if (guestDataSize != sizeof(command)) {
-        getWarningsStream(state) << "mismatched S2E_REQUIEM_COMMAND size\n";
-        return;
-    }
-
-    if (!state->mem()->read(guestDataPtr, &command, guestDataSize)) {
-        getWarningsStream(state) << "could not read transmitted data\n";
-        return;
-    }
-
-    switch (command.Command) {
-        // TODO: add custom commands here
-        case COMMAND_1:
-            break;
-        default:
-            getWarningsStream(state) << "Unknown command " << command.Command << "\n";
-            break;
-    }
 }
 
 }  // namespace s2e::plugins::requiem

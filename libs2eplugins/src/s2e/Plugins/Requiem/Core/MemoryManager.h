@@ -64,6 +64,14 @@ public:
     [[nodiscard]]
     std::vector<uint8_t> readConcrete(uint64_t virtAddr, uint64_t size) const;
 
+    // Write symbolic data to memory.
+    [[nodiscard]]
+    bool writeSymbolic(uint64_t virtAddr, const klee::ref<klee::Expr> &value);
+
+    // Write concrete data to memory.
+    [[nodiscard]]
+    bool writeConcrete(uint64_t virtAddr, uint64_t value);
+
     // Determine if the given virtual memory address is mapped.
     [[nodiscard]]
     bool isMapped(uint64_t virtAddr) const;

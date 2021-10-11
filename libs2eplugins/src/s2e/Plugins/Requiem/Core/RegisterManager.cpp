@@ -60,11 +60,29 @@ ref<Expr> RegisterManager::readSymbolic(Register reg) {
 
 uint64_t RegisterManager::readConcrete(Register reg) {
     uint64_t ret;
-    if (!m_ctx.state()->regs()->read(CPU_OFFSET(regs[reg]), &ret, sizeof(ret))) {
+    if (!m_ctx.state()->regs()->read(CPU_OFFSET(regs[reg]), &ret, sizeof(ret), /*concretize=*/false)) {
         m_ctx.log<WARN>()
-            << "Cannot read from register: " << RegisterManager::s_regs64[reg] << "\n";
+            << "Cannot read concrete data from register: " << RegisterManager::s_regs64[reg] << "\n";
     }
     return ret;
+}
+
+bool RegisterManager::writeSymbolic(Register reg, const klee::ref<klee::Expr> &value) {
+    bool success = m_ctx.state()->regs()->write(CPU_OFFSET(regs[reg]), value);
+    if (!success) {
+        m_ctx.log<WARN>()
+            << "Cannot write symbolic data to register: " << RegisterManager::s_regs64[reg] << "\n";
+    }
+    return success;
+}
+
+bool RegisterManager::writeConcrete(Register reg, uint64_t value) {
+    bool success = m_ctx.state()->regs()->write(CPU_OFFSET(regs[reg]), &value, sizeof(value));
+    if (!success) {
+        m_ctx.log<WARN>()
+            << "Cannot write concrete data to register: " << RegisterManager::s_regs64[reg] << "\n";
+    }
+    return success;
 }
 
 void RegisterManager::showRegInfo() {

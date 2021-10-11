@@ -45,16 +45,34 @@ bool MemoryManager::isSymbolic(uint64_t virtAddr, uint64_t size) const {
 }
 
 ref<Expr> MemoryManager::readSymbolic(uint64_t virtAddr, uint64_t size) const {
+    // XXX: check `size`.
+    // See: klee/include/klee/Expr.h
     return m_ctx.state()->mem()->read(virtAddr, size);
 }
 
 std::vector<uint8_t> MemoryManager::readConcrete(uint64_t virtAddr, uint64_t size) const {
     std::vector<uint8_t> ret(size);
     if (!m_ctx.state()->mem()->read(virtAddr, ret.data(), size)) {
-        m_ctx.log<WARN>() << "Cannot read from memory: " << hexval(virtAddr) << "\n";
+        m_ctx.log<WARN>() << "Cannot read concrete data from memory: " << hexval(virtAddr) << "\n";
         ret.clear();
     }
     return ret;
+}
+
+bool MemoryManager::writeSymbolic(uint64_t virtAddr, const klee::ref<klee::Expr> &value) {
+    bool success = m_ctx.state()->mem()->write(virtAddr, value);
+    if (!success) {
+        m_ctx.log<WARN>() << "Cannot write symbolic data to memory: " << hexval(virtAddr) << "\n";
+    }
+    return success;
+}
+
+bool MemoryManager::writeConcrete(uint64_t virtAddr, uint64_t value) {
+    bool success = m_ctx.state()->mem()->write(virtAddr, &value, sizeof(value));
+    if (!success) {
+        m_ctx.log<WARN>() << "Cannot write concrete data to memory: " << hexval(virtAddr) << "\n";
+    }
+    return success;
 }
 
 bool MemoryManager::isMapped(uint64_t virtAddr) const {

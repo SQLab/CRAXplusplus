@@ -73,6 +73,14 @@ public:
     [[nodiscard]]
     uint64_t readConcrete(Register reg);
 
+    // Write symbolic data to the register file.
+    [[nodiscard]]
+    bool writeSymbolic(Register reg, const klee::ref<klee::Expr> &value);
+
+    // Write concrete data to the register file.
+    [[nodiscard]]
+    bool writeConcrete(Register reg, uint64_t value);
+
     // Dump all register values.
     void showRegInfo();
 

@@ -39,7 +39,7 @@ std::vector<uint64_t> kmp(const std::vector<uint8_t> &haystack,
         }
     }
 
-    // Search needle in haystasck.
+    // Search needle in the haystack.
     for (size_t i = 0; i < haystack.size(); i++) {
         while (tail != -1 && haystack[i] != needle[tail + 1]) {
             tail = failure[tail];

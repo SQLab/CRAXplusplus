@@ -35,10 +35,12 @@ class Requiem;
 class Strategy {
 public:
     void addAuxiliaryTechnique(std::unique_ptr<Technique> t) {
+        Technique::mapper[t->toString()] = t.get();
         m_auxiliaryTechniques.push_back(std::move(t));
     }
 
     void addPrimaryTechnique(std::unique_ptr<Technique> t) {
+        Technique::mapper[t->toString()] = t.get();
         m_primaryTechniques.push_back(std::move(t));
     }
 

@@ -57,4 +57,8 @@ ELF::FunctionMap ELF::functions() const {
     return ret;
 }
 
+uint64_t ELF::bss() const {
+    return m_elf.attr("bss").call().cast<uint64_t>();
+}
+
 }  // namespace s2e::plugins::requiem

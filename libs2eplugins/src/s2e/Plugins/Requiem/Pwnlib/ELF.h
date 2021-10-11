@@ -39,6 +39,7 @@ public:
 
     SymbolMap symbols() const;
     FunctionMap functions() const;
+    uint64_t bss() const;
 
 private:
     pybind11::module m_pwnlib;

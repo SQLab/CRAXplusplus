@@ -56,7 +56,7 @@ Requiem::Requiem(S2E *s2e)
                 g_s2e->getConfig()->getString(getConfigKey() + ".elfFilename"),
                 g_s2e->getConfig()->getString(getConfigKey() + ".libcFilename")),
       m_disassembler(*this),
-      m_target_process_pid(),
+      m_targetProcessPid(),
       m_strategy(),
       m_readPrimitives(),
       m_writePrimitives(),
@@ -101,7 +101,7 @@ void Requiem::onSymbolicRip(S2EExecutionState *state,
     reg().showRegInfo();
 
     // Dump virtual memory mappings.
-    mem().showMapInfo(m_target_process_pid);
+    mem().showMapInfo(m_targetProcessPid);
 
     // Calculate padding from user input's base addr to saved rbp.
     // XXX: use symbolic execution instead.
@@ -194,7 +194,7 @@ void Requiem::onProcessLoad(S2EExecutionState *state,
     log<WARN>() << "onProcessLoad: " << imageFileName << "\n";
 
     if (imageFileName.find(m_exploit.getElfFilename()) != imageFileName.npos) {
-        m_target_process_pid = pid;
+        m_targetProcessPid = pid;
 
         g_s2e->getCorePlugin()->onTranslateInstructionEnd.connect(
                 sigc::mem_fun(*this, &Requiem::onTranslateInstructionEnd));

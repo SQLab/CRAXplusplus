@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/Requiem/Requiem.h>
+#include <s2e/Plugins/Requiem/Utils/Algorithm.h>
 
 #include "MemoryManager.h"
 
@@ -51,6 +52,7 @@ std::vector<uint8_t> MemoryManager::readConcrete(uint64_t virtAddr, uint64_t siz
     std::vector<uint8_t> ret(size);
     if (!m_ctx.state()->mem()->read(virtAddr, ret.data(), size)) {
         m_ctx.log<WARN>() << "Cannot read from memory: " << hexval(virtAddr) << "\n";
+        ret.clear();
     }
     return ret;
 }
@@ -59,8 +61,41 @@ bool MemoryManager::isMapped(uint64_t virtAddr) const {
     return m_ctx.state()->mem()->getHostAddress(virtAddr) != -1;
 }
 
-std::vector<uint64_t> MemoryManager::search(const std::vector<uint64_t> &bytes) const {
-    return {};
+std::vector<uint64_t> MemoryManager::search(const std::vector<uint8_t> &needle) const {
+    std::vector<uint64_t> ret;
+
+    // Iterate over all the mapped memory regions.
+    for (auto region : getMapInfo(m_ctx.getTargetProcessPid())) {
+        // XXX: Some regions might be unaccessible even though it's mapped,
+        // which I believe this is a bug in S2E. Just in case this happens,
+        // we'll use `MemoryManager::isMapped()` to scan through every address
+        // within this region until an accessible address is found.
+        while (!isMapped(region.start) && region.start < region.end) {
+            ++region.start;
+        }
+
+        // If the entire region is not accessible, then
+        // we don't have to do anything with this region.
+        if (region.start >= region.end) {
+            continue;
+        }
+
+        // Read the region concretely into `haystack`,
+        // and use kmp algorithm to search all the occurences of `needle`.
+        std::vector<uint8_t> haystack = readConcrete(region.start, region.end - region.start);
+        std::vector<uint64_t> localResult = kmp(haystack, needle);
+
+        // `localResult` contains the offset within `haystack`, so adding
+        // `region.start` to each element will turn them into valid virtual addresses.
+        for (auto &r : localResult) {
+            r += region.start;
+        }
+
+        // Append `localResult` to `ret`.
+        ret.insert(ret.end(), localResult.begin(), localResult.end());
+    }
+
+    return ret;
 }
 
 

@@ -35,6 +35,7 @@ add_library(
     s2e/Plugins/Requiem/Techniques/StackPivot.cpp
     s2e/Plugins/Requiem/Techniques/GotPartialOverwrite.cpp
     s2e/Plugins/Requiem/Pwnlib/ELF.cpp
+    s2e/Plugins/Requiem/Utils/Algorithm.cpp
     s2e/Plugins/Requiem/Utils/StringUtil.cpp
 
     # Core plugins

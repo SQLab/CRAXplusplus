@@ -73,6 +73,7 @@ public:
     Disassembler &getDisassembler() { return m_disassembler; }
     Exploit &getExploit() { return m_exploit; }
 
+    uint64_t getTargetProcessPid() const { return m_targetProcessPid; }
     const std::vector<uint64_t> &getReadPrimitives() const { return m_readPrimitives; }
     const std::vector<uint64_t> &getWritePrimitives() const { return m_writePrimitives; }
 
@@ -120,7 +121,7 @@ private:
     MemoryManager m_memoryManager;
     Exploit m_exploit;
     Disassembler m_disassembler;
-    uint64_t m_target_process_pid;
+    uint64_t m_targetProcessPid;
 
     std::unique_ptr<Strategy> m_strategy;
     std::vector<uint64_t> m_readPrimitives;

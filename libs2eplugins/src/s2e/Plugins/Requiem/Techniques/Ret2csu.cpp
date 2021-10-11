@@ -28,6 +28,8 @@
 
 #define X86_64_MOV_INSN_LEN 3
 
+using namespace klee;
+
 namespace s2e::plugins::requiem {
 
 Ret2csu::Ret2csu(Requiem &ctx,
@@ -70,7 +72,7 @@ std::string Ret2csu::getAuxiliaryFunctions() const {
 std::vector<std::vector<std::string>> Ret2csu::getRopChainsList() const {
     std::vector<std::vector<std::string>> ret
         = getRopChainsListWithArgs(m_arg1, m_arg2, m_arg3, m_addr, true);
-    ret.front().insert(ret.front().begin(), "A8");  // rbp
+    ret[0].insert(ret[0].begin(), "A8");  // rbp
     return ret;
 }
 
@@ -91,7 +93,7 @@ Ret2csu::getRopChainsListWithArgs(const std::string &arg1,
                                   bool arg1IsRdi) const {
     std::vector<std::string> rop;
 
-    for (auto s : m_ropChainsList.front()) {
+    for (auto s : m_ropChainsList[0]) {
         if (s.find("arg1") != std::string::npos) {
             rop.push_back(replace(s, "arg1", arg1));
         } else if (s.find("arg2") != std::string::npos) {
@@ -184,16 +186,18 @@ void Ret2csu::parseLibcCsuInit() {
 }
 
 void Ret2csu::searchGadget2CallTarget(std::string funcName) {
-    /*
     uint64_t funcAddr = m_ctx.getExploit().getElf().symbols()[funcName];
-    std::vector<uint64_t> candidates = m_ctx.mem().search(funcAddr);
+    std::vector<uint8_t> funcAddrBytes(8);
+
+    std::memcpy(funcAddrBytes.data(), &funcAddr, sizeof(funcAddr));
+    std::vector<uint64_t> candidates = m_ctx.mem().search(funcAddrBytes);
 
     if (candidates.empty()) {
         m_ctx.log<WARN>() << "No candidates for __libc_csu_init()'s call target\n";
         return;
     }
-    m_libcCsuInitCallTarget = candidates.front();
-    */
+
+    m_libcCsuInitCallTarget = candidates[0];
 }
 
 void Ret2csu::buildRopChainsList() {
@@ -208,7 +212,7 @@ void Ret2csu::buildRopChainsList() {
     };
 
     m_ropChainsList.resize(1);
-    std::vector<std::string> &rop = m_ropChainsList.front();
+    std::vector<std::string> &rop = m_ropChainsList[0];
 
     rop.push_back("p64(__libc_csu_init_gadget1)");
     for (int i = 0; i < 7; i++) {
@@ -224,7 +228,7 @@ void Ret2csu::buildRopChainsList() {
 void Ret2csu::buildAuxiliaryFunction() {
     std::string f;
 
-    for (const auto &payload : m_ropChainsList.front()) {
+    for (const auto &payload : m_ropChainsList[0]) {
         if (f.empty()) {
             f += format("    payload  = %s\n", payload.c_str());
         } else {

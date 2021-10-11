@@ -68,9 +68,10 @@ public:
     [[nodiscard]]
     bool isMapped(uint64_t virtAddr) const;
 
-    // Search bytes pattern from memory.
+    // Search for a sequence of bytes `needle` in memory,
+    // and return the addresses of all matches.
     [[nodiscard]]
-    std::vector<uint64_t> search(const std::vector<uint64_t> &bytes) const;
+    std::vector<uint64_t> search(const std::vector<uint8_t> &needle) const;
 
     // Returns the map<addr, size> of symbolic memory.
     [[nodiscard]]

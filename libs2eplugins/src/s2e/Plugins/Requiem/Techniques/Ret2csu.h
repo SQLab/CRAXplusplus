@@ -46,6 +46,7 @@ public:
     virtual std::string getAuxiliaryFunctions() const override;
     virtual std::vector<std::vector<std::string>> getRopChainsList() const override;
     virtual std::vector<std::string> getExtraPayload() const override;
+    virtual std::string toString() const override;
 
     std::vector<std::vector<std::string>>
     getRopChainsListWithArgs(const std::string &arg1,

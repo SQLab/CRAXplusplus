@@ -70,12 +70,16 @@ std::string Ret2csu::getAuxiliaryFunctions() const {
 std::vector<std::vector<std::string>> Ret2csu::getRopChainsList() const {
     std::vector<std::vector<std::string>> ret
         = getRopChainsListWithArgs(m_arg1, m_arg2, m_arg3, m_addr, true);
-    ret.front().insert(ret.front().begin(), "A8");
+    ret.front().insert(ret.front().begin(), "A8");  // rbp
     return ret;
 }
 
 std::vector<std::string> Ret2csu::getExtraPayload() const {
     return {};
+}
+
+std::string Ret2csu::toString() const {
+    return "Ret2csu";
 }
 
 
@@ -85,8 +89,7 @@ Ret2csu::getRopChainsListWithArgs(const std::string &arg1,
                                   const std::string &arg3,
                                   const std::string &addr,
                                   bool arg1IsRdi) const {
-    std::vector<std::vector<std::string>> ret(1);
-    std::vector<std::string> &rop = ret.front();
+    std::vector<std::string> rop;
 
     for (auto s : m_ropChainsList.front()) {
         if (s.find("arg1") != std::string::npos) {
@@ -109,7 +112,7 @@ Ret2csu::getRopChainsListWithArgs(const std::string &arg1,
         rop.push_back(format("p64(%s)", addr.c_str()));
     }
 
-    return ret;
+    return { move(rop) };
 }
 
 void Ret2csu::parseLibcCsuInit() {

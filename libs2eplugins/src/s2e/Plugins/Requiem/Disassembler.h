@@ -21,6 +21,7 @@
 #ifndef S2E_PLUGINS_REQUIEM_DISASSEMBLER_H
 #define S2E_PLUGINS_REQUIEM_DISASSEMBLER_H
 
+#include <string>
 #include <vector>
 
 #include <s2e/S2E.h>
@@ -44,6 +45,11 @@ public:
 
     // Disassemble one instruction at the specificed address.
     Instruction disasm(const uint64_t pc);
+
+    // Disassemble all instructions in the given `code` vector,
+    // where the `code` is assumed to be loaded at `virtAddr`.
+    std::vector<Instruction> disasm(const std::vector<uint8_t> &code,
+                                    const uint64_t virtAddr);
 
     // Disassemble a function by its symbol.
     std::vector<Instruction> disasm(const std::string &symbol);

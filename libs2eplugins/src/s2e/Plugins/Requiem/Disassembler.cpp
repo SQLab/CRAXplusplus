@@ -58,6 +58,46 @@ Instruction Disassembler::disasm(uint64_t pc) {
     return ret;
 }
 
+std::vector<Instruction> Disassembler::disasm(const std::vector<uint8_t> &code,
+                                              const uint64_t virtAddr) {
+    csh handle;
+    cs_insn *insn;
+    size_t count;
+    std::vector<Instruction> ret;
+
+    if (code.empty()) {
+        return ret;
+    }
+
+    if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK) {
+        return ret;
+    }
+
+    count = cs_disasm(handle, code.data(), code.size(), virtAddr, 0, &insn);
+
+    if (count) {
+        ret.resize(count);
+        for (size_t i = 0; i < count; i++) {
+            ret[i] = {insn[i].address, insn[i].mnemonic, insn[i].op_str};
+        }
+        cs_free(insn, count);
+    } else {
+        auto &os = m_ctx.log<WARN>();
+        os << "disassemble failed: ";
+
+        for (size_t i = 0; i < code.size(); i++) {
+            os << hexval(code[i]);
+            if (i != code.size() - 1) {
+                os << " ";
+            }
+        }
+        os << "\n";
+    }
+
+    cs_close(&handle);
+    return ret;
+}
+
 std::vector<Instruction> Disassembler::disasm(const std::string &symbol) {
     csh handle;
     cs_insn *insn;

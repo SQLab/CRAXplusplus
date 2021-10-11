@@ -38,7 +38,7 @@ class Requiem;
 struct MemoryRegion {
     uint64_t start;
     uint64_t end;
-    const MemoryMapRegionType &prot;
+    MemoryMapRegionType prot;
 };
 
 struct MemoryRegionCmp {

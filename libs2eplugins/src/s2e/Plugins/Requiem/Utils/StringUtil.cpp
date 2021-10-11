@@ -73,10 +73,10 @@ std::string slice(std::string s, size_t start, size_t end) {
 }
 
 std::string strip(std::string s) {
-  static const char* whitespace = " \n\r\t";
-  s.erase(0, s.find_first_not_of(whitespace));
-  s.erase(s.find_last_not_of(whitespace) + 1);
-  return s;
+    static const char* whitespace = " \n\r\t";
+    s.erase(0, s.find_first_not_of(whitespace));
+    s.erase(s.find_last_not_of(whitespace) + 1);
+    return s;
 }
 
 }  // namespace s2e::plugins::requiem

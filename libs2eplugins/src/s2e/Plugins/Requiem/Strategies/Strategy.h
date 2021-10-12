@@ -34,6 +34,8 @@ class Requiem;
 // The base class for all exploitation strategy.
 class Strategy {
 public:
+    virtual ~Strategy() = default;
+
     void addAuxiliaryTechnique(std::unique_ptr<Technique> t) {
         Technique::mapper[t->toString()] = t.get();
         m_auxiliaryTechniques.push_back(std::move(t));

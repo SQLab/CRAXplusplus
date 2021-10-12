@@ -36,6 +36,7 @@ class Requiem;
 class DefaultStrategy : public Strategy {
 public:
     explicit DefaultStrategy(Requiem &ctx);
+    virtual ~DefaultStrategy() = default;
 };
 
 }  // namespace s2e::plugins::requiem

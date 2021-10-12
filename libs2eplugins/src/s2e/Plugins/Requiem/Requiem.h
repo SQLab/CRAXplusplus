@@ -28,6 +28,7 @@
 #include <s2e/Plugins/Requiem/Core/RegisterManager.h>
 #include <s2e/Plugins/Requiem/Core/MemoryManager.h>
 #include <s2e/Plugins/Requiem/Strategies/Strategy.h>
+#include <s2e/Plugins/Requiem/Behaviors.h>
 #include <s2e/Plugins/Requiem/Disassembler.h>
 #include <s2e/Plugins/Requiem/Exploit.h>
 
@@ -124,6 +125,7 @@ private:
     uint64_t m_targetProcessPid;
 
     std::unique_ptr<Strategy> m_strategy;
+    std::vector<std::unique_ptr<Behavior>> m_ioBehaviors;
     std::vector<uint64_t> m_readPrimitives;
     std::vector<uint64_t> m_writePrimitives;
 

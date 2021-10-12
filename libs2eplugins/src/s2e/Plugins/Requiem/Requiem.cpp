@@ -58,6 +58,7 @@ Requiem::Requiem(S2E *s2e)
       m_disassembler(*this),
       m_targetProcessPid(),
       m_strategy(),
+      m_ioBehaviors(),
       m_readPrimitives(),
       m_writePrimitives(),
       m_padding(),
@@ -235,18 +236,24 @@ void Requiem::instructionHook(S2EExecutionState *state, uint64_t pc) {
         syscallHook(state, pc);
     }
 
+    static auto isCallSiteOf = [this](const std::string &opStr,
+                                      const std::string &funcName) {
+        const auto &sym = m_exploit.getElf().symbols();
+        auto it = sym.find(funcName);
+        return it != sym.end() && std::stoull(opStr, nullptr, 16) == it->second;
+    };
+
     if (pc <= 0x500000 && i.mnemonic == "call" && i.op_str.find("0x") == 0) {
         log<WARN>() << i.mnemonic << " " << std::stoull(i.op_str, nullptr, 16) << "\n";
 
-        const auto &sym = m_exploit.getElf().symbols();
-        auto it = sym.find("read");
-
-        if (it != sym.end()) {
-            log<WARN>() << "from pwntools: " << it->second << "\n";
-            if (std::stoull(i.op_str, nullptr, 16) == it->second) {
-                log<WARN>() << "discovered a call site of read@libc.\n";
-                m_writePrimitives.push_back(i.address);
-            }
+        if (isCallSiteOf(i.op_str, "read")) {
+            log<WARN>() << "discovered a call site of read@libc.\n";
+            m_ioBehaviors.push_back(std::make_unique<InputBehavior>());
+            m_writePrimitives.push_back(i.address);
+        } else if (isCallSiteOf(i.op_str, "sleep")) {
+            log<WARN>() << "discovered a call site of sleep@libc.\n";
+            uint64_t interval = reg().readConcrete(Register::RDI);
+            m_ioBehaviors.push_back(std::make_unique<SleepBehavior>(interval));
         }
     }
 }
@@ -319,7 +326,15 @@ void Requiem::generateExploit() {
         "    proc = elf.process()",
     });
 
-    // IOStates.
+    // I/O Behaviors.
+    for (const auto &b : m_ioBehaviors) {
+        Behavior* behavior = b.get();
+
+        if (dynamic_cast<SleepBehavior*>(behavior)) {
+            uint64_t interval = dynamic_cast<SleepBehavior*>(behavior)->getInterval();
+            m_exploit.writeline(format("    time.sleep(%d)", interval));
+        }
+    }
 
     // Generate the payload based on the strategy chosen by the user.
     std::vector<std::string> lines = {

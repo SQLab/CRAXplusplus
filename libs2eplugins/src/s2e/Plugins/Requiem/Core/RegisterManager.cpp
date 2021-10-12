@@ -18,7 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <s2e/cpu.h>
 #include <s2e/S2E.h>
 #include <s2e/S2EExecutionStateRegisters.h>
 #include <s2e/Plugins/Requiem/Requiem.h>
@@ -52,35 +51,33 @@ bool RegisterManager::isSymbolic(Register reg) {
 }
 
 ref<Expr> RegisterManager::readSymbolic(Register reg) {
-    if (reg == Register::RIP) {
-        return m_ctx.state()->regs()->read(CPU_OFFSET(eip), klee::Expr::Int64);
-    }
-    return m_ctx.state()->regs()->read(CPU_OFFSET(regs[reg]), klee::Expr::Int64);
+    // XXX: check result
+    return m_ctx.state()->regs()->read(getOffset(reg), klee::Expr::Int64);
 }
 
 uint64_t RegisterManager::readConcrete(Register reg) {
     uint64_t ret;
-    if (!m_ctx.state()->regs()->read(CPU_OFFSET(regs[reg]), &ret, sizeof(ret), /*concretize=*/false)) {
+    if (!m_ctx.state()->regs()->read(getOffset(reg), &ret, sizeof(ret), /*concretize=*/false)) {
         m_ctx.log<WARN>()
-            << "Cannot read concrete data from register: " << RegisterManager::s_regs64[reg] << "\n";
+            << "Cannot read concrete data from register: " << getName(reg) << "\n";
     }
     return ret;
 }
 
 bool RegisterManager::writeSymbolic(Register reg, const klee::ref<klee::Expr> &value) {
-    bool success = m_ctx.state()->regs()->write(CPU_OFFSET(regs[reg]), value);
+    bool success = m_ctx.state()->regs()->write(getOffset(reg), value);
     if (!success) {
         m_ctx.log<WARN>()
-            << "Cannot write symbolic data to register: " << RegisterManager::s_regs64[reg] << "\n";
+            << "Cannot write symbolic data to register: " << getName(reg) << "\n";
     }
     return success;
 }
 
 bool RegisterManager::writeConcrete(Register reg, uint64_t value) {
-    bool success = m_ctx.state()->regs()->write(CPU_OFFSET(regs[reg]), &value, sizeof(value));
+    bool success = m_ctx.state()->regs()->write(getOffset(reg), &value, sizeof(value));
     if (!success) {
         m_ctx.log<WARN>()
-            << "Cannot write concrete data to register: " << RegisterManager::s_regs64[reg] << "\n";
+            << "Cannot write concrete data to register: " << getName(reg) << "\n";
     }
     return success;
 }
@@ -89,24 +86,14 @@ void RegisterManager::showRegInfo() {
     auto &os = m_ctx.log<WARN>();
     os << "---------- [REGISTERS] ----------\n";
 
-    for (int reg = 0; reg < Register::LAST; reg++) {
-        const auto &name = RegisterManager::s_regs64[reg];
-        os << name << "\t";
-        if (!isSymbolic(static_cast<Register>(reg))) {
-            os << hexval(readConcrete(static_cast<Register>(reg)));
-        } else {
-            os << "(symbolic)";
-        }
-        os << "\n";
+    for (int i = 0; i < Register::LAST; i++) {
+        auto reg = static_cast<Register>(i);
+        os << getName(reg) << "\t";
+        os << (isSymbolic(reg) ? "(symbolic)" : hexval(readConcrete(reg))) << "\n";
     }
 
     os << "RIP\t";
-    if (!m_isRipSymbolic) {
-        os << hexval(m_ctx.state()->regs()->getPc());
-    } else {
-        os << "(symbolic)";
-    }
-    os << "\n";
+    os << (m_isRipSymbolic ? "(symbolic)" : hexval(readConcrete(Register::RIP))) << "\n";
 }
 
 void RegisterManager::setRipSymbolic(klee::ref<klee::Expr> ripExpr) {

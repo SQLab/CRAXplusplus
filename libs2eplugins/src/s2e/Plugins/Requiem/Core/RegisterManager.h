@@ -21,6 +21,7 @@
 #ifndef S2E_PLUGINS_REQUIEM_REGISTER_MANAGER_H
 #define S2E_PLUGINS_REQUIEM_REGISTER_MANAGER_H
 
+#include <s2e/cpu.h>
 #include <s2e/S2EExecutionState.h>
 
 #include <array>
@@ -80,6 +81,20 @@ public:
     // Write concrete data to the register file.
     [[nodiscard]]
     bool writeConcrete(Register reg, uint64_t value);
+
+    // Register files are declared as the data members of `struct CPUX86State`.
+    // This method returns the offset of the specified register file.
+    // See libcpu/include/cpu/i386/cpu.h
+    [[nodiscard, gnu::always_inline]]
+    unsigned getOffset(Register reg) const {
+        return (reg == Register::RIP) ? CPU_OFFSET(eip) : CPU_OFFSET(regs[reg]);
+    }
+
+    // Get the name of the specified register file.
+    [[nodiscard, gnu::always_inline]]
+    std::string getName(Register reg) const {
+        return (reg == Register::RIP) ? "RIP" : s_regs64[reg];
+    }
 
     // Dump all register values.
     void showRegInfo();

@@ -19,7 +19,10 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/Requiem/Requiem.h>
+#include <s2e/Plugins/Requiem/Pwnlib/Function.h>
 #include <capstone/capstone.h>
+
+#include <cassert>
 
 #include "Disassembler.h"
 
@@ -28,38 +31,28 @@
 namespace s2e::plugins::requiem {
 
 Instruction Disassembler::disasm(uint64_t pc) {
-    csh handle;
-    cs_insn *insn;
-    size_t count;
-    Instruction ret;
+    std::vector<uint8_t> code = m_ctx.mem().readConcrete(pc, X86_64_INSN_MAX_NR_BYTES);
+    std::vector<Instruction> insns = disasm(code, pc);
 
-    std::vector<uint8_t> code
-        = m_ctx.mem().readConcrete(pc, X86_64_INSN_MAX_NR_BYTES);
+    assert(insns.size());
+    return insns[0];
+}
 
-    if (code.empty()) {
-        return ret;
-    }
+std::vector<Instruction> Disassembler::disasm(const std::string &symbol) {
+    // The object `f` holds the information about the function `symbol`,
+    // e.g., offset within ELF, size, etc.
+    // XXX: PIE
+    Function f = m_ctx.getExploit().getElf().functions()[symbol];
+    std::vector<uint8_t> code = m_ctx.mem().readConcrete(f.address, f.size);
+    std::vector<Instruction> insns = disasm(code, f.address);
 
-    if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK) {
-        return ret;
-    }
-
-    count = cs_disasm(handle, code.data(), code.size(), pc, 0, &insn);
-
-    if (count) {
-        ret = {pc, std::move(insn[0].mnemonic), std::move(insn[0].op_str)};
-        cs_free(insn, count);
-    } else {
-        m_ctx.log<WARN>()
-            << "disassemble failed: " << hexval(pc) << "\n";
-    }
-
-    cs_close(&handle);
-    return ret;
+    assert(insns.size());
+    return insns;
 }
 
 std::vector<Instruction> Disassembler::disasm(const std::vector<uint8_t> &code,
-                                              const uint64_t virtAddr) {
+                                              uint64_t virtAddr,
+                                              bool warnOnError) {
     csh handle;
     cs_insn *insn;
     size_t count;
@@ -78,10 +71,14 @@ std::vector<Instruction> Disassembler::disasm(const std::vector<uint8_t> &code,
     if (count) {
         ret.resize(count);
         for (size_t i = 0; i < count; i++) {
-            ret[i] = {insn[i].address, insn[i].mnemonic, insn[i].op_str};
+            ret[i] = {
+                insn[i].address,
+                insn[i].mnemonic,
+                insn[i].op_str
+            };
         }
         cs_free(insn, count);
-    } else {
+    } else if (warnOnError) {
         auto &os = m_ctx.log<WARN>();
         os << "disassemble failed: ";
 
@@ -92,45 +89,6 @@ std::vector<Instruction> Disassembler::disasm(const std::vector<uint8_t> &code,
             }
         }
         os << "\n";
-    }
-
-    cs_close(&handle);
-    return ret;
-}
-
-std::vector<Instruction> Disassembler::disasm(const std::string &symbol) {
-    csh handle;
-    cs_insn *insn;
-    size_t count;
-    std::vector<Instruction> ret;
-
-    auto f = m_ctx.getExploit().getElf().functions()[symbol];
-
-    std::vector<uint8_t> code
-        = m_ctx.mem().readConcrete(f.address, f.size);
-
-    if (code.empty()) {
-        return ret;
-    }
-
-    if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK) {
-        return ret;
-    }
-
-    count = cs_disasm(handle, code.data(), code.size(), f.address, 0, &insn);
-
-    if (count) {
-        ret.resize(count);
-        for (size_t i = 0; i < count; i++) {
-            ret[i] = {insn[i].address, insn[i].mnemonic, insn[i].op_str};
-        }
-        cs_free(insn, count);
-    } else {
-        m_ctx.log<WARN>()
-            << "disassemble failed: "
-            << f.name << " ("
-            << hexval(f.address) << ", "
-            << hexval(f.size) << ")\n";
     }
 
     cs_close(&handle);

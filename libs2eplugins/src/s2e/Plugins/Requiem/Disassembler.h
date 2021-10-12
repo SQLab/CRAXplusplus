@@ -21,11 +21,11 @@
 #ifndef S2E_PLUGINS_REQUIEM_DISASSEMBLER_H
 #define S2E_PLUGINS_REQUIEM_DISASSEMBLER_H
 
-#include <string>
-#include <vector>
-
 #include <s2e/S2E.h>
 #include <s2e/S2EExecutionState.h>
+
+#include <string>
+#include <vector>
 
 namespace s2e::plugins::requiem {
 
@@ -44,16 +44,16 @@ public:
     explicit Disassembler(Requiem &ctx) : m_ctx(ctx) {}
 
     // Disassemble one instruction at the specificed address.
-    Instruction disasm(const uint64_t pc);
-
-    // Disassemble all instructions in the given `code` vector,
-    // where the `code` is assumed to be loaded at `virtAddr`.
-    std::vector<Instruction> disasm(const std::vector<uint8_t> &code,
-                                    const uint64_t virtAddr);
+    Instruction disasm(uint64_t pc);
 
     // Disassemble a function by its symbol.
     std::vector<Instruction> disasm(const std::string &symbol);
 
+    // Disassemble all instructions in the given `code` vector,
+    // where the `code` is assumed to be loaded at `virtAddr`.
+    std::vector<Instruction> disasm(const std::vector<uint8_t> &code,
+                                    uint64_t virtAddr,
+                                    bool warnOnError = true);
 private:
     Requiem &m_ctx;
 };

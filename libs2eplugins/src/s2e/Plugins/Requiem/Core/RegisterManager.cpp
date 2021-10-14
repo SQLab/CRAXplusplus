@@ -89,11 +89,22 @@ void RegisterManager::showRegInfo() {
     for (int i = 0; i < Register::LAST; i++) {
         auto reg = static_cast<Register>(i);
         os << getName(reg) << "\t";
-        os << (isSymbolic(reg) ? "(symbolic)" : hexval(readConcrete(reg))) << "\n";
+
+        if (isSymbolic(reg)) {
+            os << "(symbolic)";
+        } else {
+            os << hexval(readConcrete(reg));
+        }
+        os << "\n";
     }
 
     os << "RIP\t";
-    os << (m_isRipSymbolic ? "(symbolic)" : hexval(readConcrete(Register::RIP))) << "\n";
+    if (m_isRipSymbolic) {
+        os << "(symbolic)";
+    } else {
+        os << hexval(m_ctx.state()->regs()->getPc());
+    }
+    os << "\n";
 }
 
 void RegisterManager::setRipSymbolic(klee::ref<klee::Expr> ripExpr) {

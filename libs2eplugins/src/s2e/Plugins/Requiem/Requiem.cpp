@@ -277,8 +277,6 @@ void Requiem::generateExploit() {
 
     // Generate ROP chain based on the strategy list chosen by the user.
     std::vector<Technique*> primaryTechniques = m_strategy->getPrimaryTechniques();
-    std::vector<std::string> lines;
-
     bool symbolicMode = true;
     uint32_t rspOffset = 0;
 
@@ -288,19 +286,9 @@ void Requiem::generateExploit() {
 
             for (const auto &payloadList : ropPayloadList) {
                 for (const auto &payload : payloadList) {
-                    if (lines.empty()) {
-                        lines.push_back(format("    payload  = %s", payload.c_str()));
-                    } else {
-                        lines.push_back(format("    payload += %s", payload.c_str()));
-                    }
+                    m_exploit.appendRopPayload(payload);
                 }
-                m_exploit.writeline(join(lines, '\n'));
-                m_exploit.writelines({
-                    "    proc.send(payload)",
-                    "    time.sleep(0.2)",
-                    ""
-                });
-                lines.clear();
+                m_exploit.flushRopPayload();
             }
         } else {
             std::vector<std::vector<uint64_t>> concretizedRopPayloadList = t->getConcretizedRopPayloadList();
@@ -309,7 +297,6 @@ void Requiem::generateExploit() {
                 uint64_t value = concretizedRopPayloadList[0][i];
 
                 if (i == 0) {
-                    log<WARN>() << "setting rbp to " << klee::hexval(value) << '\n';
                     // Add RBP constraint.
                     klee::ref<klee::Expr> rbpConstraint
                         = klee::EqExpr::create(
@@ -317,7 +304,6 @@ void Requiem::generateExploit() {
                                 klee::ConstantExpr::create(value, klee::Expr::Int64));
                     static_cast<void>(m_currentState->addConstraint(rbpConstraint, true));
                 } else if (i == 1) {
-                    log<WARN>() << "setting rip to " << klee::hexval(value) << '\n';
                     // Add RIP constraint.
                     klee::ref<klee::Expr> ripConstraint
                         = klee::EqExpr::create(
@@ -325,7 +311,6 @@ void Requiem::generateExploit() {
                                 klee::ConstantExpr::create(value, klee::Expr::Int64));
                     static_cast<void>(m_currentState->addConstraint(ripConstraint, true));
                 } else {
-                    log<WARN>() << "setting stack to " << klee::hexval(value) << '\n';
                     klee::ref<klee::Expr> constraint
                         = klee::EqExpr::create(
                                 mem().readSymbolic(reg().readConcrete(Register::RSP) + rspOffset, klee::Expr::Int64),
@@ -347,39 +332,21 @@ void Requiem::generateExploit() {
                     return;
                 }
 
-                std::string line = "    payload  = b'";
+                std::string symbolicPayload = "b'";
                 const VarValuePair &vp = newInput[0];
                 for (const auto _byte : vp.second) {
-                    line += format("\\x%02x", _byte);
+                    symbolicPayload += format("\\x%02x", _byte);
                 }
-                line += "'";
-                lines.push_back(move(line));
-
-                m_exploit.writeline(join(lines, '\n'));
-                m_exploit.writelines({
-                        "    proc.send(payload)",
-                        "    time.sleep(0.2)",
-                        ""
-                        });
-                lines.clear();
+                symbolicPayload += "'";
+                m_exploit.appendRopPayload(symbolicPayload);
+                m_exploit.flushRopPayload();
 
                 std::vector<std::vector<std::string>> ropPayloadList = t->getRopPayloadList();
-
                 for (size_t i = 1; i < ropPayloadList.size(); i++) {
                     for (const auto &payload : ropPayloadList[i]) {
-                        if (lines.empty()) {
-                            lines.push_back(format("    payload  = %s", payload.c_str()));
-                        } else {
-                            lines.push_back(format("    payload += %s", payload.c_str()));
-                        }
+                        m_exploit.appendRopPayload(payload);
                     }
-                    m_exploit.writeline(join(lines, '\n'));
-                    m_exploit.writelines({
-                        "    proc.send(payload)",
-                        "    time.sleep(0.2)",
-                        ""
-                    });
-                    lines.clear();
+                    m_exploit.flushRopPayload();
                 }
             }
         }

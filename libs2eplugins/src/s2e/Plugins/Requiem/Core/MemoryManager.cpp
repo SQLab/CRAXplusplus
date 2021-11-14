@@ -47,12 +47,12 @@ bool MemoryManager::isSymbolic(uint64_t virtAddr, uint64_t size) const {
 ref<Expr> MemoryManager::readSymbolic(uint64_t virtAddr, uint64_t size) const {
     // XXX: check `size`.
     // See: klee/include/klee/Expr.h
-    return m_ctx.state()->mem()->read(virtAddr, size);
+    return m_ctx.getCurrentState()->mem()->read(virtAddr, size);
 }
 
 std::vector<uint8_t> MemoryManager::readConcrete(uint64_t virtAddr, uint64_t size) const {
     std::vector<uint8_t> ret(size);
-    if (!m_ctx.state()->mem()->read(virtAddr, ret.data(), size)) {
+    if (!m_ctx.getCurrentState()->mem()->read(virtAddr, ret.data(), size)) {
         m_ctx.log<WARN>() << "Cannot read concrete data from memory: " << hexval(virtAddr) << "\n";
         ret.clear();
     }
@@ -60,7 +60,7 @@ std::vector<uint8_t> MemoryManager::readConcrete(uint64_t virtAddr, uint64_t siz
 }
 
 bool MemoryManager::writeSymbolic(uint64_t virtAddr, const klee::ref<klee::Expr> &value) {
-    bool success = m_ctx.state()->mem()->write(virtAddr, value);
+    bool success = m_ctx.getCurrentState()->mem()->write(virtAddr, value);
     if (!success) {
         m_ctx.log<WARN>() << "Cannot write symbolic data to memory: " << hexval(virtAddr) << "\n";
     }
@@ -68,7 +68,7 @@ bool MemoryManager::writeSymbolic(uint64_t virtAddr, const klee::ref<klee::Expr>
 }
 
 bool MemoryManager::writeConcrete(uint64_t virtAddr, uint64_t value) {
-    bool success = m_ctx.state()->mem()->write(virtAddr, &value, sizeof(value));
+    bool success = m_ctx.getCurrentState()->mem()->write(virtAddr, &value, sizeof(value));
     if (!success) {
         m_ctx.log<WARN>() << "Cannot write concrete data to memory: " << hexval(virtAddr) << "\n";
     }
@@ -76,7 +76,7 @@ bool MemoryManager::writeConcrete(uint64_t virtAddr, uint64_t value) {
 }
 
 bool MemoryManager::isMapped(uint64_t virtAddr) const {
-    return m_ctx.state()->mem()->getHostAddress(virtAddr) != -1;
+    return m_ctx.getCurrentState()->mem()->getHostAddress(virtAddr) != -1;
 }
 
 std::vector<uint64_t> MemoryManager::search(const std::vector<uint8_t> &needle) const {
@@ -132,7 +132,7 @@ std::set<MemoryRegion, MemoryRegionCmp> MemoryManager::getMapInfo(uint64_t pid) 
         return true;
     };
     
-    m_map->iterateRegions(m_ctx.state(), pid, callback);
+    m_map->iterateRegions(m_ctx.getCurrentState(), pid, callback);
 
     // The MemoryMap plugin cannot keep track of the stack mapping,
     // so we have to find it by ourselves.

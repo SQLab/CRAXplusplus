@@ -44,7 +44,7 @@ std::string GotPartialOverwrite::getAuxiliaryFunctions() const {
     return "";
 }
 
-std::vector<std::vector<std::string>> GotPartialOverwrite::getRopChainsList() const {
+std::vector<std::vector<std::string>> GotPartialOverwrite::getRopPayloadList() const {
     return {
         {
             "A8",
@@ -58,6 +58,10 @@ std::vector<std::vector<std::string>> GotPartialOverwrite::getRopChainsList() co
             "b'/bin/sh'.ljust(59, b'\\x00')"
         }
     };
+}
+
+std::vector<std::vector<uint64_t>> GotPartialOverwrite::getConcretizedRopPayloadList() const {
+    return {};
 }
 
 std::vector<std::string> GotPartialOverwrite::getExtraPayload() const {

@@ -57,26 +57,60 @@ public:
     llvm::raw_ostream &log() const;
 
     template <>
-    llvm::raw_ostream &log<LogLevel::INFO>() const { return g_s2e->getInfoStream(m_state); }
+    llvm::raw_ostream &log<LogLevel::INFO>() const {
+        return g_s2e->getInfoStream(m_currentState);
+    }
 
     template <>
-    llvm::raw_ostream &log<LogLevel::DEBUG>() const { return g_s2e->getDebugStream(m_state); }
+    llvm::raw_ostream &log<LogLevel::DEBUG>() const {
+        return g_s2e->getDebugStream(m_currentState);
+    }
 
     template <>
-    llvm::raw_ostream &log<LogLevel::WARN>() const { return g_s2e->getWarningsStream(m_state); }
+    llvm::raw_ostream &log<LogLevel::WARN>() const {
+        return g_s2e->getWarningsStream(m_currentState);
+    }
 
 
-    S2EExecutionState *state() { return m_state; }
-    pybind11::module &pwnlib() { return m_pwnlib; }
-    RegisterManager &reg() { return m_registerManager; }
-    MemoryManager &mem() { return m_memoryManager; }
+    S2EExecutionState *getCurrentState() {
+        return m_currentState;
+    }
 
-    Disassembler &getDisassembler() { return m_disassembler; }
-    Exploit &getExploit() { return m_exploit; }
+    void setCurrentState(S2EExecutionState *state) {
+        m_currentState = state;
+    }
 
-    uint64_t getTargetProcessPid() const { return m_targetProcessPid; }
-    const std::vector<uint64_t> &getReadPrimitives() const { return m_readPrimitives; }
-    const std::vector<uint64_t> &getWritePrimitives() const { return m_writePrimitives; }
+    pybind11::module &pwnlib() {
+        return m_pwnlib;
+    }
+
+    RegisterManager &reg() {
+        return m_registerManager;
+    }
+
+    MemoryManager &mem() {
+        return m_memoryManager;
+    }
+
+    Disassembler &getDisassembler() {
+        return m_disassembler;
+    }
+
+    Exploit &getExploit() {
+        return m_exploit;
+    }
+
+    uint64_t getTargetProcessPid() const {
+        return m_targetProcessPid;
+    }
+
+    const std::vector<uint64_t> &getReadPrimitives() const {
+        return m_readPrimitives;
+    }
+
+    const std::vector<uint64_t> &getWritePrimitives() const {
+        return m_writePrimitives;
+    }
 
 private:
     // Allow the guest to communicate with this plugin using s2e_invoke_plugin
@@ -95,20 +129,29 @@ private:
                        bool &concretize,
                        CorePlugin::symbolicAddressReason reason);
 
+    void onTranslateInstructionStart(ExecutionSignal *onInstructionExecute,
+                                     S2EExecutionState *state,
+                                     TranslationBlock *tb,
+                                     uint64_t pc);
 
     void onTranslateInstructionEnd(ExecutionSignal *onInstructionExecute,
                                    S2EExecutionState *state,
                                    TranslationBlock *tb,
                                    uint64_t pc);
 
-    void instructionHook(S2EExecutionState *state, uint64_t pc);
-    void syscallHook(S2EExecutionState *state, uint64_t pc);
+    // Requiem's instruction hook.
+    void onExecuteInstructionEnd(S2EExecutionState *state,
+                                 uint64_t pc);
+
+    // Requiem's syscall hook.
+    void onExecuteSyscallEnd(S2EExecutionState *state,
+                             uint64_t pc);
 
     void generateExploit();
 
 
     // S2E
-    S2EExecutionState *m_state;
+    S2EExecutionState *m_currentState;
 
     // S2E built-in plugins.
     LinuxMonitor *m_linuxMonitor;
@@ -128,6 +171,8 @@ private:
     std::vector<std::unique_ptr<Behavior>> m_ioBehaviors;
     std::vector<uint64_t> m_readPrimitives;
     std::vector<uint64_t> m_writePrimitives;
+
+    S2EExecutionState *m_inputState;
 
 public:
     uint64_t m_padding;

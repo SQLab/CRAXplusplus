@@ -44,20 +44,27 @@ public:
     virtual bool checkRequirements() const override;
     virtual void resolveRequiredGadgets() override;
     virtual std::string getAuxiliaryFunctions() const override;
-    virtual std::vector<std::vector<std::string>> getRopChainsList() const override;
+    virtual std::vector<std::vector<std::string>> getRopPayloadList() const override;
+    virtual std::vector<std::vector<uint64_t>> getConcretizedRopPayloadList() const override;
     virtual std::vector<std::string> getExtraPayload() const override;
     virtual std::string toString() const override;
 
-    std::vector<std::vector<std::string>>
-    getRopChainsListWithArgs(const std::string &arg1,
-                             const std::string &arg2,
-                             const std::string &arg3,
-                             const std::string &addr,
-                             bool arg1IsRdi = false) const;
+    std::vector<std::vector<std::string>> getRopPayloadList(const std::string &arg1,
+                                                            const std::string &arg2,
+                                                            const std::string &arg3,
+                                                            const std::string &addr,
+                                                            bool arg1IsRdi = false) const;
+
+    std::vector<std::vector<uint64_t>> getConcretizedRopPayloadList(uint64_t arg1,
+                                                                    uint64_t arg2,
+                                                                    uint64_t arg3,
+                                                                    uint64_t addr,
+                                                                    bool arg1IsRdi = false) const;
 protected:
     void parseLibcCsuInit();
     void searchGadget2CallTarget(std::string funcName = "_fini");
-    void buildRopChainsList();
+    void buildRopPayloadList();
+    void buildConcretizedRopPayloadList();
     void buildAuxiliaryFunction();
 
     std::string m_arg1;
@@ -77,7 +84,8 @@ protected:
     std::string m_gadget2CallReg1;
     std::string m_gadget2CallReg2;
 
-    std::vector<std::vector<std::string>> m_ropChainsList;
+    std::vector<std::vector<std::string>> m_ropPayloadList;
+    std::vector<std::vector<uint64_t>> m_concretizedRopPayloadList;
     std::string m_auxiliaryFunction;
 };
 

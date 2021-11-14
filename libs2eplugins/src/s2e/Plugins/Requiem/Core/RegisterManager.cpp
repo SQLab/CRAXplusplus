@@ -52,12 +52,12 @@ bool RegisterManager::isSymbolic(Register reg) {
 
 ref<Expr> RegisterManager::readSymbolic(Register reg) {
     // XXX: check result
-    return m_ctx.state()->regs()->read(getOffset(reg), klee::Expr::Int64);
+    return m_ctx.getCurrentState()->regs()->read(getOffset(reg), klee::Expr::Int64);
 }
 
 uint64_t RegisterManager::readConcrete(Register reg) {
     uint64_t ret;
-    if (!m_ctx.state()->regs()->read(getOffset(reg), &ret, sizeof(ret), /*concretize=*/false)) {
+    if (!m_ctx.getCurrentState()->regs()->read(getOffset(reg), &ret, sizeof(ret), /*concretize=*/false)) {
         m_ctx.log<WARN>()
             << "Cannot read concrete data from register: " << getName(reg) << "\n";
     }
@@ -65,7 +65,7 @@ uint64_t RegisterManager::readConcrete(Register reg) {
 }
 
 bool RegisterManager::writeSymbolic(Register reg, const klee::ref<klee::Expr> &value) {
-    bool success = m_ctx.state()->regs()->write(getOffset(reg), value);
+    bool success = m_ctx.getCurrentState()->regs()->write(getOffset(reg), value);
     if (!success) {
         m_ctx.log<WARN>()
             << "Cannot write symbolic data to register: " << getName(reg) << "\n";
@@ -74,7 +74,7 @@ bool RegisterManager::writeSymbolic(Register reg, const klee::ref<klee::Expr> &v
 }
 
 bool RegisterManager::writeConcrete(Register reg, uint64_t value) {
-    bool success = m_ctx.state()->regs()->write(getOffset(reg), &value, sizeof(value));
+    bool success = m_ctx.getCurrentState()->regs()->write(getOffset(reg), &value, sizeof(value));
     if (!success) {
         m_ctx.log<WARN>()
             << "Cannot write concrete data to register: " << getName(reg) << "\n";
@@ -102,7 +102,7 @@ void RegisterManager::showRegInfo() {
     if (m_isRipSymbolic) {
         os << "(symbolic)";
     } else {
-        os << hexval(m_ctx.state()->regs()->getPc());
+        os << hexval(m_ctx.getCurrentState()->regs()->getPc());
     }
     os << "\n";
 }

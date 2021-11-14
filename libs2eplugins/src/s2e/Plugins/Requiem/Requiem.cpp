@@ -24,8 +24,10 @@
 #include <s2e/Plugins/OSMonitors/Support/ProcessExecutionDetector.h>
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
 #include <s2e/Plugins/Requiem/Strategies/DefaultStrategy.h>
+#include <s2e/Plugins/Requiem/Techniques/StackPivot.h>
 #include <s2e/Plugins/Requiem/Utils/StringUtil.h>
 
+#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -46,7 +48,6 @@ S2E_DEFINE_PLUGIN(Requiem, "Automatic Exploit Generation Engine", "", );
 
 Requiem::Requiem(S2E *s2e)
     : Plugin(s2e),
-      m_state(),
       m_linuxMonitor(),
       m_pybind11(),
       m_pwnlib(py::module::import("pwnlib.elf")),
@@ -61,6 +62,7 @@ Requiem::Requiem(S2E *s2e)
       m_ioBehaviors(),
       m_readPrimitives(),
       m_writePrimitives(),
+      m_inputState(),
       m_padding(),
       m_sysReadBuf(),
       m_sysReadSize() {}
@@ -80,7 +82,7 @@ void Requiem::initialize() {
 }
 
 
-void Requiem::onSymbolicRip(S2EExecutionState *state,
+void Requiem::onSymbolicRip(S2EExecutionState *exploitableState,
                             klee::ref<klee::Expr> symbolicRip,
                             uint64_t concreteRip,
                             bool &concretize,
@@ -89,11 +91,13 @@ void Requiem::onSymbolicRip(S2EExecutionState *state,
         return;
     }
 
-    m_state = state;
+    // Set m_currentState to exploitableState.
+    // All subsequent calls to reg() and mem() will operate on m_currentState.
+    setCurrentState(exploitableState);
 
     log<WARN>()
         << "Detected symbolic RIP: " << hexval(concreteRip)
-        << ", original value is: " << hexval(state->regs()->getPc())
+        << ", original value is: " << hexval(reg().readConcrete(Register::RIP))
         << "\n";
 
     reg().setRipSymbolic(symbolicRip);
@@ -108,89 +112,16 @@ void Requiem::onSymbolicRip(S2EExecutionState *state,
     // XXX: use symbolic execution instead.
     m_padding = reg().readConcrete(Register::RSP) - m_sysReadBuf - 16;
 
-    // Disassembler test.
-    /*
-    os << "__libc_csu_init = " << hexval(m_exploit.getElf().symbols()["__libc_csu_init"]) << "\n";
-
-    for (auto insn : m_disassembler.disasm(state, "__libc_csu_init")) {
-        os << hexval(insn.address) << ": " << insn.mnemonic << " " << insn.op_str << "\n";
-    }
-    */
-
-    // Constraints test
-    /*
-    os << "dumping input constraints...\n";
-    for (auto expr : state->constraints().getConstraintSet()) {
-        os << expr << "\n";
-    }
-    */
-
-    /*
-    // RBP constraint
-    klee::ref<klee::Expr> rbpConstraint
-        = klee::EqExpr::create(
-                reg().readSymbolic(Register::RBP),
-                klee::ConstantExpr::create(0xaabbccdd, klee::Expr::Int64));
-
-    // Adding RIP constraint to the current execution state.
-    klee::ref<klee::Expr> ripConstraint
-        = klee::EqExpr::create(
-                symbolicRip,
-                klee::ConstantExpr::create(0xdeadbeef, klee::Expr::Int64));
-
-    klee::ref<klee::Expr> rspConstraint
-        = klee::EqExpr::create(
-                mem().readSymbolic(reg().readConcrete(Register::RSP), klee::Expr::Int64),
-                klee::ConstantExpr::create(0xcafebabe, klee::Expr::Int64));
-
-    klee::ref<klee::Expr> rsp8Constraint
-        = klee::EqExpr::create(
-                mem().readSymbolic(reg().readConcrete(Register::RSP) + 8, klee::Expr::Int64),
-                klee::ConstantExpr::create(0x77885566, klee::Expr::Int64));
-    */
-    /*
-    bool isSym = state->mem()->symbolic(rspConcrete, 8);
-    os << "RSP = " << hexval(rspConcrete) << "\n";
-    os << "is *RSP symbolic ? " << isSym << "\n";
-    */
-
-    //(void) m_state->addConstraint(rbpConstraint, /*recomputeConcolics=*/true);
-    //(void) m_state->addConstraint(ripConstraint, /*recomputeConcolics=*/true);
-    //(void) state->addConstraint(rspConstraint, /*recomputeConcolics=*/true);
-    //(void) state->addConstraint(rsp8Constraint, /*recomputeConcolics=*/true);
-
-    /*
-    ConcreteInputs newInput;
-
-    if (m_state->getSymbolicSolution(newInput)) {
-        static int counter = 0;
-        std::string filename = "exploit" + std::to_string(counter++) + ".bin";
-
-        log<WARN>() << "Generated exploit: " << filename << "\n";
-        std::stringstream ss;
-
-        const VarValuePair &vp = newInput.front();
-        for (const auto _byte : vp.second) {
-            ss << _byte;
-        }
-
-        std::ofstream ofs("exploit.bin", std::ios::binary);
-        ofs << ss.rdbuf();
-    } else {
-        log<WARN>() << "Could not get symbolic solutions\n";
-    }
-    */
-
     generateExploit();
 
-    g_s2e->getExecutor()->terminateState(*state, "End of exploit generation");
+    g_s2e->getExecutor()->terminateState(*exploitableState, "End of exploit generation");
 }
 
 void Requiem::onProcessLoad(S2EExecutionState *state,
                             uint64_t cr3,
                             uint64_t pid,
                             const std::string &imageFileName) {
-    m_state = state;
+    setCurrentState(state);
 
     log<WARN>() << "onProcessLoad: " << imageFileName << "\n";
 
@@ -206,7 +137,7 @@ void Requiem::onTranslateInstructionEnd(ExecutionSignal *onInstructionExecute,
                                         S2EExecutionState *state,
                                         TranslationBlock *tb,
                                         uint64_t pc) {
-    m_state = state;
+    setCurrentState(state);
 
     if (pc == m_exploit.getElf().symbols()["main"]) {
         log<WARN>() << "reached main()\n";
@@ -217,11 +148,12 @@ void Requiem::onTranslateInstructionEnd(ExecutionSignal *onInstructionExecute,
     }
 
     onInstructionExecute->connect(
-            sigc::mem_fun(*this, & Requiem::instructionHook));
+            sigc::mem_fun(*this, &Requiem::onExecuteInstructionEnd));
 }
 
-void Requiem::instructionHook(S2EExecutionState *state, uint64_t pc) {
-    m_state = state;
+void Requiem::onExecuteInstructionEnd(S2EExecutionState *state,
+                                      uint64_t pc) {
+    setCurrentState(state);
 
     Instruction i = m_disassembler.disasm(pc);
 
@@ -233,7 +165,7 @@ void Requiem::instructionHook(S2EExecutionState *state, uint64_t pc) {
     */
 
     if (i.mnemonic == "syscall") {
-        syscallHook(state, pc);
+        onExecuteSyscallEnd(state, pc);
     }
 
     static auto isCallSiteOf = [this](const std::string &opStr,
@@ -258,8 +190,9 @@ void Requiem::instructionHook(S2EExecutionState *state, uint64_t pc) {
     }
 }
 
-void Requiem::syscallHook(S2EExecutionState *state, uint64_t pc) {
-    m_state = state;
+void Requiem::onExecuteSyscallEnd(S2EExecutionState *state,
+                                  uint64_t pc) {
+    setCurrentState(state);
 
     log<INFO>()
         << "syscall: " << hexval(reg().readConcrete(Register::RAX)) << " ("
@@ -275,9 +208,22 @@ void Requiem::syscallHook(S2EExecutionState *state, uint64_t pc) {
         reg().readConcrete(Register::RDI) == 0) {
         m_sysReadBuf = reg().readConcrete(Register::RSI);
         m_sysReadSize = reg().readConcrete(Register::RDX);
+
+        /*
+        // Create input state snapshot.
+        if (state->needToJumpToSymbolic()) {
+            state->regs()->setPc(pc);
+            state->jumpToSymbolic();
+        }
+        S2EExecutor::StatePair sp = g_s2e->getExecutor()->fork(*state);
+        m_inputState = dynamic_cast<S2EExecutionState *>(sp.second);
+        */
+    } else if (reg().readConcrete(Register::RAX) == 1 &&
+               reg().readConcrete(Register::RDI) == 1) {
+        log<WARN>() << "sys_write()\n";
+        // Create output state snapshot.
     }
 }
-
 
 void Requiem::generateExploit() {
     // Determine exploit strategy.
@@ -285,7 +231,7 @@ void Requiem::generateExploit() {
         m_strategy = std::make_unique<DefaultStrategy>(*this);
     }
 
-        // Write exploit shebang.
+    // Write exploit shebang.
     m_exploit.writeline(Exploit::s_shebang);
 
     // Pwntools stuff.
@@ -297,18 +243,11 @@ void Requiem::generateExploit() {
         "A8 = 8 * b'A'",
     });
 
-    // Declare gadgets.
-    for (const auto &entry : m_exploit.getGadgets()) {
-        const std::string &assembly = entry.first;
-        const uint64_t addr = entry.second;
-        m_exploit.writeline(format("%s = 0x%x", assembly.c_str(), addr));
-    }
-
-    // Declare useful memory locations.
-    for (const auto &entry : m_exploit.getMemLocations()) {
-        const std::string &name = entry.first;
-        const uint64_t addr = entry.second;
-        m_exploit.writeline(format("%s = 0x%x", name.c_str(), addr));
+    // Declare symbols and values.
+    for (const auto &entry : m_exploit.getSymtab()) {
+        const auto &name = entry.first;
+        const auto &value = entry.second;
+        m_exploit.writeline(format("%s = 0x%x", name.c_str(), value));
     }
 
     m_exploit.writeline();
@@ -336,48 +275,112 @@ void Requiem::generateExploit() {
         }
     }
 
-    // Generate the payload based on the strategy chosen by the user.
-    std::vector<std::string> lines = {
-        format("    payload  = b'A' * %d", m_padding)
-    };
+    // Generate ROP chain based on the strategy list chosen by the user.
+    std::vector<Technique*> primaryTechniques = m_strategy->getPrimaryTechniques();
+    std::vector<std::string> lines;
 
-    bool hasWrittenFirstRbp = false;
+    bool symbolicMode = true;
+    uint32_t rspOffset = 0;
 
-    for (auto technique : m_strategy->getPrimaryTechniques()) {
-        std::vector<std::vector<std::string>> ropChainsList = technique->getRopChainsList();
+    for (Technique *t : primaryTechniques) {
+        if (!symbolicMode) {
+            std::vector<std::vector<std::string>> ropPayloadList = t->getRopPayloadList();
 
-        if (hasWrittenFirstRbp) {
-            // Slice off saved rbp
-            ropChainsList.front().erase(ropChainsList.front().begin());
+            for (const auto &payloadList : ropPayloadList) {
+                for (const auto &payload : payloadList) {
+                    if (lines.empty()) {
+                        lines.push_back(format("    payload  = %s", payload.c_str()));
+                    } else {
+                        lines.push_back(format("    payload += %s", payload.c_str()));
+                    }
+                }
+                m_exploit.writeline(join(lines, '\n'));
+                m_exploit.writelines({
+                    "    proc.send(payload)",
+                    "    time.sleep(0.2)",
+                    ""
+                });
+                lines.clear();
+            }
         } else {
-            hasWrittenFirstRbp = true;
-        }
+            std::vector<std::vector<uint64_t>> concretizedRopPayloadList = t->getConcretizedRopPayloadList();
 
-        for (const auto &payloadList : ropChainsList) {
-            for (const auto &payload : payloadList) {
-                if (lines.empty()) {
-                    lines.push_back(format("    payload  = %s", payload.c_str()));
+            for (size_t i = 0; i < concretizedRopPayloadList[0].size(); i++) {
+                uint64_t value = concretizedRopPayloadList[0][i];
+
+                if (i == 0) {
+                    log<WARN>() << "setting rbp to " << klee::hexval(value) << '\n';
+                    // Add RBP constraint.
+                    klee::ref<klee::Expr> rbpConstraint
+                        = klee::EqExpr::create(
+                                reg().readSymbolic(Register::RBP),
+                                klee::ConstantExpr::create(value, klee::Expr::Int64));
+                    static_cast<void>(m_currentState->addConstraint(rbpConstraint, true));
+                } else if (i == 1) {
+                    log<WARN>() << "setting rip to " << klee::hexval(value) << '\n';
+                    // Add RIP constraint.
+                    klee::ref<klee::Expr> ripConstraint
+                        = klee::EqExpr::create(
+                                reg().readSymbolic(Register::RIP),
+                                klee::ConstantExpr::create(value, klee::Expr::Int64));
+                    static_cast<void>(m_currentState->addConstraint(ripConstraint, true));
                 } else {
-                    lines.push_back(format("    payload += %s", payload.c_str()));
+                    log<WARN>() << "setting stack to " << klee::hexval(value) << '\n';
+                    klee::ref<klee::Expr> constraint
+                        = klee::EqExpr::create(
+                                mem().readSymbolic(reg().readConcrete(Register::RSP) + rspOffset, klee::Expr::Int64),
+                                klee::ConstantExpr::create(value, klee::Expr::Int64));
+                    static_cast<void>(m_currentState->addConstraint(constraint, true));
+                    rspOffset += 8;
                 }
             }
 
-            m_exploit.writeline(join(lines, '\n'));
+            if (dynamic_cast<BasicStackPivot *>(t) ||
+                dynamic_cast<AdvancedStackPivot *>(t)) {
+                log<WARN>() << "Switching from symbolic mode to direct mode...\n";
 
-            m_exploit.writelines({
-                "    proc.send(payload)",
-                "    time.sleep(0.2)",
-                ""
-            });
+                symbolicMode = false;
+                ConcreteInputs newInput;
 
-            lines.clear();
-        }
+                if (!m_currentState->getSymbolicSolution(newInput)) {
+                    log<WARN>() << "Could not get symbolic solutions\n";
+                    return;
+                }
 
-        for (const auto &payload : technique->getExtraPayload()) {
-            if (lines.empty()) {
-                lines.push_back(format("    payload  = %s", payload.c_str()));
-            } else {
-                lines.push_back(format("    payload += %s", payload.c_str()));
+                std::string line = "    payload  = b'";
+                const VarValuePair &vp = newInput[0];
+                for (const auto _byte : vp.second) {
+                    line += format("\\x%02x", _byte);
+                }
+                line += "'";
+                lines.push_back(move(line));
+
+                m_exploit.writeline(join(lines, '\n'));
+                m_exploit.writelines({
+                        "    proc.send(payload)",
+                        "    time.sleep(0.2)",
+                        ""
+                        });
+                lines.clear();
+
+                std::vector<std::vector<std::string>> ropPayloadList = t->getRopPayloadList();
+
+                for (size_t i = 1; i < ropPayloadList.size(); i++) {
+                    for (const auto &payload : ropPayloadList[i]) {
+                        if (lines.empty()) {
+                            lines.push_back(format("    payload  = %s", payload.c_str()));
+                        } else {
+                            lines.push_back(format("    payload += %s", payload.c_str()));
+                        }
+                    }
+                    m_exploit.writeline(join(lines, '\n'));
+                    m_exploit.writelines({
+                        "    proc.send(payload)",
+                        "    time.sleep(0.2)",
+                        ""
+                    });
+                    lines.clear();
+                }
             }
         }
     }
@@ -386,10 +389,10 @@ void Requiem::generateExploit() {
     m_exploit.writeline("    proc.interactive()");
 
     // Write the buffered content to the file.
-    std::ofstream ofs(m_exploit.getOutputFilename());
+    std::ofstream ofs(m_exploit.getFilename());
     ofs << m_exploit.getContent();
 
-    log<WARN>() << "Generated exploit: " << m_exploit.getOutputFilename() << "\n";
+    log<WARN>() << "Generated script: " << m_exploit.getFilename() << "\n";
 }
 
 }  // namespace s2e::plugins::requiem

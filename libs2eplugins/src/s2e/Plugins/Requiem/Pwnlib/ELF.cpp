@@ -30,7 +30,8 @@ namespace s2e::plugins::requiem {
 ELF::ELF(py::module pwnlib,
          const std::string &filename)
     : m_pwnlib(pwnlib),
-      m_elf(pwnlib.attr("elf").attr("ELF").call(filename)) {}
+      m_elf(pwnlib.attr("elf").attr("ELF").call(filename)),
+      m_elfBase() {}
 
 
 ELF::SymbolMap ELF::symbols() const {

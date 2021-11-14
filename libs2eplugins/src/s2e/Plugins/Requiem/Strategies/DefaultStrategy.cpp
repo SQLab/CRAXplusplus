@@ -34,7 +34,8 @@ DefaultStrategy::DefaultStrategy(Requiem &ctx) : Strategy(ctx) {
     addAuxiliaryTechnique(std::make_unique<Ret2csu>(ctx));
 
     // Register primary techniques.
-    addPrimaryTechnique(std::make_unique<AdvancedStackPivot>(ctx));
+    addPrimaryTechnique(std::make_unique<BasicStackPivot>(ctx));
+    //addPrimaryTechnique(std::make_unique<AdvancedStackPivot>(ctx));
     addPrimaryTechnique(std::make_unique<GotPartialOverwrite>(ctx));
 
     /*

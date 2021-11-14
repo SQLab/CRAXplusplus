@@ -21,6 +21,8 @@
 #ifndef S2E_PLUGINS_REQUIEM_TECHNIQUE_H
 #define S2E_PLUGINS_REQUIEM_TECHNIQUE_H
 
+#include <s2e/Plugins/Requiem/Exploit.h>
+
 #include <map>
 #include <string>
 #include <vector>
@@ -40,7 +42,8 @@ public:
     virtual bool checkRequirements() const = 0;
     virtual void resolveRequiredGadgets() = 0;
     virtual std::string getAuxiliaryFunctions() const = 0;
-    virtual std::vector<std::vector<std::string>> getRopChainsList() const = 0;
+    virtual std::vector<std::vector<std::string>> getRopPayloadList() const = 0;
+    virtual std::vector<std::vector<uint64_t>> getConcretizedRopPayloadList() const = 0;
     virtual std::vector<std::string> getExtraPayload() const = 0;
     virtual std::string toString() const = 0;
 

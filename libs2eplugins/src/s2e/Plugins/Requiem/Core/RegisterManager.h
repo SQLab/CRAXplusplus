@@ -68,19 +68,25 @@ public:
 
     // Read symbolic data from the register file.
     [[nodiscard]]
-    klee::ref<klee::Expr> readSymbolic(Register reg);
+    klee::ref<klee::Expr> readSymbolic(Register reg,
+                                       bool verbose = true);
 
     // Read concrete data from the register file.
     [[nodiscard]]
-    uint64_t readConcrete(Register reg);
+    uint64_t readConcrete(Register reg,
+                          bool verbose = true);
 
     // Write symbolic data to the register file.
     [[nodiscard]]
-    bool writeSymbolic(Register reg, const klee::ref<klee::Expr> &value);
+    bool writeSymbolic(Register reg,
+                       const klee::ref<klee::Expr> &value,
+                       bool verbose = true);
 
     // Write concrete data to the register file.
     [[nodiscard]]
-    bool writeConcrete(Register reg, uint64_t value);
+    bool writeConcrete(Register reg,
+                       uint64_t value,
+                       bool verbose = true);
 
     // Register files are declared as the data members of `struct CPUX86State`.
     // This method returns the offset of the specified register file.

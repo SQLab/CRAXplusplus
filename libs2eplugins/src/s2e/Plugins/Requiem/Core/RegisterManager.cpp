@@ -47,35 +47,47 @@ void RegisterManager::initialize() {}
 
 
 bool RegisterManager::isSymbolic(Register reg) {
-    return !isa<klee::ConstantExpr>(readSymbolic(reg));
+    return !isa<klee::ConstantExpr>(readSymbolic(reg, /*verbose=*/false));
 }
 
-ref<Expr> RegisterManager::readSymbolic(Register reg) {
-    // XXX: check result
-    return m_ctx.getCurrentState()->regs()->read(getOffset(reg), klee::Expr::Int64);
+ref<Expr> RegisterManager::readSymbolic(Register reg, bool verbose) {
+    ref<Expr> ret = nullptr;
+
+    if (reg == Register::RIP && m_isRipSymbolic) {
+        ret = m_ripExpr;
+    } else {
+        ret = m_ctx.getCurrentState()->regs()->read(getOffset(reg), klee::Expr::Int64);
+    }
+
+    if (verbose && isa<klee::ConstantExpr>(ret)) {
+        m_ctx.log<WARN>() << "readSymbolic(" << getName(reg) << "), but register isn't symbolic.\n";
+    }
+    return ret;
 }
 
-uint64_t RegisterManager::readConcrete(Register reg) {
-    uint64_t ret;
-    if (!m_ctx.getCurrentState()->regs()->read(getOffset(reg), &ret, sizeof(ret), /*concretize=*/false)) {
+uint64_t RegisterManager::readConcrete(Register reg, bool verbose) {
+    uint64_t ret = 0;
+
+    if (verbose &&
+        !m_ctx.getCurrentState()->regs()->read(getOffset(reg), &ret, sizeof(ret), /*concretize=*/false)) {
         m_ctx.log<WARN>()
             << "Cannot read concrete data from register: " << getName(reg) << "\n";
     }
     return ret;
 }
 
-bool RegisterManager::writeSymbolic(Register reg, const klee::ref<klee::Expr> &value) {
+bool RegisterManager::writeSymbolic(Register reg, const klee::ref<klee::Expr> &value, bool verbose) {
     bool success = m_ctx.getCurrentState()->regs()->write(getOffset(reg), value);
-    if (!success) {
+    if (verbose && !success) {
         m_ctx.log<WARN>()
             << "Cannot write symbolic data to register: " << getName(reg) << "\n";
     }
     return success;
 }
 
-bool RegisterManager::writeConcrete(Register reg, uint64_t value) {
+bool RegisterManager::writeConcrete(Register reg, uint64_t value, bool verbose) {
     bool success = m_ctx.getCurrentState()->regs()->write(getOffset(reg), &value, sizeof(value));
-    if (!success) {
+    if (verbose && !success) {
         m_ctx.log<WARN>()
             << "Cannot write concrete data to register: " << getName(reg) << "\n";
     }

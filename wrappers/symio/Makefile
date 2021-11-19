@@ -1,5 +1,5 @@
 CXX=g++
-CXXFLAGS=-Wall -I../../source/s2e/guest/common/include
+CXXFLAGS=-Wall -I../../guest/common/include
 SRC=$(wildcard *.cc)
 BIN=symio
 

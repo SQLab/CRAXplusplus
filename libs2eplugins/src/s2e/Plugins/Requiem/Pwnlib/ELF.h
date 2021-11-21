@@ -41,14 +41,14 @@ public:
     FunctionMap functions() const;
     uint64_t bss() const;
 
-    uint64_t getElfBase() const { return m_elfBase; }
-    void setElfBase(uint64_t elfBase) { m_elfBase = elfBase; }
+    uint64_t getBase() const { return m_base; }
+    void setBase(uint64_t base) { m_base= base; }
 
 private:
     pybind11::module m_pwnlib;
     pybind11::object m_elf;
 
-    uint64_t m_elfBase;
+    uint64_t m_base;
 };
 
 }  // namespace s2e::plugins::requiem

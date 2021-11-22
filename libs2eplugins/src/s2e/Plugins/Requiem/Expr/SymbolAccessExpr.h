@@ -52,6 +52,14 @@ private:
 public:
     virtual ~SymbolAccessExpr() = default;
 
+    virtual unsigned getNumKids() const override {
+        return 0;
+    }
+
+    virtual ref<Expr> getKid(unsigned i) const override {
+        return nullptr;
+    }
+
     static ref<Expr> alloc(const ref<ConstantExpr> &l,
                            const ref<ConstantExpr> &r,
                            const std::string &symbol) {
@@ -78,9 +86,15 @@ public:
         return true;
     }
 
-    int64_t toInt64() const {
-        //return AddExpr::getKid(0) + AddExpr::getKid(1);
-        return 0;
+    ref<ConstantExpr> sumExpr() const {
+        auto lce = dyn_cast<ConstantExpr>(AddExpr::getKid(0));
+        auto rce = dyn_cast<ConstantExpr>(AddExpr::getKid(1));
+        assert(lce && rce);
+        return lce->Add(rce);
+    }
+
+    uint64_t getZExtValue() const {
+        return sumExpr()->getZExtValue();
     }
 
     std::string toString() const {

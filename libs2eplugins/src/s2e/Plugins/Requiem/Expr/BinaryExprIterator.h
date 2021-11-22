@@ -94,6 +94,7 @@ public:
         return m_currentNode;
     }
 
+    // XXX: optimize this with compile-time polymorphism.
     virtual void step() = 0;
 
     static BinaryExprIterator<S> begin(const ref<Expr> &e) {

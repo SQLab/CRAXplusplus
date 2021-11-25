@@ -23,6 +23,7 @@
 #include <s2e/ConfigFile.h>
 #include <s2e/Plugins/OSMonitors/Support/ProcessExecutionDetector.h>
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
+#include <s2e/Plugins/Requiem/Expr/BinaryExprEvaluator.h>
 #include <s2e/Plugins/Requiem/Strategies/DefaultStrategy.h>
 #include <s2e/Plugins/Requiem/Techniques/StackPivot.h>
 #include <s2e/Plugins/Requiem/Utils/StringUtil.h>
@@ -32,6 +33,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <memory>
 
 #include "Requiem.h"
 
@@ -42,6 +44,9 @@ typedef std::pair<std::string, std::vector<unsigned char>> VarValuePair;
 typedef std::vector<VarValuePair> ConcreteInputs;
 
 namespace s2e::plugins::requiem {
+
+using SymbolicRopPayload = Technique::SymbolicRopPayload;
+using ConcreteRopPayload = Technique::ConcreteRopPayload;
 
 S2E_DEFINE_PLUGIN(Requiem, "Automatic Exploit Generation Engine", "", );
 
@@ -226,11 +231,6 @@ void Requiem::onExecuteSyscallEnd(S2EExecutionState *state,
 }
 
 void Requiem::generateExploit() {
-    // Determine exploit strategy.
-    if (!m_strategy) {
-        m_strategy = std::make_unique<DefaultStrategy>(*this);
-    }
-
     // Write exploit shebang.
     m_exploit.writeline(Exploit::s_shebang);
 
@@ -240,14 +240,20 @@ void Requiem::generateExploit() {
         "context.update(arch = 'amd64', os = 'linux', log_level = 'info')",
         "",
         format("elf = ELF('%s', checksec=False)", m_exploit.getElfFilename().c_str()),
-        "A8 = 8 * b'A'",
     });
+
+    // Determine exploit strategy.
+    if (!m_strategy) {
+        m_strategy = std::make_unique<DefaultStrategy>(*this);
+    }
+
+    m_exploit.registerSymbol("elf_base", 0);
 
     // Declare symbols and values.
     for (const auto &entry : m_exploit.getSymtab()) {
         const auto &name = entry.first;
         const auto &value = entry.second;
-        m_exploit.writeline(format("%s = 0x%x", name.c_str(), value));
+        m_exploit.writeline(format("%s = 0x%llx", name.c_str(), value));
     }
 
     m_exploit.writeline();
@@ -281,73 +287,92 @@ void Requiem::generateExploit() {
     uint32_t rspOffset = 0;
 
     for (Technique *t : primaryTechniques) {
+        log<WARN>() << t->toString() << '\n';
+
+        std::vector<SymbolicRopPayload> symbolicRopPayloadList = t->getSymbolicRopPayloadList();
+
+        // Direct payload generation mode
         if (!symbolicMode) {
-            std::vector<std::vector<std::string>> ropPayloadList = t->getRopPayloadList();
-
-            for (const auto &payloadList : ropPayloadList) {
-                for (const auto &payload : payloadList) {
-                    m_exploit.appendRopPayload(payload);
+            for (const auto &payload : symbolicRopPayloadList) {
+                for (const ref<Expr> &e : payload) {
+                    m_exploit.appendRopPayload(BinaryExprEvaluator<std::string>().evaluate(e));
                 }
                 m_exploit.flushRopPayload();
             }
-        } else {
-            std::vector<std::vector<uint64_t>> concretizedRopPayloadList = t->getConcretizedRopPayloadList();
+            continue;
+        }
 
-            for (size_t i = 0; i < concretizedRopPayloadList[0].size(); i++) {
-                uint64_t value = concretizedRopPayloadList[0][i];
+        // Symbolic payload generation mode
+        log<WARN>() << "allocating concrete rop payload list...\n";
+        std::vector<ConcreteRopPayload> concreteRopPayloadList;
 
-                if (i == 0) {
-                    // Add RBP constraint.
-                    klee::ref<klee::Expr> rbpConstraint
-                        = klee::EqExpr::create(
-                                reg().readSymbolic(Register::RBP),
-                                klee::ConstantExpr::create(value, klee::Expr::Int64));
-                    static_cast<void>(m_currentState->addConstraint(rbpConstraint, true));
-                } else if (i == 1) {
-                    // Add RIP constraint.
-                    klee::ref<klee::Expr> ripConstraint
-                        = klee::EqExpr::create(
-                                reg().readSymbolic(Register::RIP),
-                                klee::ConstantExpr::create(value, klee::Expr::Int64));
-                    static_cast<void>(m_currentState->addConstraint(ripConstraint, true));
-                } else {
-                    klee::ref<klee::Expr> constraint
-                        = klee::EqExpr::create(
-                                mem().readSymbolic(reg().readConcrete(Register::RSP) + rspOffset, klee::Expr::Int64),
-                                klee::ConstantExpr::create(value, klee::Expr::Int64));
-                    static_cast<void>(m_currentState->addConstraint(constraint, true));
-                    rspOffset += 8;
-                }
+        log<WARN>() << "concretizing rop payload list...\n";
+        for (size_t i = 0; i < symbolicRopPayloadList.size(); i++) {
+            concreteRopPayloadList.push_back({});
+
+            for (size_t j = 0; j < symbolicRopPayloadList[i].size(); j++) {
+                const ref<Expr> &e = symbolicRopPayloadList[i][j];
+                uint64_t value = BinaryExprEvaluator<uint64_t>().evaluate(e);
+                concreteRopPayloadList.back().push_back(value);
+            }
+        }
+
+        log<WARN>() << "building exploit constraints...\n";
+        for (size_t i = 0; i < concreteRopPayloadList[0].size(); i++) {
+            const ref<Expr> &e = symbolicRopPayloadList[0][i];
+            uint64_t value = concreteRopPayloadList[0][i];
+            log<WARN>() << BinaryExprEvaluator<std::string>().evaluate(e) << " (concretized=" << klee::hexval(value) << ")\n";
+
+            if (i == 0) {
+                // Add RBP constraint.
+                klee::ref<klee::Expr> rbpConstraint
+                    = klee::EqExpr::create(
+                            reg().readSymbolic(Register::RBP),
+                            klee::ConstantExpr::create(value, klee::Expr::Int64));
+                static_cast<void>(m_currentState->addConstraint(rbpConstraint, true));
+            } else if (i == 1) {
+                // Add RIP constraint.
+                klee::ref<klee::Expr> ripConstraint
+                    = klee::EqExpr::create(
+                            reg().readSymbolic(Register::RIP),
+                            klee::ConstantExpr::create(value, klee::Expr::Int64));
+                static_cast<void>(m_currentState->addConstraint(ripConstraint, true));
+            } else {
+                klee::ref<klee::Expr> constraint
+                    = klee::EqExpr::create(
+                            mem().readSymbolic(reg().readConcrete(Register::RSP) + rspOffset, klee::Expr::Int64),
+                            klee::ConstantExpr::create(value, klee::Expr::Int64));
+                static_cast<void>(m_currentState->addConstraint(constraint, true));
+                rspOffset += 8;
+            }
+        }
+
+        if (dynamic_cast<BasicStackPivot *>(t) ||
+            dynamic_cast<AdvancedStackPivot *>(t)) {
+            log<WARN>() << "Switching from symbolic mode to direct mode...\n";
+
+            symbolicMode = false;
+            ConcreteInputs newInput;
+
+            if (!m_currentState->getSymbolicSolution(newInput)) {
+                log<WARN>() << "Could not get symbolic solutions\n";
+                return;
             }
 
-            if (dynamic_cast<BasicStackPivot *>(t) ||
-                dynamic_cast<AdvancedStackPivot *>(t)) {
-                log<WARN>() << "Switching from symbolic mode to direct mode...\n";
+            std::string symbolicPayload = "b'";
+            const VarValuePair &vp = newInput[0];
+            for (const auto _byte : vp.second) {
+                symbolicPayload += format("\\x%02x", _byte);
+            }
+            symbolicPayload += "'";
+            m_exploit.appendRopPayload(symbolicPayload);
+            m_exploit.flushRopPayload();
 
-                symbolicMode = false;
-                ConcreteInputs newInput;
-
-                if (!m_currentState->getSymbolicSolution(newInput)) {
-                    log<WARN>() << "Could not get symbolic solutions\n";
-                    return;
+            for (size_t i = 1; i < symbolicRopPayloadList.size(); i++) {
+                for (const ref<Expr> &e : symbolicRopPayloadList[i]) {
+                    m_exploit.appendRopPayload(BinaryExprEvaluator<std::string>().evaluate(e));
                 }
-
-                std::string symbolicPayload = "b'";
-                const VarValuePair &vp = newInput[0];
-                for (const auto _byte : vp.second) {
-                    symbolicPayload += format("\\x%02x", _byte);
-                }
-                symbolicPayload += "'";
-                m_exploit.appendRopPayload(symbolicPayload);
                 m_exploit.flushRopPayload();
-
-                std::vector<std::vector<std::string>> ropPayloadList = t->getRopPayloadList();
-                for (size_t i = 1; i < ropPayloadList.size(); i++) {
-                    for (const auto &payload : ropPayloadList[i]) {
-                        m_exploit.appendRopPayload(payload);
-                    }
-                    m_exploit.flushRopPayload();
-                }
             }
         }
     }
@@ -359,7 +384,7 @@ void Requiem::generateExploit() {
     std::ofstream ofs(m_exploit.getFilename());
     ofs << m_exploit.getContent();
 
-    log<WARN>() << "Generated script: " << m_exploit.getFilename() << "\n";
+    log<WARN>() << "Generated exploit script: " << m_exploit.getFilename() << "\n";
 }
 
 }  // namespace s2e::plugins::requiem

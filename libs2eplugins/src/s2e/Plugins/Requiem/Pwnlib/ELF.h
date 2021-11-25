@@ -18,8 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef S2E_PLUGINS_REQUIEM_ELF_H
-#define S2E_PLUGINS_REQUIEM_ELF_H
+#ifndef S2E_PLUGINS_REQUIEM_PWNLIB_ELF_H
+#define S2E_PLUGINS_REQUIEM_PWNLIB_ELF_H
 
 #include <s2e/Plugins/Requiem/Pwnlib/Function.h>
 #include <pybind11/embed.h>
@@ -35,9 +35,10 @@ public:
     using FunctionMap = std::map<std::string, Function>;
 
     ELF(pybind11::module pwnlib,
-       const std::string &filename); 
+        const std::string &filename); 
 
     SymbolMap symbols() const;
+    SymbolMap got() const;
     FunctionMap functions() const;
     uint64_t bss() const;
 
@@ -53,4 +54,4 @@ private:
 
 }  // namespace s2e::plugins::requiem
 
-#endif  // S2E_PLUGINS_REQUIEM_ELF_H
+#endif  // S2E_PLUGINS_REQUIEM_PWNLIB_ELF_H

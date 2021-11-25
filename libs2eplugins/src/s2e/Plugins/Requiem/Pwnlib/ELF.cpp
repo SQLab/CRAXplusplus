@@ -38,6 +38,10 @@ ELF::SymbolMap ELF::symbols() const {
     return m_elf.attr("symbols").cast<ELF::SymbolMap>();
 }
 
+ELF::SymbolMap ELF::got() const {
+    return m_elf.attr("got").cast<ELF::SymbolMap>();
+}
+
 ELF::FunctionMap ELF::functions() const {
     // The ELF class from pwntools is huge and I don't want to
     // introduce the entire of it into requiem, so I'll perform

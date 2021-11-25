@@ -110,6 +110,7 @@ protected:
         : m_currentNode(),
           m_stack() {}
 
+    explicit
     __BaseBinaryExprIterator(const ref<Expr> &root)
         : m_currentNode(),
           m_stack(std::make_shared<std::stack<ref<Expr>>>()) {
@@ -141,6 +142,7 @@ protected:
     BinaryExprIterator()
         : details::__BaseBinaryExprIterator<IterStrategy::PRE_ORDER>() {}
 
+    explicit
     BinaryExprIterator(const ref<Expr> &root)
         : details::__BaseBinaryExprIterator<IterStrategy::PRE_ORDER>(root) {
         m_stack->push(root);
@@ -179,6 +181,7 @@ protected:
     BinaryExprIterator()
         : details::__BaseBinaryExprIterator<IterStrategy::IN_ORDER>() {}
 
+    explicit
     BinaryExprIterator(const ref<Expr> &root)
         : details::__BaseBinaryExprIterator<IterStrategy::IN_ORDER>(root) {
         ref<Expr> node = root;
@@ -221,6 +224,7 @@ protected:
         : details::__BaseBinaryExprIterator<IterStrategy::POST_ORDER>(),
           m_localRootNode() {}
 
+    explicit
     BinaryExprIterator(const ref<Expr> &root)
         : details::__BaseBinaryExprIterator<IterStrategy::POST_ORDER>(root),
           m_localRootNode(root) {

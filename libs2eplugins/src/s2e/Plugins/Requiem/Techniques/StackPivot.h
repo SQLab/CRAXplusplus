@@ -40,9 +40,10 @@ public:
     virtual bool checkRequirements() const override;
     virtual void resolveRequiredGadgets() override;
     virtual std::string getAuxiliaryFunctions() const override;
-    virtual std::vector<std::vector<std::string>> getRopPayloadList() const override;
-    virtual std::vector<std::vector<uint64_t>> getConcretizedRopPayloadList() const override;
-    virtual std::vector<std::string> getExtraPayload() const override;
+
+    virtual std::vector<SymbolicRopPayload> getSymbolicRopPayloadList() const override;
+    virtual ConcreteRopPayload getExtraPayload() const override;
+
     virtual std::string toString() const override;
 };
 
@@ -54,9 +55,10 @@ public:
     virtual bool checkRequirements() const override;
     virtual void resolveRequiredGadgets() override;
     virtual std::string getAuxiliaryFunctions() const override;
-    virtual std::vector<std::vector<std::string>> getRopPayloadList() const override;
-    virtual std::vector<std::vector<uint64_t>> getConcretizedRopPayloadList() const override;
-    virtual std::vector<std::string> getExtraPayload() const override;
+
+    virtual std::vector<SymbolicRopPayload> getSymbolicRopPayloadList() const override;
+    virtual ConcreteRopPayload getExtraPayload() const override;
+
     virtual std::string toString() const override;
 
 protected:

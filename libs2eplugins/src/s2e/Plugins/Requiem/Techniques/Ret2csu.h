@@ -23,6 +23,7 @@
 
 #include <s2e/Plugins/Requiem/Techniques/Technique.h>
 
+#include <exception>
 #include <map>
 #include <string>
 #include <vector>
@@ -34,43 +35,49 @@ class Requiem;
 
 class Ret2csu : public Technique {
 public:
-    Ret2csu(Requiem &ctx,
-            std::string arg1 = "",
-            std::string arg2 = "",
-            std::string arg3 = "",
-            std::string addr = "");
+    class UnhandledPlaceholderException : public std::exception {
+    public:
+        UnhandledPlaceholderException() = default;
+        virtual ~UnhandledPlaceholderException() = default;
+
+        virtual const char *what() const throw() {
+            return "Unhandled placeholder expr found";
+        }
+    };
+
+
+    Ret2csu(Requiem &ctx);
     virtual ~Ret2csu() = default;
 
     virtual bool checkRequirements() const override;
     virtual void resolveRequiredGadgets() override;
     virtual std::string getAuxiliaryFunctions() const override;
-    virtual std::vector<std::vector<std::string>> getRopPayloadList() const override;
-    virtual std::vector<std::vector<uint64_t>> getConcretizedRopPayloadList() const override;
-    virtual std::vector<std::string> getExtraPayload() const override;
+
+    virtual std::vector<SymbolicRopPayload> getSymbolicRopPayloadList() const override;
+    virtual ConcreteRopPayload getExtraPayload() const override;
+
     virtual std::string toString() const override;
 
-    std::vector<std::vector<std::string>> getRopPayloadList(const std::string &arg1,
-                                                            const std::string &arg2,
-                                                            const std::string &arg3,
-                                                            const std::string &addr,
-                                                            bool arg1IsRdi = false) const;
+    std::vector<SymbolicRopPayload> getSymbolicRopPayloadList(uint64_t addr,
+                                                              uint64_t arg1,
+                                                              uint64_t arg2,
+                                                              uint64_t arg3) const;
 
-    std::vector<std::vector<uint64_t>> getConcretizedRopPayloadList(uint64_t arg1,
-                                                                    uint64_t arg2,
-                                                                    uint64_t arg3,
-                                                                    uint64_t addr,
-                                                                    bool arg1IsRdi = false) const;
-protected:
+    static const std::string s_libcCsuInit;
+    static const std::string s_libcCsuInitGadget1;
+    static const std::string s_libcCsuInitGadget2;
+    static const std::string s_libcCsuInitCallTarget;
+
+private:
     void parseLibcCsuInit();
     void searchGadget2CallTarget(std::string funcName = "_fini");
-    void buildRopPayloadList();
-    void buildConcretizedRopPayloadList();
+    void buildSymbolicRopPayloadList();
     void buildAuxiliaryFunction();
 
-    std::string m_arg1;
-    std::string m_arg2;
-    std::string m_arg3;
-    std::string m_addr;
+    uint64_t m_addr;
+    uint64_t m_arg1;
+    uint64_t m_arg2;
+    uint64_t m_arg3;
 
     // The following attributes will be initialized in
     // `Ret2csu::parseLibcCsuInit()` and `Ret2csu::buildAuxiliaryFunction()`.
@@ -84,8 +91,7 @@ protected:
     std::string m_gadget2CallReg1;
     std::string m_gadget2CallReg2;
 
-    std::vector<std::vector<std::string>> m_ropPayloadList;
-    std::vector<std::vector<uint64_t>> m_concretizedRopPayloadList;
+    std::vector<SymbolicRopPayload> m_symbolicRopPayloadList;
     std::string m_auxiliaryFunction;
 };
 

@@ -26,7 +26,13 @@
 
 #include "StackPivot.h"
 
+using namespace klee;
+
 namespace s2e::plugins::requiem {
+
+using SymbolicRopPayload = Technique::SymbolicRopPayload;
+using ConcreteRopPayload = Technique::ConcreteRopPayload;
+
 
 BasicStackPivot::BasicStackPivot(Requiem &ctx) : Technique(ctx) {
     resolveRequiredGadgets();
@@ -51,37 +57,24 @@ std::string BasicStackPivot::getAuxiliaryFunctions() const {
     return "";
 }
 
-std::vector<std::vector<std::string>> BasicStackPivot::getRopPayloadList() const {
-    return {
-        {
-            "p64(0)",
-            "uROP(elf.sym['read'], 0, pivot_dest, 1024)",
-            "p64(pop_rbp_ret)",
-            "p64(pivot_dest)",
-            "p64(leave_ret)"
-        }
-    };
-}
-
-std::vector<std::vector<uint64_t>> BasicStackPivot::getConcretizedRopPayloadList() const {
-    std::vector<uint64_t> part1 = {0};
-
+std::vector<SymbolicRopPayload> BasicStackPivot::getSymbolicRopPayloadList() const {
     Ret2csu *ret2csu = dynamic_cast<Ret2csu *>(Technique::mapper["Ret2csu"]);
+    assert(ret2csu);
 
-    std::vector<uint64_t> part2
-        = ret2csu->getConcretizedRopPayloadList(
-                0,
-                m_ctx.getExploit().getSymbolValue("pivot_dest"),
-                1024,
-                m_ctx.getExploit().getElf().symbols()["read"])[0];
+    uint64_t addr = m_ctx.getExploit().getElf().symbols()["read"];
+    uint64_t arg1 = 0;
+    uint64_t arg2 = m_ctx.getExploit().getSymbolValue("pivot_dest");
+    uint64_t arg3 = 1024;
 
-    std::vector<uint64_t> part3 = {
-        m_ctx.getExploit().getSymbolValue("pop_rbp_ret"),
-        m_ctx.getExploit().getSymbolValue("pivot_dest"),
-        m_ctx.getExploit().getSymbolValue("leave_ret")
+    SymbolicRopPayload part1 = { ConstantExpr::create(0, Expr::Int64) };
+    SymbolicRopPayload part2 = ret2csu->getSymbolicRopPayloadList(addr, arg1, arg2, arg3)[0];
+    SymbolicRopPayload part3 = {
+        BaseOffsetExpr::create(m_ctx.getExploit(), "pop_rbp_ret"),
+        BaseOffsetExpr::create(m_ctx.getExploit(), "pivot_dest"),
+        BaseOffsetExpr::create(m_ctx.getExploit(), "leave_ret"),
     };
 
-    std::vector<uint64_t> ret;
+    SymbolicRopPayload ret;
     ret.reserve(part1.size() + part2.size() + part3.size());
     ret.insert(ret.end(), part1.begin(), part1.end());
     ret.insert(ret.end(), part2.begin(), part2.end());
@@ -89,8 +82,8 @@ std::vector<std::vector<uint64_t>> BasicStackPivot::getConcretizedRopPayloadList
     return {ret};
 }
 
-std::vector<std::string> BasicStackPivot::getExtraPayload() const {
-    return {"p64(0)"};  // rbp
+ConcreteRopPayload BasicStackPivot::getExtraPayload() const {
+    return {0};  // rbp
 }
 
 std::string BasicStackPivot::toString() const {
@@ -121,7 +114,8 @@ std::string AdvancedStackPivot::getAuxiliaryFunctions() const {
     return "";
 }
 
-std::vector<std::vector<std::string>> AdvancedStackPivot::getRopPayloadList() const {
+std::vector<SymbolicRopPayload> AdvancedStackPivot::getSymbolicRopPayloadList() const {
+    /*
     const std::vector<uint64_t> &writePrimitives = m_ctx.getWritePrimitives();
     assert(writePrimitives.size());
 
@@ -185,24 +179,11 @@ std::vector<std::vector<std::string>> AdvancedStackPivot::getRopPayloadList() co
     }
 
     return ret;
+    */
+    return {};
 }
 
-std::vector<std::vector<uint64_t>> AdvancedStackPivot::getConcretizedRopPayloadList() const {
-    const std::vector<uint64_t> &writePrimitives = m_ctx.getWritePrimitives();
-    assert(writePrimitives.size());
-
-    // Resolve `ret2LeaRbp`.
-    uint64_t ret2LeaRbp = writePrimitives.front() - determineOffset();
-
-    return {
-        {
-            m_ctx.getExploit().getSymbolValue("pivot_dest"),
-            ret2LeaRbp
-        }
-    };
-}
-
-std::vector<std::string> AdvancedStackPivot::getExtraPayload() const {
+ConcreteRopPayload AdvancedStackPivot::getExtraPayload() const {
     return {};
 }
 

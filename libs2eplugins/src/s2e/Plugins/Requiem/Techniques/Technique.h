@@ -21,7 +21,10 @@
 #ifndef S2E_PLUGINS_REQUIEM_TECHNIQUE_H
 #define S2E_PLUGINS_REQUIEM_TECHNIQUE_H
 
+#include <s2e/Plugins/Requiem/Expr/Expr.h>
 #include <s2e/Plugins/Requiem/Exploit.h>
+
+#include <klee/Expr.h>
 
 #include <map>
 #include <string>
@@ -36,15 +39,20 @@ class Requiem;
 // e.g., stack pivoting, ret2csu, orw, etc.
 class Technique {
 public:
+    using SymbolicRopPayload = std::vector<klee::ref<klee::Expr>>;
+    using ConcreteRopPayload = std::vector<uint64_t>;
+
+
     explicit Technique(Requiem &ctx) : m_ctx(ctx) {}
     virtual ~Technique() = default;
 
     virtual bool checkRequirements() const = 0;
     virtual void resolveRequiredGadgets() = 0;
     virtual std::string getAuxiliaryFunctions() const = 0;
-    virtual std::vector<std::vector<std::string>> getRopPayloadList() const = 0;
-    virtual std::vector<std::vector<uint64_t>> getConcretizedRopPayloadList() const = 0;
-    virtual std::vector<std::string> getExtraPayload() const = 0;
+
+    virtual std::vector<SymbolicRopPayload> getSymbolicRopPayloadList() const = 0;
+    virtual ConcreteRopPayload getExtraPayload() const = 0;
+
     virtual std::string toString() const = 0;
 
     static std::map<std::string, Technique*> mapper;

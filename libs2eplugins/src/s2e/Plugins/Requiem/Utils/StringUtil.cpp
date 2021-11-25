@@ -18,6 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <algorithm>
+
 #include "StringUtil.h"
 
 namespace s2e::plugins::requiem {
@@ -77,6 +79,20 @@ std::string strip(std::string s) {
     s.erase(0, s.find_first_not_of(whitespace));
     s.erase(s.find_last_not_of(whitespace) + 1);
     return s;
+}
+
+std::string ljust(std::string s, size_t size, char c) {
+    if (s.size() >= size) {
+        return s;
+    }
+    s.resize(size);
+    std::fill_n(s.begin() + s.size(), size - s.size(), c);
+    return s;
+}
+
+bool isNumString(const std::string &s) {
+    return !s.empty() &&
+           std::find_if(s.begin(), s.end(), [](const auto c) { return !std::isdigit(c); }) == s.end();
 }
 
 }  // namespace s2e::plugins::requiem

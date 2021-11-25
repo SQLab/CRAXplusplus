@@ -21,12 +21,17 @@
 #ifndef S2E_PLUGINS_REQUIEM_BINARY_EXPR_EVALUATOR_H
 #define S2E_PLUGINS_REQUIEM_BINARY_EXPR_EVALUATOR_H
 
-#include <s2e/Plugins/Requiem/Expr/SymbolAccessExpr.h>
+#include <s2e/Plugins/Requiem/Expr/Expr.h>
 #include <s2e/Plugins/Requiem/Expr/BinaryExprIterator.h>
+#include <s2e/Plugins/Requiem/Pwnlib/Util.h>
 
 #include <stack>
 #include <string>
 #include <type_traits>
+
+using s2e::plugins::requiem::p64;
+using s2e::plugins::requiem::u64;
+
 
 namespace klee {
 
@@ -61,19 +66,25 @@ T BinaryExprEvaluator<T>::evaluate(const ref<Expr> &e) const {
     T ret {};
 
     if constexpr (std::is_same_v<uint64_t, T>) {
+        // ByteVectorExpr should only exist as expr tree's root node.
+        if (auto bve = dyn_cast<ByteVectorExpr>(e)) {
+            ret = u64(bve->getBytes());
+            return ret;
+        }
+
         std::stack<ref<Expr>> stack;
 
         // Evaluates an expr to an integer constant.
         for (auto it = BinaryExprIterator<IterStrategy::POST_ORDER>::begin(e);
-                it != decltype(it)::end();
-                it++) {
+             it != decltype(it)::end();
+             it++) {
             ref<Expr> node = *it;
 
-            if (auto sae = dyn_cast<SymbolAccessExpr>(node)) {
-                // SymbolAccessExpr, essentially, is an AddExpr,
+            if (auto boe = dyn_cast<BaseOffsetExpr>(node)) {
+                // BaseOffsetExpr, essentially, is an AddExpr,
                 // but during reverse polish notation evaluation
                 // we should treat it like a ConstantExpr.
-                stack.push(sae->sumExpr());
+                stack.push(boe->toConstantExpr());
             } else if (auto ce = dyn_cast<ConstantExpr>(node)) {
                 stack.push(ce);
             } else if (isValidOperator(node)) {
@@ -110,6 +121,14 @@ T BinaryExprEvaluator<T>::evaluate(const ref<Expr> &e) const {
         ret = ce->getZExtValue();
 
     } else if constexpr (std::is_same_v<std::string, T>) {
+        // ByteVectorExpr should only exist as expr tree's root node.
+        if (auto bve = dyn_cast<ByteVectorExpr>(e)) {
+            ret = bve->toString();
+            return ret;
+        }
+
+        ret += "p64(";
+
         // Evaluates an expr to a string of infix expression,
         // e.g., "3 + 2", "0 + elf.sym['read'] + 0x30 * 2"
         for (auto it = BinaryExprIterator<IterStrategy::IN_ORDER>::begin(e);
@@ -117,8 +136,8 @@ T BinaryExprEvaluator<T>::evaluate(const ref<Expr> &e) const {
              it++) {
             ref<Expr> node = *it;
 
-            if (auto sae = dyn_cast<SymbolAccessExpr>(node)) {
-                ret += sae->toString();
+            if (auto boe = dyn_cast<BaseOffsetExpr>(node)) {
+                ret += boe->toString();
             } else if (auto ce = dyn_cast<ConstantExpr>(node)) {
                 std::string s;
                 ce->toString(s, /*Base=*/16);
@@ -139,6 +158,8 @@ T BinaryExprEvaluator<T>::evaluate(const ref<Expr> &e) const {
                 }
             }
         }
+
+        ret += ')';
 
     } else {
         // https://stackoverflow.com/questions/53945490/how-to-assert-that-a-constexpr-if-else-clause-never-happen

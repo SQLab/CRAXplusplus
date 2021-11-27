@@ -144,12 +144,11 @@ void Requiem::onTranslateInstructionEnd(ExecutionSignal *onInstructionExecute,
                                         uint64_t pc) {
     setCurrentState(state);
 
-    if (m_linuxMonitor->isKernelAddress(pc)) {
-        return;
+    if (!m_linuxMonitor->isKernelAddress(pc)) {
+        // Register instruction hook.
+        onInstructionExecute->connect(
+                sigc::mem_fun(*this, &Requiem::onExecuteInstructionEnd));
     }
-
-    onInstructionExecute->connect(
-            sigc::mem_fun(*this, &Requiem::onExecuteInstructionEnd));
 }
 
 void Requiem::onExecuteInstructionEnd(S2EExecutionState *state,

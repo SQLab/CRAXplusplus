@@ -211,8 +211,7 @@ void Ret2csu::searchGadget2CallTarget(std::string funcName) {
     std::vector<uint8_t> funcAddrBytes(8);
 
     std::memcpy(funcAddrBytes.data(), &funcAddr, sizeof(funcAddr));
-    //std::vector<uint64_t> candidates = m_ctx.mem().search(funcAddrBytes);
-    std::vector<uint64_t> candidates = {0x403e38};
+    std::vector<uint64_t> candidates = m_ctx.mem().search(funcAddrBytes);
 
     if (candidates.empty()) {
         m_ctx.log<WARN>() << "No candidates for " << s_libcCsuInit << "()'s call target\n";

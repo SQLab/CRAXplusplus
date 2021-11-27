@@ -116,9 +116,6 @@ std::vector<uint64_t> MemoryManager::search(const std::vector<uint8_t> &needle) 
             continue;
         }
 
-        m_ctx.log<WARN>()
-            << "searching [" << hexval(region.start) << ',' << hexval(region.end) << "]\n";
-
         // Read the region concretely into `haystack`,
         // and use kmp algorithm to search all the occurences of `needle`.
         std::vector<uint8_t> haystack = readConcrete(region.start, region.end - region.start, /*concretize=*/false);
@@ -181,7 +178,8 @@ std::set<MemoryRegion, MemoryRegionCmp> MemoryManager::getMapInfo(uint64_t pid) 
 void MemoryManager::showMapInfo(uint64_t pid) const {
     auto &os = m_ctx.log<WARN>();
 
-    os << "--------------- [VMMAP] ---------------\n"
+    os << "Dummping memory map...\n"
+        << "--------------- [VMMAP] ---------------\n"
         << "Start\t\tEnd\t\tPerm\n";
 
     for (const auto &region : getMapInfo(pid)) {

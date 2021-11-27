@@ -55,21 +55,21 @@ public:
     void initialize();
 
     template <enum LogLevel T>
-    llvm::raw_ostream &log() const;
+    llvm::raw_ostream &log(S2EExecutionState *state = nullptr) const;
 
     template <>
-    llvm::raw_ostream &log<LogLevel::INFO>() const {
-        return g_s2e->getInfoStream(m_currentState);
+    llvm::raw_ostream &log<LogLevel::INFO>(S2EExecutionState *state) const {
+        return state ? getInfoStream(state) : getInfoStream(m_currentState);
     }
 
     template <>
-    llvm::raw_ostream &log<LogLevel::DEBUG>() const {
-        return g_s2e->getDebugStream(m_currentState);
+    llvm::raw_ostream &log<LogLevel::DEBUG>(S2EExecutionState *state) const {
+        return state ? getDebugStream(state) : getDebugStream(m_currentState);
     }
 
     template <>
-    llvm::raw_ostream &log<LogLevel::WARN>() const {
-        return g_s2e->getWarningsStream(m_currentState);
+    llvm::raw_ostream &log<LogLevel::WARN>(S2EExecutionState *state) const {
+        return state ? getWarningsStream(state) : getWarningsStream(m_currentState);
     }
 
 

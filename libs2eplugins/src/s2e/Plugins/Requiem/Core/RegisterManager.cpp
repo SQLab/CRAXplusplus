@@ -96,7 +96,9 @@ bool RegisterManager::writeConcrete(Register reg, uint64_t value, bool verbose) 
 
 void RegisterManager::showRegInfo() {
     auto &os = m_ctx.log<WARN>();
-    os << "---------- [REGISTERS] ----------\n";
+
+    os << "Dumping CPU registers...\n"
+        << "---------- [REGISTERS] ----------\n";
 
     for (int i = 0; i < Register::LAST; i++) {
         auto reg = static_cast<Register>(i);

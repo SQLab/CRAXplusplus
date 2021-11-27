@@ -75,16 +75,22 @@ bool RopChainBuilder::build(Exploit &exploit,
         for (size_t i = 0; i < concreteRopPayloadList[0].size(); i++) {
             const ref<Expr> &e = symbolicRopPayloadList[0][i];
             uint64_t value = concreteRopPayloadList[0][i];
-            m_ctx.log<WARN>() << BinaryExprEvaluator<std::string>().evaluate(e) << " (concretized=" << klee::hexval(value) << ")\n";
+            m_ctx.log<INFO>() << BinaryExprEvaluator<std::string>().evaluate(e) << " (concretized=" << klee::hexval(value) << ")\n";
 
             if (i == 0) {
-                addRegisterConstraint(Register::RBP, value);
+                if (!addRegisterConstraint(Register::RBP, value)) {
+                    return false;
+                }
             } else if (i == 1) {
-                addRegisterConstraint(Register::RIP, value);
+                if (!addRegisterConstraint(Register::RIP, value)) {
+                    return false;
+                }
             } else {
                 uint64_t addr = m_ctx.reg().readConcrete(Register::RSP) +
                                 m_symbolicModeRspOffset;
-                addMemoryConstraint(addr, value);
+                if (!addMemoryConstraint(addr, value)) {
+                    return false;
+                }
                 m_symbolicModeRspOffset += 8;
             }
         }

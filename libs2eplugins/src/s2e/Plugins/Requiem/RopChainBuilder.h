@@ -42,19 +42,23 @@ public:
           m_symbolicModeRspOffset() {}
 
 
+    [[nodiscard]]
     bool build(Exploit &exploit,
                const std::vector<Technique *> &techniques);
 
 private:
+    [[nodiscard]]
     bool shouldSwitchToDirectMode(const Technique *t) const;
 
     // When building ROP chain using symbolic mode,
     // exploit constraints are added to the input constraints
     // in order to generate ROP payload.
+    [[nodiscard]]
     bool addRegisterConstraint(Register reg, uint64_t value);
+
+    [[nodiscard]]
     bool addMemoryConstraint(uint64_t virtAddr, uint64_t value);
     
-
 
     Requiem &m_ctx;
     bool m_symbolicMode;  // true: symbolic, false: direct

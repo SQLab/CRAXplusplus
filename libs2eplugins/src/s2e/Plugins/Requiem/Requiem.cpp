@@ -276,11 +276,9 @@ bool Requiem::generateExploit() {
 
     // I/O Behaviors.
     for (const auto &b : m_ioBehaviors) {
-        Behavior* behavior = b.get();
-
-        if (dynamic_cast<SleepBehavior*>(behavior)) {
-            uint64_t interval = dynamic_cast<SleepBehavior*>(behavior)->getInterval();
-            m_exploit.writeline(format("    time.sleep(%d)", interval));
+        Behavior *behavior = b.get();
+        if (auto sb = dynamic_cast<SleepBehavior *>(behavior)) {
+            m_exploit.writeline(format("    time.sleep(%d)", sb->getInterval()));
         }
     }
 

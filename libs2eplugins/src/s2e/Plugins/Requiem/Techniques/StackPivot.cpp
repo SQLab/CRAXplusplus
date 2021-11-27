@@ -40,6 +40,7 @@ BasicStackPivot::BasicStackPivot(Requiem &ctx) : Technique(ctx) {
 
 
 bool BasicStackPivot::checkRequirements() const {
+    // XXX: check if ROP gadgets exist.
     return true;
 }
 
@@ -98,8 +99,9 @@ AdvancedStackPivot::AdvancedStackPivot(Requiem &ctx) : Technique(ctx) {
 
 
 bool AdvancedStackPivot::checkRequirements() const {
-   const auto &sym = m_ctx.getExploit().getElf().symbols();
-   return sym.find("read") != sym.end();
+    const auto &sym = m_ctx.getExploit().getElf().symbols();
+    return sym.find("read") != sym.end() &&
+           m_ctx.getWritePrimitives().size() > 0;
 }
 
 void AdvancedStackPivot::resolveRequiredGadgets() {
@@ -120,12 +122,14 @@ std::vector<SymbolicRopPayload> AdvancedStackPivot::getSymbolicRopPayloadList() 
     assert(writePrimitives.size());
 
     // Resolve `ret2LeaRbp`.
+    // XXX: from balsn: this is a good research topic.
     uint64_t ret2LeaRbp = writePrimitives.front() - determineOffset();
+    m_ctx.getExploit().registerSymbol("ret2lea_rbp", ret2LeaRbp);
 
-    std::vector<std::vector<std::string>> ret = {
+    std::vector<SymbolicRopPayload> ret = {
         {
-            "p64(pivot_dest)",
-            format("p64(0x%x)", ret2LeaRbp)
+            BaseOffsetExpr::create(m_ctx.getExploit(), "pivot_dest");
+            BaseOffsetExpr::create(m_ctx.getExploit(), "ret2lea_rbp");
         }, {
             format("b'A' * %d", m_ctx.m_padding),
             format("p64(pivot_dest + 8 + %d)", m_ctx.m_padding),

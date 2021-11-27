@@ -40,9 +40,6 @@
 using namespace klee;
 namespace py = pybind11;
 
-typedef std::pair<std::string, std::vector<unsigned char>> VarValuePair;
-typedef std::vector<VarValuePair> ConcreteInputs;
-
 namespace s2e::plugins::requiem {
 
 using SymbolicRopPayload = Technique::SymbolicRopPayload;
@@ -62,6 +59,7 @@ Requiem::Requiem(S2E *s2e)
                 g_s2e->getConfig()->getString(getConfigKey() + ".elfFilename"),
                 g_s2e->getConfig()->getString(getConfigKey() + ".libcFilename")),
       m_disassembler(*this),
+      m_ropChainBuilder(*this),
       m_targetProcessPid(),
       m_strategy(),
       m_ioBehaviors(),
@@ -88,7 +86,7 @@ void Requiem::initialize() {
 
 
 void Requiem::onSymbolicRip(S2EExecutionState *exploitableState,
-                            klee::ref<klee::Expr> symbolicRip,
+                            ref<Expr> symbolicRip,
                             uint64_t concreteRip,
                             bool &concretize,
                             CorePlugin::symbolicAddressReason reason) {
@@ -167,7 +165,7 @@ void Requiem::onExecuteInstructionEnd(S2EExecutionState *state,
     /*
     if (pc <= 0x500000) {
         g_s2e->getInfoStream()
-            << klee::hexval(i.address) << ": " << i.mnemonic << " " << i.op_str << "\n";
+            << hexval(i.address) << ": " << i.mnemonic << " " << i.op_str << "\n";
     }
     */
 
@@ -249,6 +247,16 @@ bool Requiem::generateExploit() {
         m_strategy = std::make_unique<DefaultStrategy>(*this);
     }
 
+    // Check requirements.
+    std::vector<Technique *> primaryTechniques = m_strategy->getPrimaryTechniques();
+
+    for (Technique *t : primaryTechniques) {
+        if (!t->checkRequirements()) {
+            log<WARN>() << "Requirements unsatisfied: " << t->toString() << '\n';
+            return false;
+        }
+    }
+
     m_exploit.registerSymbol("elf_base", 0);
 
     // Declare symbols and values.
@@ -259,13 +267,6 @@ bool Requiem::generateExploit() {
     }
 
     m_exploit.writeline();
-
-    // Define auxiliary functions.
-    //for (auto technique : m_strategy->getTechniques()) {
-    //    m_exploit.writeline(technique->getAuxiliaryFunctions());
-    //}
-
-    //m_exploit.writeline();
 
     // Write exploit body.
     m_exploit.writelines({
@@ -283,106 +284,9 @@ bool Requiem::generateExploit() {
         }
     }
 
-    // Generate ROP chain based on the strategy list chosen by the user.
-    std::vector<Technique*> primaryTechniques = m_strategy->getPrimaryTechniques();
-    bool symbolicMode = true;
-    uint32_t rspOffset = 0;
-
-    for (Technique *t : primaryTechniques) {
-        log<WARN>() << t->toString() << '\n';
-
-        std::vector<SymbolicRopPayload> symbolicRopPayloadList = t->getSymbolicRopPayloadList();
-
-        // Direct payload generation mode
-        if (!symbolicMode) {
-            for (const auto &payload : symbolicRopPayloadList) {
-                for (const ref<Expr> &e : payload) {
-                    m_exploit.appendRopPayload(BinaryExprEvaluator<std::string>().evaluate(e));
-                }
-                m_exploit.flushRopPayload();
-            }
-            continue;
-        }
-
-        // Symbolic payload generation mode
-        log<WARN>() << "allocating concrete rop payload list...\n";
-        std::vector<ConcreteRopPayload> concreteRopPayloadList;
-
-        log<WARN>() << "concretizing rop payload list...\n";
-        for (size_t i = 0; i < symbolicRopPayloadList.size(); i++) {
-            concreteRopPayloadList.push_back({});
-
-            for (size_t j = 0; j < symbolicRopPayloadList[i].size(); j++) {
-                const ref<Expr> &e = symbolicRopPayloadList[i][j];
-                uint64_t value = BinaryExprEvaluator<uint64_t>().evaluate(e);
-                concreteRopPayloadList.back().push_back(value);
-            }
-        }
-
-        log<WARN>() << "building exploit constraints...\n";
-        for (size_t i = 0; i < concreteRopPayloadList[0].size(); i++) {
-            const ref<Expr> &e = symbolicRopPayloadList[0][i];
-            uint64_t value = concreteRopPayloadList[0][i];
-            log<WARN>() << BinaryExprEvaluator<std::string>().evaluate(e) << " (concretized=" << klee::hexval(value) << ")\n";
-
-            if (i == 0) {
-                // Add RBP constraint.
-                klee::ref<klee::Expr> rbpConstraint
-                    = klee::EqExpr::create(
-                            reg().readSymbolic(Register::RBP),
-                            klee::ConstantExpr::create(value, klee::Expr::Int64));
-                if (!m_currentState->addConstraint(rbpConstraint, true)) {
-                    return false;
-                }
-            } else if (i == 1) {
-                // Add RIP constraint.
-                klee::ref<klee::Expr> ripConstraint
-                    = klee::EqExpr::create(
-                            reg().readSymbolic(Register::RIP),
-                            klee::ConstantExpr::create(value, klee::Expr::Int64));
-                if (!m_currentState->addConstraint(ripConstraint, true)) {
-                    return false;
-                }
-            } else {
-                klee::ref<klee::Expr> constraint
-                    = klee::EqExpr::create(
-                            mem().readSymbolic(reg().readConcrete(Register::RSP) + rspOffset, klee::Expr::Int64),
-                            klee::ConstantExpr::create(value, klee::Expr::Int64));
-                if (!m_currentState->addConstraint(constraint, true)) {
-                    return false;
-                }
-                rspOffset += 8;
-            }
-        }
-
-        if (dynamic_cast<BasicStackPivot *>(t) ||
-            dynamic_cast<AdvancedStackPivot *>(t)) {
-            log<WARN>() << "Switching from symbolic mode to direct mode...\n";
-
-            symbolicMode = false;
-            ConcreteInputs newInput;
-
-            if (!m_currentState->getSymbolicSolution(newInput)) {
-                log<WARN>() << "Could not get symbolic solutions\n";
-                return false;
-            }
-
-            std::string symbolicPayload = "b'";
-            const VarValuePair &vp = newInput[0];
-            for (const auto __byte : vp.second) {
-                symbolicPayload += format("\\x%02x", __byte);
-            }
-            symbolicPayload += "'";
-            m_exploit.appendRopPayload(symbolicPayload);
-            m_exploit.flushRopPayload();
-
-            for (size_t i = 1; i < symbolicRopPayloadList.size(); i++) {
-                for (const ref<Expr> &e : symbolicRopPayloadList[i]) {
-                    m_exploit.appendRopPayload(BinaryExprEvaluator<std::string>().evaluate(e));
-                }
-                m_exploit.flushRopPayload();
-            }
-        }
+    // Build ROP chain based on the strategy list chosen by the user.
+    if (!m_ropChainBuilder.build(m_exploit, primaryTechniques)) {
+        return false;
     }
 
     // Write exploit trailer.

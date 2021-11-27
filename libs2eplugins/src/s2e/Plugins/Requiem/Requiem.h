@@ -31,6 +31,7 @@
 #include <s2e/Plugins/Requiem/Behaviors.h>
 #include <s2e/Plugins/Requiem/Disassembler.h>
 #include <s2e/Plugins/Requiem/Exploit.h>
+#include <s2e/Plugins/Requiem/RopChainBuilder.h>
 
 #include <pybind11/embed.h>
 
@@ -165,6 +166,7 @@ private:
     MemoryManager m_memoryManager;
     Exploit m_exploit;
     Disassembler m_disassembler;
+    RopChainBuilder m_ropChainBuilder;
     uint64_t m_targetProcessPid;
 
     std::unique_ptr<Strategy> m_strategy;

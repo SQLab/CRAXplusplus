@@ -27,6 +27,7 @@ add_library(
     s2e/Plugins/Requiem/Requiem.cpp
     s2e/Plugins/Requiem/Disassembler.cpp
     s2e/Plugins/Requiem/Exploit.cpp
+    s2e/Plugins/Requiem/RopChainBuilder.cpp
     s2e/Plugins/Requiem/Core/RegisterManager.cpp
     s2e/Plugins/Requiem/Core/MemoryManager.cpp
     s2e/Plugins/Requiem/Strategies/DefaultStrategy.cpp

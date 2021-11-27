@@ -59,7 +59,7 @@ template <IterStrategy S>
 class BinaryExprIterator;
 
 
-namespace details {
+namespace detail {
 
 template <IterStrategy S>
 class __BaseBinaryExprIterator
@@ -123,7 +123,7 @@ protected:
     std::shared_ptr<std::stack<ref<Expr>>> m_stack;
 };
 
-}  // namespace details
+}  // namespace detail
 
 
 // Primary template.
@@ -134,17 +134,17 @@ class BinaryExprIterator {};
 // Explicit (full) template specialization for S = IterStrategy::PRE_ORDER.
 template <>
 class BinaryExprIterator<IterStrategy::PRE_ORDER>
-    : public details::__BaseBinaryExprIterator<IterStrategy::PRE_ORDER> {
+    : public detail::__BaseBinaryExprIterator<IterStrategy::PRE_ORDER> {
 
-    friend class details::__BaseBinaryExprIterator<IterStrategy::PRE_ORDER>;
+    friend class detail::__BaseBinaryExprIterator<IterStrategy::PRE_ORDER>;
 
 protected:
     BinaryExprIterator()
-        : details::__BaseBinaryExprIterator<IterStrategy::PRE_ORDER>() {}
+        : detail::__BaseBinaryExprIterator<IterStrategy::PRE_ORDER>() {}
 
     explicit
     BinaryExprIterator(const ref<Expr> &root)
-        : details::__BaseBinaryExprIterator<IterStrategy::PRE_ORDER>(root) {
+        : detail::__BaseBinaryExprIterator<IterStrategy::PRE_ORDER>(root) {
         m_stack->push(root);
         step();
     }
@@ -173,17 +173,17 @@ protected:
 // Explicit (full) template specialization for S = IterStrategy::IN_ORDER.
 template <>
 class BinaryExprIterator<IterStrategy::IN_ORDER>
-    : public details::__BaseBinaryExprIterator<IterStrategy::IN_ORDER> {
+    : public detail::__BaseBinaryExprIterator<IterStrategy::IN_ORDER> {
 
-    friend class details::__BaseBinaryExprIterator<IterStrategy::IN_ORDER>;
+    friend class detail::__BaseBinaryExprIterator<IterStrategy::IN_ORDER>;
 
 protected:
     BinaryExprIterator()
-        : details::__BaseBinaryExprIterator<IterStrategy::IN_ORDER>() {}
+        : detail::__BaseBinaryExprIterator<IterStrategy::IN_ORDER>() {}
 
     explicit
     BinaryExprIterator(const ref<Expr> &root)
-        : details::__BaseBinaryExprIterator<IterStrategy::IN_ORDER>(root) {
+        : detail::__BaseBinaryExprIterator<IterStrategy::IN_ORDER>(root) {
         ref<Expr> node = root;
         while (node) {
             m_stack->push(node);
@@ -215,18 +215,18 @@ protected:
 // Explicit (full) template specialization for S = IterStrategy::POST_ORDER.
 template <>
 class BinaryExprIterator<IterStrategy::POST_ORDER>
-    : public details::__BaseBinaryExprIterator<IterStrategy::POST_ORDER> {
+    : public detail::__BaseBinaryExprIterator<IterStrategy::POST_ORDER> {
 
-    friend class details::__BaseBinaryExprIterator<IterStrategy::POST_ORDER>;
+    friend class detail::__BaseBinaryExprIterator<IterStrategy::POST_ORDER>;
 
 protected:
     BinaryExprIterator()
-        : details::__BaseBinaryExprIterator<IterStrategy::POST_ORDER>(),
+        : detail::__BaseBinaryExprIterator<IterStrategy::POST_ORDER>(),
           m_localRootNode() {}
 
     explicit
     BinaryExprIterator(const ref<Expr> &root)
-        : details::__BaseBinaryExprIterator<IterStrategy::POST_ORDER>(root),
+        : detail::__BaseBinaryExprIterator<IterStrategy::POST_ORDER>(root),
           m_localRootNode(root) {
         step();
     }

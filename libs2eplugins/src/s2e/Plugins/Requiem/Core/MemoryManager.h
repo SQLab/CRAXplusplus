@@ -62,7 +62,7 @@ public:
 
     // Read concrete data from memory.
     [[nodiscard]]
-    std::vector<uint8_t> readConcrete(uint64_t virtAddr, uint64_t size) const;
+    std::vector<uint8_t> readConcrete(uint64_t virtAddr, uint64_t size, bool concretize = true) const;
 
     // Write symbolic data to memory.
     [[nodiscard]]
@@ -82,6 +82,7 @@ public:
     std::vector<uint64_t> search(const std::vector<uint8_t> &needle) const;
 
     // Returns the map<addr, size> of symbolic memory.
+    // XXX: currently not implemented.
     [[nodiscard]]
     std::map<uint64_t, uint64_t> getSymbolicMemory(uint64_t start, uint64_t end) const;
 

@@ -41,7 +41,7 @@ void MemoryManager::initialize() {
 
 
 bool MemoryManager::isSymbolic(uint64_t virtAddr, uint64_t size) const {
-    return !isa<klee::ConstantExpr>(readSymbolic(virtAddr, size));
+    return m_ctx.getCurrentState()->mem()->symbolic(virtAddr, size);
 }
 
 ref<Expr> MemoryManager::readSymbolic(uint64_t virtAddr, uint64_t size) const {
@@ -50,12 +50,30 @@ ref<Expr> MemoryManager::readSymbolic(uint64_t virtAddr, uint64_t size) const {
     return m_ctx.getCurrentState()->mem()->read(virtAddr, size);
 }
 
-std::vector<uint8_t> MemoryManager::readConcrete(uint64_t virtAddr, uint64_t size) const {
+std::vector<uint8_t> MemoryManager::readConcrete(uint64_t virtAddr, uint64_t size, bool concretize) const {
     std::vector<uint8_t> ret(size);
-    if (!m_ctx.getCurrentState()->mem()->read(virtAddr, ret.data(), size)) {
-        m_ctx.log<WARN>() << "Cannot read concrete data from memory: " << hexval(virtAddr) << "\n";
-        ret.clear();
+
+    if (concretize) {
+        if (!m_ctx.getCurrentState()->mem()->read(virtAddr, ret.data(), size)) {
+            m_ctx.log<WARN>() << "Cannot read concrete data from memory: " << hexval(virtAddr) << "\n";
+            ret.clear();
+        }
+    } else {
+        // XXX: The performance seems fast enough even though I bruteforce it byte by byte,
+        // but maybe we can optimize it directly in libs2ecore at some point.
+        for (uint64_t i = 0; i < size; i++) {
+            // Skip symbolic bytes.
+            if (isSymbolic(virtAddr + i, 1)) {
+                continue;
+            }
+            if (!m_ctx.getCurrentState()->mem()->read(virtAddr + i, &ret[i], 1)) {
+                m_ctx.log<WARN>() << "Cannot read concrete data from memory: " << hexval(virtAddr + i) << "\n";
+                ret.clear();
+                break;
+            }
+         }
     }
+
     return ret;
 }
 
@@ -98,9 +116,12 @@ std::vector<uint64_t> MemoryManager::search(const std::vector<uint8_t> &needle) 
             continue;
         }
 
+        m_ctx.log<WARN>()
+            << "searching [" << hexval(region.start) << ',' << hexval(region.end) << "]\n";
+
         // Read the region concretely into `haystack`,
         // and use kmp algorithm to search all the occurences of `needle`.
-        std::vector<uint8_t> haystack = readConcrete(region.start, region.end - region.start);
+        std::vector<uint8_t> haystack = readConcrete(region.start, region.end - region.start, /*concretize=*/false);
         std::vector<uint64_t> localResult = kmp(haystack, needle);
 
         // `localResult` contains the offset within `haystack`, so adding

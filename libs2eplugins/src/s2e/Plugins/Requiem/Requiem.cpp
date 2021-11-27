@@ -117,7 +117,9 @@ void Requiem::onSymbolicRip(S2EExecutionState *exploitableState,
     // XXX: use symbolic execution instead.
     m_padding = reg().readConcrete(Register::RSP) - m_sysReadBuf - 16;
 
-    generateExploit();
+    if (!generateExploit()) {
+        log<WARN>() << "Failed to generate exploit.\n";
+    }
 
     g_s2e->getExecutor()->terminateState(*exploitableState, "End of exploit generation");
 }
@@ -181,7 +183,7 @@ void Requiem::onExecuteInstructionEnd(S2EExecutionState *state,
     };
 
     if (pc <= 0x500000 && i.mnemonic == "call" && i.op_str.find("0x") == 0) {
-        log<WARN>() << i.mnemonic << " " << std::stoull(i.op_str, nullptr, 16) << "\n";
+        log<WARN>() << i.mnemonic << " " << i.op_str << "\n";
 
         if (isCallSiteOf(i.op_str, "read")) {
             log<WARN>() << "discovered a call site of read@libc.\n";
@@ -230,7 +232,7 @@ void Requiem::onExecuteSyscallEnd(S2EExecutionState *state,
     }
 }
 
-void Requiem::generateExploit() {
+bool Requiem::generateExploit() {
     // Write exploit shebang.
     m_exploit.writeline(Exploit::s_shebang);
 
@@ -259,11 +261,11 @@ void Requiem::generateExploit() {
     m_exploit.writeline();
 
     // Define auxiliary functions.
-    for (auto technique : m_strategy->getTechniques()) {
-        m_exploit.writeline(technique->getAuxiliaryFunctions());
-    }
+    //for (auto technique : m_strategy->getTechniques()) {
+    //    m_exploit.writeline(technique->getAuxiliaryFunctions());
+    //}
 
-    m_exploit.writeline();
+    //m_exploit.writeline();
 
     // Write exploit body.
     m_exploit.writelines({
@@ -329,20 +331,26 @@ void Requiem::generateExploit() {
                     = klee::EqExpr::create(
                             reg().readSymbolic(Register::RBP),
                             klee::ConstantExpr::create(value, klee::Expr::Int64));
-                static_cast<void>(m_currentState->addConstraint(rbpConstraint, true));
+                if (!m_currentState->addConstraint(rbpConstraint, true)) {
+                    return false;
+                }
             } else if (i == 1) {
                 // Add RIP constraint.
                 klee::ref<klee::Expr> ripConstraint
                     = klee::EqExpr::create(
                             reg().readSymbolic(Register::RIP),
                             klee::ConstantExpr::create(value, klee::Expr::Int64));
-                static_cast<void>(m_currentState->addConstraint(ripConstraint, true));
+                if (!m_currentState->addConstraint(ripConstraint, true)) {
+                    return false;
+                }
             } else {
                 klee::ref<klee::Expr> constraint
                     = klee::EqExpr::create(
                             mem().readSymbolic(reg().readConcrete(Register::RSP) + rspOffset, klee::Expr::Int64),
                             klee::ConstantExpr::create(value, klee::Expr::Int64));
-                static_cast<void>(m_currentState->addConstraint(constraint, true));
+                if (!m_currentState->addConstraint(constraint, true)) {
+                    return false;
+                }
                 rspOffset += 8;
             }
         }
@@ -356,13 +364,13 @@ void Requiem::generateExploit() {
 
             if (!m_currentState->getSymbolicSolution(newInput)) {
                 log<WARN>() << "Could not get symbolic solutions\n";
-                return;
+                return false;
             }
 
             std::string symbolicPayload = "b'";
             const VarValuePair &vp = newInput[0];
-            for (const auto _byte : vp.second) {
-                symbolicPayload += format("\\x%02x", _byte);
+            for (const auto __byte : vp.second) {
+                symbolicPayload += format("\\x%02x", __byte);
             }
             symbolicPayload += "'";
             m_exploit.appendRopPayload(symbolicPayload);
@@ -385,6 +393,7 @@ void Requiem::generateExploit() {
     ofs << m_exploit.getContent();
 
     log<WARN>() << "Generated exploit script: " << m_exploit.getFilename() << "\n";
+    return true;
 }
 
 }  // namespace s2e::plugins::requiem

@@ -147,7 +147,7 @@ private:
     void onExecuteSyscallEnd(S2EExecutionState *state,
                              uint64_t pc);
 
-    void generateExploit();
+    bool generateExploit();
 
 
     // S2E

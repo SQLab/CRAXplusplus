@@ -72,7 +72,7 @@ Requiem::Requiem(S2E *s2e)
 
 
 void Requiem::initialize() {
-    m_linuxMonitor = g_s2e->getPlugin<LinuxMonitor>();
+    m_linuxMonitor = s2e()->getPlugin<LinuxMonitor>();
 
     m_registerManager.initialize();
     m_memoryManager.initialize();
@@ -80,7 +80,7 @@ void Requiem::initialize() {
     m_linuxMonitor->onProcessLoad.connect(
             sigc::mem_fun(*this, &Requiem::onProcessLoad));
 
-    g_s2e->getCorePlugin()->onSymbolicAddress.connect(
+    s2e()->getCorePlugin()->onSymbolicAddress.connect(
             sigc::mem_fun(*this, &Requiem::onSymbolicRip));
 }
 
@@ -119,7 +119,7 @@ void Requiem::onSymbolicRip(S2EExecutionState *exploitableState,
         log<WARN>() << "Failed to generate exploit.\n";
     }
 
-    g_s2e->getExecutor()->terminateState(*exploitableState, "End of exploit generation");
+    s2e()->getExecutor()->terminateState(*exploitableState, "End of exploit generation");
 }
 
 void Requiem::onProcessLoad(S2EExecutionState *state,
@@ -133,7 +133,7 @@ void Requiem::onProcessLoad(S2EExecutionState *state,
     if (imageFileName.find(m_exploit.getElfFilename()) != imageFileName.npos) {
         m_targetProcessPid = pid;
 
-        g_s2e->getCorePlugin()->onTranslateInstructionEnd.connect(
+        s2e()->getCorePlugin()->onTranslateInstructionEnd.connect(
                 sigc::mem_fun(*this, &Requiem::onTranslateInstructionEnd));
     }
 }
@@ -143,10 +143,6 @@ void Requiem::onTranslateInstructionEnd(ExecutionSignal *onInstructionExecute,
                                         TranslationBlock *tb,
                                         uint64_t pc) {
     setCurrentState(state);
-
-    if (pc == m_exploit.getElf().symbols()["main"]) {
-        log<WARN>() << "reached main()\n";
-    }
 
     if (m_linuxMonitor->isKernelAddress(pc)) {
         return;
@@ -162,12 +158,11 @@ void Requiem::onExecuteInstructionEnd(S2EExecutionState *state,
 
     Instruction i = m_disassembler.disasm(pc);
 
-    /*
-    if (pc <= 0x500000) {
-        g_s2e->getInfoStream()
-            << hexval(i.address) << ": " << i.mnemonic << " " << i.op_str << "\n";
+    if (s2e()->getConfig()->getBool(getConfigKey() + ".showInstructions", false) &&
+        !m_linuxMonitor->isKernelAddress(pc)) {
+        s2e()->getInfoStream()
+            << hexval(i.address) << ": " << i.mnemonic << " " << i.opStr << "\n";
     }
-    */
 
     if (i.mnemonic == "syscall") {
         onExecuteSyscallEnd(state, pc);
@@ -180,14 +175,14 @@ void Requiem::onExecuteInstructionEnd(S2EExecutionState *state,
         return it != sym.end() && std::stoull(opStr, nullptr, 16) == it->second;
     };
 
-    if (pc <= 0x500000 && i.mnemonic == "call" && i.op_str.find("0x") == 0) {
-        log<WARN>() << i.mnemonic << " " << i.op_str << "\n";
+    if (pc <= 0x500000 && i.mnemonic == "call" && i.opStr.find("0x") == 0) {
+        log<WARN>() << i.mnemonic << " " << i.opStr << "\n";
 
-        if (isCallSiteOf(i.op_str, "read")) {
+        if (isCallSiteOf(i.opStr, "read")) {
             log<WARN>() << "discovered a call site of read@libc.\n";
             m_ioBehaviors.push_back(std::make_unique<InputBehavior>());
             m_writePrimitives.push_back(i.address);
-        } else if (isCallSiteOf(i.op_str, "sleep")) {
+        } else if (isCallSiteOf(i.opStr, "sleep")) {
             log<WARN>() << "discovered a call site of sleep@libc.\n";
             uint64_t interval = reg().readConcrete(Register::RDI);
             m_ioBehaviors.push_back(std::make_unique<SleepBehavior>(interval));
@@ -199,14 +194,16 @@ void Requiem::onExecuteSyscallEnd(S2EExecutionState *state,
                                   uint64_t pc) {
     setCurrentState(state);
 
-    log<INFO>()
-        << "syscall: " << hexval(reg().readConcrete(Register::RAX)) << " ("
-        << hexval(reg().readConcrete(Register::RDI)) << ", "
-        << hexval(reg().readConcrete(Register::RSI)) << ", "
-        << hexval(reg().readConcrete(Register::RDX)) << ", "
-        << hexval(reg().readConcrete(Register::R10)) << ", "
-        << hexval(reg().readConcrete(Register::R8)) << ", "
-        << hexval(reg().readConcrete(Register::R9)) << ")\n";
+    if (s2e()->getConfig()->getBool(getConfigKey() + ".showSyscalls", true)) {
+        log<INFO>()
+            << "syscall: " << hexval(reg().readConcrete(Register::RAX)) << " ("
+            << hexval(reg().readConcrete(Register::RDI)) << ", "
+            << hexval(reg().readConcrete(Register::RSI)) << ", "
+            << hexval(reg().readConcrete(Register::RDX)) << ", "
+            << hexval(reg().readConcrete(Register::R10)) << ", "
+            << hexval(reg().readConcrete(Register::R8)) << ", "
+            << hexval(reg().readConcrete(Register::R9)) << ")\n";
+    }
 
     // sys_read from stdin?
     if (reg().readConcrete(Register::RAX) == 0 &&
@@ -220,7 +217,7 @@ void Requiem::onExecuteSyscallEnd(S2EExecutionState *state,
             state->regs()->setPc(pc);
             state->jumpToSymbolic();
         }
-        S2EExecutor::StatePair sp = g_s2e->getExecutor()->fork(*state);
+        S2EExecutor::StatePair sp = s2e()->getExecutor()->fork(*state);
         m_inputState = dynamic_cast<S2EExecutionState *>(sp.second);
         */
     } else if (reg().readConcrete(Register::RAX) == 1 &&

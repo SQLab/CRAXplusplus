@@ -158,8 +158,8 @@ void Ret2csu::parseLibcCsuInit() {
 
         m_gadget1Regs.reserve(7);
         for (int j = i + 1; j < i + 8; j++) {
-            const std::string &op_str = insns[j].op_str;
-            std::string reg = op_str.substr(0, op_str.find_first_of(','));
+            const std::string &opStr = insns[j].opStr;
+            std::string reg = opStr.substr(0, opStr.find_first_of(','));
             m_gadget1Regs.push_back(std::move(reg));
         }
 
@@ -186,20 +186,20 @@ void Ret2csu::parseLibcCsuInit() {
         m_libcCsuInitGadget2 = insns[i].address - 3 * X86_64_MOV_INSN_LEN;
 
         for (int j = i - 3; j < i; j++) {
-            const std::string &op_str = insns[j].op_str;
-            size_t dstRegEndIdx = op_str.find_first_of(',');
+            const std::string &opStr = insns[j].opStr;
+            size_t dstRegEndIdx = opStr.find_first_of(',');
             size_t srcRegStartIdx = dstRegEndIdx + 2;  // skips ","
-            std::string dstReg = op_str.substr(0, dstRegEndIdx);
-            std::string srcReg = op_str.substr(srcRegStartIdx);
+            std::string dstReg = opStr.substr(0, dstRegEndIdx);
+            std::string srcReg = opStr.substr(srcRegStartIdx);
             m_gadget2Regs[dstReg] = srcReg;
         }
 
         // Parse call qword ptr [a + b*8]
-        std::string op_str = insns[i].op_str;
-        op_str = replace(op_str, "qword ptr [", "");
-        op_str = replace(op_str, "*8]", "");
-        m_gadget2CallReg1 = op_str.substr(0, op_str.find_first_of(' '));
-        m_gadget2CallReg2 = op_str.substr(op_str.find_last_of('+') + 2);
+        std::string opStr = insns[i].opStr;
+        opStr = replace(opStr, "qword ptr [", "");
+        opStr = replace(opStr, "*8]", "");
+        m_gadget2CallReg1 = opStr.substr(0, opStr.find_first_of(' '));
+        m_gadget2CallReg2 = opStr.substr(opStr.find_last_of('+') + 2);
         break;
     }
 

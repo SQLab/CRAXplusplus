@@ -232,7 +232,7 @@ uint64_t AdvancedStackPivot::determineOffset() const {
     uint64_t offset = 0;
 
     for (int i = insns.size() - 2; i >= 0; i--) {
-        if (insns[i].op_str.find("rbp") != std::string::npos) {
+        if (insns[i].opStr.find("rbp") != std::string::npos) {
             offset = target - insns[i].address;
             break;
         }

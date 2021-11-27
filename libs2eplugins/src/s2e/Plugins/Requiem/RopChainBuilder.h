@@ -21,6 +21,8 @@
 #ifndef S2E_PLUGINS_REQUIEM_ROP_CHAIN_BUILDER_H
 #define S2E_PLUGINS_REQUIEM_ROP_CHAIN_BUILDER_H
 
+#include <klee/Expr.h>
+
 #include <vector>
 
 namespace s2e::plugins::requiem {
@@ -54,10 +56,10 @@ private:
     // exploit constraints are added to the input constraints
     // in order to generate ROP payload.
     [[nodiscard]]
-    bool addRegisterConstraint(Register reg, uint64_t value);
+    bool addRegisterConstraint(Register reg, const klee::ref<klee::Expr> &e);
 
     [[nodiscard]]
-    bool addMemoryConstraint(uint64_t virtAddr, uint64_t value);
+    bool addMemoryConstraint(uint64_t addr, const klee::ref<klee::Expr> &e);
     
 
     Requiem &m_ctx;

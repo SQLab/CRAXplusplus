@@ -57,41 +57,23 @@ bool RopChainBuilder::build(Exploit &exploit,
         }
 
         // Symbolic payload generation mode
-        m_ctx.log<WARN>() << "Allocating concrete rop payload list...\n";
-        std::vector<ConcreteRopPayload> concreteRopPayloadList;
-
-        m_ctx.log<WARN>() << "Concretizing rop payload list...\n";
-        for (size_t i = 0; i < symbolicRopPayloadList.size(); i++) {
-            concreteRopPayloadList.push_back({});
-
-            for (size_t j = 0; j < symbolicRopPayloadList[i].size(); j++) {
-                const ref<Expr> &e = symbolicRopPayloadList[i][j];
-                uint64_t value = BinaryExprEvaluator<uint64_t>().evaluate(e);
-                concreteRopPayloadList.back().push_back(value);
-            }
-        }
-
         m_ctx.log<WARN>() << "Building exploit constraints...\n";
-        for (size_t i = 0; i < concreteRopPayloadList[0].size(); i++) {
+        for (size_t i = 0; i < symbolicRopPayloadList[0].size(); i++) {
             const ref<Expr> &e = symbolicRopPayloadList[0][i];
-            uint64_t value = concreteRopPayloadList[0][i];
-            m_ctx.log<INFO>() << BinaryExprEvaluator<std::string>().evaluate(e) << " (concretized=" << klee::hexval(value) << ")\n";
+            bool ok = false;
 
             if (i == 0) {
-                if (!addRegisterConstraint(Register::RBP, value)) {
-                    return false;
-                }
+                ok = addRegisterConstraint(Register::RBP, e);
             } else if (i == 1) {
-                if (!addRegisterConstraint(Register::RIP, value)) {
-                    return false;
-                }
+                ok = addRegisterConstraint(Register::RIP, e);
             } else {
-                uint64_t addr = m_ctx.reg().readConcrete(Register::RSP) +
-                                m_symbolicModeRspOffset;
-                if (!addMemoryConstraint(addr, value)) {
-                    return false;
-                }
+                uint64_t addr = m_ctx.reg().readConcrete(Register::RSP) + m_symbolicModeRspOffset;
+                ok = addMemoryConstraint(addr, e);
                 m_symbolicModeRspOffset += 8;
+            }
+
+            if (!ok) {
+                return false;
             }
         }
 
@@ -133,15 +115,29 @@ bool RopChainBuilder::shouldSwitchToDirectMode(const Technique *t) const {
            dynamic_cast<const AdvancedStackPivot *>(t);
 }
 
-bool RopChainBuilder::addRegisterConstraint(Register reg, uint64_t value) {
+bool RopChainBuilder::addRegisterConstraint(Register reg, const ref<Expr> &e) {
+    uint64_t value = BinaryExprEvaluator<uint64_t>().evaluate(e);
     auto regExpr = m_ctx.reg().readSymbolic(reg);
     auto constraint = EqExpr::create(regExpr, ConstantExpr::create(value, Expr::Int64));
+
+    m_ctx.log<INFO>()
+         << m_ctx.reg().getName(reg) << " = "
+        << BinaryExprEvaluator<std::string>().evaluate(e)
+        << " (concretized=" << klee::hexval(value) << ")\n";
+
     return m_ctx.getCurrentState()->addConstraint(constraint, true);
 }
 
-bool RopChainBuilder::addMemoryConstraint(uint64_t virtAddr, uint64_t value) {
-    auto memExpr = m_ctx.mem().readSymbolic(virtAddr, klee::Expr::Int64);
+bool RopChainBuilder::addMemoryConstraint(uint64_t addr, const ref<Expr> &e) {
+    uint64_t value = BinaryExprEvaluator<uint64_t>().evaluate(e);
+    auto memExpr = m_ctx.mem().readSymbolic(addr, klee::Expr::Int64);
     auto constraint = EqExpr::create(memExpr, ConstantExpr::create(value, Expr::Int64));
+
+    m_ctx.log<INFO>()
+        << "[RSP + " << m_symbolicModeRspOffset << "] = "
+        << BinaryExprEvaluator<std::string>().evaluate(e)
+        << " (concretized=" << klee::hexval(value) << ")\n";
+
     return m_ctx.getCurrentState()->addConstraint(constraint, true);
 }
 

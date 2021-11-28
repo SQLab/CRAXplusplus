@@ -66,6 +66,7 @@ Requiem::Requiem(S2E *s2e)
       m_readPrimitives(),
       m_writePrimitives(),
       m_inputState(),
+      // XXX: Remove the following in the future.
       m_padding(),
       m_sysReadBuf(),
       m_sysReadSize() {}
@@ -167,6 +168,7 @@ void Requiem::onExecuteInstructionEnd(S2EExecutionState *state,
         onExecuteSyscallEnd(state, pc);
     }
 
+    // XXX: Remove the following lines and implement a CallbackManager (?)
     static auto isCallSiteOf = [this](const std::string &opStr,
                                       const std::string &funcName) {
         const auto &sym = m_exploit.getElf().symbols();
@@ -204,6 +206,7 @@ void Requiem::onExecuteSyscallEnd(S2EExecutionState *state,
             << hexval(reg().readConcrete(Register::R9)) << ")\n";
     }
 
+    // XXX: Remove the following lines and implement a CallbackManager (?)
     // sys_read from stdin?
     if (reg().readConcrete(Register::RAX) == 0 &&
         reg().readConcrete(Register::RDI) == 0) {

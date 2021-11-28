@@ -25,3 +25,7 @@ To build CRAX++, please refer to the following documentation:
 ## Features
 
 WIP...
+
+## License
+
+Licensed under MIT. Copyright 2021-2022 Software Quality Laboratory, NYCU.

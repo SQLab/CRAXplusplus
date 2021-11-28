@@ -50,6 +50,8 @@ S2E_DEFINE_PLUGIN(Requiem, "Automatic Exploit Generation Engine", "", );
 
 Requiem::Requiem(S2E *s2e)
     : Plugin(s2e),
+      instructionHooks(),
+      syscallHooks(),
       m_linuxMonitor(),
       m_pybind11(),
       m_pwnlib(py::module::import("pwnlib.elf")),
@@ -64,12 +66,7 @@ Requiem::Requiem(S2E *s2e)
       m_strategy(),
       m_ioBehaviors(),
       m_readPrimitives(),
-      m_writePrimitives(),
-      m_inputState(),
-      // XXX: Remove the following in the future.
-      m_padding(),
-      m_sysReadBuf(),
-      m_sysReadSize() {}
+      m_writePrimitives() {}
 
 
 void Requiem::initialize() {
@@ -111,10 +108,6 @@ void Requiem::onSymbolicRip(S2EExecutionState *exploitableState,
 
     // Dump virtual memory mappings.
     mem().showMapInfo(m_targetProcessPid);
-
-    // Calculate padding from user input's base addr to saved rbp.
-    // XXX: use symbolic execution instead.
-    m_padding = reg().readConcrete(Register::RSP) - m_sysReadBuf - 16;
 
     if (!generateExploit()) {
         log<WARN>() << "Failed to generate exploit.\n";
@@ -160,73 +153,40 @@ void Requiem::onExecuteInstructionEnd(S2EExecutionState *state,
 
     if (s2e()->getConfig()->getBool(getConfigKey() + ".showInstructions", false) &&
         !m_linuxMonitor->isKernelAddress(pc)) {
-        s2e()->getInfoStream()
-            << hexval(i.address) << ": " << i.mnemonic << " " << i.opStr << "\n";
+        log<INFO>() << hexval(i.address) << ": " << i.mnemonic << ' ' << i.opStr << '\n';
     }
 
     if (i.mnemonic == "syscall") {
         onExecuteSyscallEnd(state, pc);
     }
 
-    // XXX: Remove the following lines and implement a CallbackManager (?)
-    static auto isCallSiteOf = [this](const std::string &opStr,
-                                      const std::string &funcName) {
-        const auto &sym = m_exploit.getElf().symbols();
-        auto it = sym.find(funcName);
-        return it != sym.end() && std::stoull(opStr, nullptr, 16) == it->second;
-    };
-
-    if (pc <= 0x500000 && i.mnemonic == "call" && i.opStr.find("0x") == 0) {
-        log<WARN>() << i.mnemonic << " " << i.opStr << "\n";
-
-        if (isCallSiteOf(i.opStr, "read")) {
-            log<WARN>() << "discovered a call site of read@libc.\n";
-            m_ioBehaviors.push_back(std::make_unique<InputBehavior>());
-            m_writePrimitives.push_back(i.address);
-        } else if (isCallSiteOf(i.opStr, "sleep")) {
-            log<WARN>() << "discovered a call site of sleep@libc.\n";
-            uint64_t interval = reg().readConcrete(Register::RDI);
-            m_ioBehaviors.push_back(std::make_unique<SleepBehavior>(interval));
-        }
-    }
+    instructionHooks.emit(state, i);
 }
 
 void Requiem::onExecuteSyscallEnd(S2EExecutionState *state,
                                   uint64_t pc) {
     setCurrentState(state);
 
+    uint64_t rax = reg().readConcrete(Register::RAX);
+    uint64_t rdi = reg().readConcrete(Register::RDI);
+    uint64_t rsi = reg().readConcrete(Register::RSI);
+    uint64_t rdx = reg().readConcrete(Register::RDX);
+    uint64_t r10 = reg().readConcrete(Register::R10);
+    uint64_t r8  = reg().readConcrete(Register::R8);
+    uint64_t r9  = reg().readConcrete(Register::R9);
+
     if (s2e()->getConfig()->getBool(getConfigKey() + ".showSyscalls", true)) {
         log<INFO>()
-            << "syscall: " << hexval(reg().readConcrete(Register::RAX)) << " ("
-            << hexval(reg().readConcrete(Register::RDI)) << ", "
-            << hexval(reg().readConcrete(Register::RSI)) << ", "
-            << hexval(reg().readConcrete(Register::RDX)) << ", "
-            << hexval(reg().readConcrete(Register::R10)) << ", "
-            << hexval(reg().readConcrete(Register::R8)) << ", "
-            << hexval(reg().readConcrete(Register::R9)) << ")\n";
+            << "syscall: " << hexval(rax) << " ("
+            << hexval(rdi) << ", "
+            << hexval(rsi) << ", "
+            << hexval(rdx) << ", "
+            << hexval(r10) << ", "
+            << hexval(r8) << ", "
+            << hexval(r9) << ")\n";
     }
 
-    // XXX: Remove the following lines and implement a CallbackManager (?)
-    // sys_read from stdin?
-    if (reg().readConcrete(Register::RAX) == 0 &&
-        reg().readConcrete(Register::RDI) == 0) {
-        m_sysReadBuf = reg().readConcrete(Register::RSI);
-        m_sysReadSize = reg().readConcrete(Register::RDX);
-
-        /*
-        // Create input state snapshot.
-        if (state->needToJumpToSymbolic()) {
-            state->regs()->setPc(pc);
-            state->jumpToSymbolic();
-        }
-        S2EExecutor::StatePair sp = s2e()->getExecutor()->fork(*state);
-        m_inputState = dynamic_cast<S2EExecutionState *>(sp.second);
-        */
-    } else if (reg().readConcrete(Register::RAX) == 1 &&
-               reg().readConcrete(Register::RDI) == 1) {
-        log<WARN>() << "sys_write()\n";
-        // Create output state snapshot.
-    }
+    syscallHooks.emit(state, rax, rdi, rsi, rdx, r10, r8, r9);
 }
 
 bool Requiem::generateExploit() {
@@ -272,14 +232,6 @@ bool Requiem::generateExploit() {
         "if __name__ == '__main__':",
         "    proc = elf.process()",
     });
-
-    // I/O Behaviors.
-    for (const auto &b : m_ioBehaviors) {
-        Behavior *behavior = b.get();
-        if (auto sb = dynamic_cast<SleepBehavior *>(behavior)) {
-            m_exploit.writeline(format("    time.sleep(%d)", sb->getInterval()));
-        }
-    }
 
     // Build ROP chain based on the strategy list chosen by the user.
     if (!m_ropChainBuilder.build(m_exploit, primaryTechniques)) {

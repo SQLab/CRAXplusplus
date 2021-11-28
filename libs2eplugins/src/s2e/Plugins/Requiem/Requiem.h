@@ -73,45 +73,53 @@ public:
     }
 
 
-    S2EExecutionState *getCurrentState() {
-        return m_currentState;
-    }
+    [[nodiscard]]
+    S2EExecutionState *getCurrentState() { return m_currentState; }
 
-    void setCurrentState(S2EExecutionState *state) {
-        m_currentState = state;
-    }
+    void setCurrentState(S2EExecutionState *state) { m_currentState = state; }
 
-    pybind11::module &pwnlib() {
-        return m_pwnlib;
-    }
+    [[nodiscard]]
+    pybind11::module &pwnlib() { return m_pwnlib; }
 
-    RegisterManager &reg() {
-        return m_registerManager;
-    }
+    [[nodiscard]]
+    RegisterManager &reg() { return m_registerManager; }
 
-    MemoryManager &mem() {
-        return m_memoryManager;
-    }
+    [[nodiscard]]
+    MemoryManager &mem() { return m_memoryManager; }
 
-    Disassembler &getDisassembler() {
-        return m_disassembler;
-    }
+    [[nodiscard]]
+    Disassembler &getDisassembler() { return m_disassembler; }
 
-    Exploit &getExploit() {
-        return m_exploit;
-    }
+    [[nodiscard]]
+    Exploit &getExploit() { return m_exploit; }
 
-    uint64_t getTargetProcessPid() const {
-        return m_targetProcessPid;
-    }
+    [[nodiscard]]
+    uint64_t getTargetProcessPid() const { return m_targetProcessPid; }
 
-    const std::vector<uint64_t> &getReadPrimitives() const {
-        return m_readPrimitives;
-    }
+    [[nodiscard]]
+    const std::vector<uint64_t> &getReadPrimitives() const { return m_readPrimitives; }
 
-    const std::vector<uint64_t> &getWritePrimitives() const {
-        return m_writePrimitives;
-    }
+    [[nodiscard]]
+    const std::vector<uint64_t> &getWritePrimitives() const { return m_writePrimitives; }
+
+
+    // clang-format off
+    sigc::signal<void,
+                 S2EExecutionState*,
+                 const Instruction&>
+        instructionHooks;
+
+    sigc::signal<void,
+                 S2EExecutionState*,
+                 uint64_t /* rax */,
+                 uint64_t /* rdi */,
+                 uint64_t /* rsi */,
+                 uint64_t /* rdx */,
+                 uint64_t /* r10 */,
+                 uint64_t /* r8 */,
+                 uint64_t /* r9 */>
+        syscallHooks;
+    // clang-format on
 
 private:
     // Allow the guest to communicate with this plugin using s2e_invoke_plugin
@@ -140,17 +148,16 @@ private:
                                    TranslationBlock *tb,
                                    uint64_t pc);
 
-    // Requiem's instruction hook.
     void onExecuteInstructionEnd(S2EExecutionState *state,
                                  uint64_t pc);
 
-    // Requiem's syscall hook.
     void onExecuteSyscallEnd(S2EExecutionState *state,
                              uint64_t pc);
 
+    [[nodiscard]]
     bool generateExploit();
 
-
+ 
     // S2E
     S2EExecutionState *m_currentState;
 
@@ -169,17 +176,11 @@ private:
     RopChainBuilder m_ropChainBuilder;
     uint64_t m_targetProcessPid;
 
+    // Exploitation-specific attributes.
     std::unique_ptr<Strategy> m_strategy;
     std::vector<std::unique_ptr<Behavior>> m_ioBehaviors;
     std::vector<uint64_t> m_readPrimitives;
     std::vector<uint64_t> m_writePrimitives;
-
-    S2EExecutionState *m_inputState;
-
-public:
-    uint64_t m_padding;
-    uint64_t m_sysReadBuf;
-    uint64_t m_sysReadSize;
 };
 
 }  // namespace s2e::plugins::requiem

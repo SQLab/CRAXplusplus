@@ -32,7 +32,13 @@ namespace s2e::plugins::requiem {
 // Forward declaration
 class Requiem;
 
-class BasicStackPivot : public Technique {
+class StackPivot : public Technique {
+public:
+    explicit StackPivot(Requiem &ctx) : Technique(ctx) {}
+    virtual ~StackPivot() = default;
+};
+
+class BasicStackPivot : public StackPivot {
 public:
     explicit BasicStackPivot(Requiem &ctx);
     virtual ~BasicStackPivot() = default;
@@ -47,7 +53,7 @@ public:
     virtual std::string toString() const override;
 };
 
-class AdvancedStackPivot : public Technique {
+class AdvancedStackPivot : public StackPivot {
 public:
     explicit AdvancedStackPivot(Requiem &ctx);
     virtual ~AdvancedStackPivot() = default;

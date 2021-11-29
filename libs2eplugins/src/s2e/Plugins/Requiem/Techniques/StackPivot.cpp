@@ -34,7 +34,7 @@ using SymbolicRopPayload = Technique::SymbolicRopPayload;
 using ConcreteRopPayload = Technique::ConcreteRopPayload;
 
 
-BasicStackPivot::BasicStackPivot(Requiem &ctx) : Technique(ctx) {
+BasicStackPivot::BasicStackPivot(Requiem &ctx) : StackPivot(ctx) {
     resolveRequiredGadgets();
 }
 
@@ -93,7 +93,7 @@ std::string BasicStackPivot::toString() const {
 
 
 
-AdvancedStackPivot::AdvancedStackPivot(Requiem &ctx) : Technique(ctx) {
+AdvancedStackPivot::AdvancedStackPivot(Requiem &ctx) : StackPivot(ctx) {
     resolveRequiredGadgets();
 }
 

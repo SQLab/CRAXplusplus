@@ -109,10 +109,13 @@ bool RopChainBuilder::build(Exploit &exploit,
 }
 
 
-// XXX: jesus...
 bool RopChainBuilder::shouldSwitchToDirectMode(const Technique *t) const {
-    return dynamic_cast<const BasicStackPivot *>(t) ||
-           dynamic_cast<const AdvancedStackPivot *>(t);
+    // Currently we assume that we can find a decent
+    // write primitive such as read(0, bss, 0x400)
+    // to write the 2nd stage rop payload to bss, so
+    // after stack pivoting our rop chain can be built
+    // without solving exploit constraints.
+    return dynamic_cast<const StackPivot *>(t);
 }
 
 bool RopChainBuilder::addRegisterConstraint(Register reg, const ref<Expr> &e) {

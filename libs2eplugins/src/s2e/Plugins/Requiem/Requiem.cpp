@@ -18,19 +18,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <cpu/i386/cpu.h>
 #include <s2e/S2E.h>
 #include <s2e/ConfigFile.h>
 #include <s2e/Plugins/OSMonitors/Support/ProcessExecutionDetector.h>
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
-#include <s2e/Plugins/Requiem/Expr/BinaryExprEvaluator.h>
 #include <s2e/Plugins/Requiem/Strategies/DefaultStrategy.h>
-#include <s2e/Plugins/Requiem/Techniques/StackPivot.h>
 #include <s2e/Plugins/Requiem/Utils/StringUtil.h>
 
-#include <iostream>
 #include <fstream>
-#include <sstream>
 #include <string>
 #include <vector>
 #include <memory>
@@ -38,12 +33,8 @@
 #include "Requiem.h"
 
 using namespace klee;
-namespace py = pybind11;
 
 namespace s2e::plugins::requiem {
-
-using SymbolicRopPayload = Technique::SymbolicRopPayload;
-using ConcreteRopPayload = Technique::ConcreteRopPayload;
 
 S2E_DEFINE_PLUGIN(Requiem, "Automatic Exploit Generation Engine", "", );
 
@@ -54,7 +45,7 @@ Requiem::Requiem(S2E *s2e)
       syscallHooks(),
       m_linuxMonitor(),
       m_pybind11(),
-      m_pwnlib(py::module::import("pwnlib.elf")),
+      m_pwnlib(pybind11::module::import("pwnlib.elf")),
       m_registerManager(*this),
       m_memoryManager(*this),
       m_exploit(*this,
@@ -160,6 +151,7 @@ void Requiem::onExecuteInstructionEnd(S2EExecutionState *state,
         onExecuteSyscallEnd(state, pc);
     }
 
+    // Execute instruction hooks installed by the user.
     instructionHooks.emit(state, i);
 }
 
@@ -186,6 +178,7 @@ void Requiem::onExecuteSyscallEnd(S2EExecutionState *state,
             << hexval(r9) << ")\n";
     }
 
+    // Execute syscall hooks installed by the user.
     syscallHooks.emit(state, rax, rdi, rsi, rdx, r10, r8, r9);
 }
 
@@ -209,7 +202,7 @@ bool Requiem::generateExploit() {
     // Check requirements.
     std::vector<Technique *> primaryTechniques = m_strategy->getPrimaryTechniques();
 
-    for (Technique *t : primaryTechniques) {
+    for (auto t : primaryTechniques) {
         if (!t->checkRequirements()) {
             log<WARN>() << "Requirements unsatisfied: " << t->toString() << '\n';
             return false;

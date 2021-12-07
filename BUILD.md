@@ -3,7 +3,7 @@
 
 CRAX++ is implemented as a plugin of S2E, and it requires our custom patches for s2e which are only containted in this repository.
 
-This file contains the instructions for building CRAX++ (Requiem).
+This file contains the instructions for building CRAX++.
 
 ## Preparation
 

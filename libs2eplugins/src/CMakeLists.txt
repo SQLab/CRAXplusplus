@@ -24,21 +24,21 @@ add_library(
     s2eplugins
 
     # Exploit generation
-    s2e/Plugins/Requiem/Requiem.cpp
-    s2e/Plugins/Requiem/Disassembler.cpp
-    s2e/Plugins/Requiem/Exploit.cpp
-    s2e/Plugins/Requiem/RopChainBuilder.cpp
-    s2e/Plugins/Requiem/Core/RegisterManager.cpp
-    s2e/Plugins/Requiem/Core/MemoryManager.cpp
-    s2e/Plugins/Requiem/Strategies/DefaultStrategy.cpp
-    s2e/Plugins/Requiem/Techniques/Technique.cpp
-    s2e/Plugins/Requiem/Techniques/Ret2csu.cpp
-    s2e/Plugins/Requiem/Techniques/StackPivot.cpp
-    s2e/Plugins/Requiem/Techniques/GotPartialOverwrite.cpp
-    s2e/Plugins/Requiem/Pwnlib/ELF.cpp
-    s2e/Plugins/Requiem/Pwnlib/Util.cpp
-    s2e/Plugins/Requiem/Utils/Algorithm.cpp
-    s2e/Plugins/Requiem/Utils/StringUtil.cpp
+    s2e/Plugins/CRAX/CRAX.cpp
+    s2e/Plugins/CRAX/Disassembler.cpp
+    s2e/Plugins/CRAX/Exploit.cpp
+    s2e/Plugins/CRAX/RopChainBuilder.cpp
+    s2e/Plugins/CRAX/Core/RegisterManager.cpp
+    s2e/Plugins/CRAX/Core/MemoryManager.cpp
+    s2e/Plugins/CRAX/Strategies/DefaultStrategy.cpp
+    s2e/Plugins/CRAX/Techniques/Technique.cpp
+    s2e/Plugins/CRAX/Techniques/Ret2csu.cpp
+    s2e/Plugins/CRAX/Techniques/StackPivot.cpp
+    s2e/Plugins/CRAX/Techniques/GotPartialOverwrite.cpp
+    s2e/Plugins/CRAX/Pwnlib/ELF.cpp
+    s2e/Plugins/CRAX/Pwnlib/Util.cpp
+    s2e/Plugins/CRAX/Utils/Algorithm.cpp
+    s2e/Plugins/CRAX/Utils/StringUtil.cpp
 
     # Core plugins
     s2e/Plugins/Core/BaseInstructions.cpp

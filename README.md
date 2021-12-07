@@ -1,7 +1,5 @@
 ## CRAX++: software CRash analysis for Automatic eXploit generation
 
-codename: `requiem`
-
 version: early alpha
 
 CRAX++ is being actively developed by:

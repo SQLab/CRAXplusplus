@@ -380,12 +380,12 @@ end
 --]]
 
 -------------------------------------------------------------------------------
--- Requiem exploit generation engine.
--- See source/s2e/libs2eplugins/src/s2e/Plugins/Requiem/Requiem.cpp
+-- CRAX exploit generation engine.
+-- See source/s2e/libs2eplugins/src/s2e/Plugins/CRAX/CRAX.cpp
 -------------------------------------------------------------------------------
-add_plugin("Requiem")
+add_plugin("CRAX")
 
-pluginsConfig.Requiem = {
+pluginsConfig.CRAX = {
     elfFilename = "target",
     libcFilename = "/lib/x86_64-linux-gnu/libc.so.6",
 }

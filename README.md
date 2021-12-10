@@ -14,6 +14,8 @@ CRAX (2012) [[Paper](https://ir.nctu.edu.tw/bitstream/11536/24012/1/000332520700
 
 CRAX++ (2021) is the new version of the original CRAX.
 
+<img src="/docs/overview.png">
+
 ## Build
 
 To build CRAX++, please refer to the following documentation:

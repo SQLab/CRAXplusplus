@@ -35,6 +35,7 @@ add_library(
     s2e/Plugins/CRAX/Modules/Techniques/Ret2csu.cpp
     s2e/Plugins/CRAX/Modules/Techniques/StackPivot.cpp
     s2e/Plugins/CRAX/Modules/Techniques/GotPartialOverwrite.cpp
+    s2e/Plugins/CRAX/Modules/IOStates.cpp
     s2e/Plugins/CRAX/Pwnlib/ELF.cpp
     s2e/Plugins/CRAX/Pwnlib/Util.cpp
     s2e/Plugins/CRAX/Utils/Algorithm.cpp

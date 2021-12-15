@@ -29,6 +29,7 @@
 #include <s2e/Plugins/CRAX/Core/MemoryManager.h>
 #include <s2e/Plugins/CRAX/Modules/Strategies/Strategy.h>
 #include <s2e/Plugins/CRAX/Modules/Behaviors.h>
+#include <s2e/Plugins/CRAX/Modules/IOStates.h>
 #include <s2e/Plugins/CRAX/Disassembler.h>
 #include <s2e/Plugins/CRAX/Exploit.h>
 #include <s2e/Plugins/CRAX/RopChainBuilder.h>
@@ -107,7 +108,12 @@ public:
     sigc::signal<void,
                  S2EExecutionState*,
                  const Instruction&>
-        instructionHooks;
+        beforeInstructionHooks;
+
+    sigc::signal<void,
+                 S2EExecutionState*,
+                 const Instruction&>
+        afterInstructionHooks;
 
     sigc::signal<void,
                  S2EExecutionState*,
@@ -118,7 +124,19 @@ public:
                  uint64_t /* r10 */,
                  uint64_t /* r8 */,
                  uint64_t /* r9 */>
-        syscallHooks;
+        beforeSyscallHooks;
+
+    sigc::signal<void,
+                 S2EExecutionState*,
+                 uint64_t /* rax */,
+                 uint64_t /* rdi */,
+                 uint64_t /* rsi */,
+                 uint64_t /* rdx */,
+                 uint64_t /* r10 */,
+                 uint64_t /* r8 */,
+                 uint64_t /* r9 */>
+        afterSyscallHooks;
+
     // clang-format on
 
 private:
@@ -148,11 +166,15 @@ private:
                                    TranslationBlock *tb,
                                    uint64_t pc);
 
+    void onExecuteInstructionStart(S2EExecutionState *state,
+                                   uint64_t pc);
+
     void onExecuteInstructionEnd(S2EExecutionState *state,
                                  uint64_t pc);
 
-    void onExecuteSyscallEnd(S2EExecutionState *state,
-                             uint64_t pc);
+    void onExecuteSyscallStart(S2EExecutionState *state);
+
+    void onExecuteSyscallEnd(S2EExecutionState *state);
 
     [[nodiscard]]
     bool generateExploit();
@@ -174,6 +196,7 @@ private:
     Exploit m_exploit;
     Disassembler m_disassembler;
     RopChainBuilder m_ropChainBuilder;
+    IOStates m_ioStates;
     uint64_t m_targetProcessPid;
 
     // Exploitation-specific attributes.

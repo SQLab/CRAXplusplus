@@ -41,8 +41,10 @@ S2E_DEFINE_PLUGIN(CRAX, "Automatic Exploit Generation Engine", "", );
 
 CRAX::CRAX(S2E *s2e)
     : Plugin(s2e),
-      instructionHooks(),
-      syscallHooks(),
+      beforeInstructionHooks(),
+      afterInstructionHooks(),
+      beforeSyscallHooks(),
+      afterSyscallHooks(),
       m_linuxMonitor(),
       m_pybind11(),
       m_pwnlib(pybind11::module::import("pwnlib.elf")),
@@ -53,6 +55,7 @@ CRAX::CRAX(S2E *s2e)
                 g_s2e->getConfig()->getString(getConfigKey() + ".libcFilename")),
       m_disassembler(*this),
       m_ropChainBuilder(*this),
+      m_ioStates(*this),
       m_targetProcessPid(),
       m_strategy(),
       m_ioBehaviors(),
@@ -118,8 +121,23 @@ void CRAX::onProcessLoad(S2EExecutionState *state,
     if (imageFileName.find(m_exploit.getElfFilename()) != imageFileName.npos) {
         m_targetProcessPid = pid;
 
+        s2e()->getCorePlugin()->onTranslateInstructionStart.connect(
+                sigc::mem_fun(*this, &CRAX::onTranslateInstructionStart));
+
         s2e()->getCorePlugin()->onTranslateInstructionEnd.connect(
                 sigc::mem_fun(*this, &CRAX::onTranslateInstructionEnd));
+    }
+}
+
+void CRAX::onTranslateInstructionStart(ExecutionSignal *onInstructionExecute,
+                                       S2EExecutionState *state,
+                                       TranslationBlock *tb,
+                                       uint64_t pc) {
+    if (!m_linuxMonitor->isKernelAddress(pc)) {
+        // Register the instruction hook which
+        // will be called before the instruction is executed.
+        onInstructionExecute->connect(
+                sigc::mem_fun(*this, &CRAX::onExecuteInstructionStart));
     }
 }
 
@@ -127,13 +145,26 @@ void CRAX::onTranslateInstructionEnd(ExecutionSignal *onInstructionExecute,
                                      S2EExecutionState *state,
                                      TranslationBlock *tb,
                                      uint64_t pc) {
-    setCurrentState(state);
-
     if (!m_linuxMonitor->isKernelAddress(pc)) {
-        // Register instruction hook.
+        // Register the instruction hook which
+        // will be called after the instruction is executed.
         onInstructionExecute->connect(
                 sigc::mem_fun(*this, &CRAX::onExecuteInstructionEnd));
     }
+}
+
+void CRAX::onExecuteInstructionStart(S2EExecutionState *state,
+                                     uint64_t pc) {
+    setCurrentState(state);
+
+    Instruction i = m_disassembler.disasm(pc);
+
+    if (i.mnemonic == "syscall") {
+        onExecuteSyscallStart(state);
+    }
+
+    // Execute instruction hooks installed by the user.
+    beforeInstructionHooks.emit(state, i);
 }
 
 void CRAX::onExecuteInstructionEnd(S2EExecutionState *state,
@@ -148,17 +179,27 @@ void CRAX::onExecuteInstructionEnd(S2EExecutionState *state,
     }
 
     if (i.mnemonic == "syscall") {
-        onExecuteSyscallEnd(state, pc);
+        onExecuteSyscallEnd(state);
     }
 
     // Execute instruction hooks installed by the user.
-    instructionHooks.emit(state, i);
+    afterInstructionHooks.emit(state, i);
 }
 
-void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,
-                               uint64_t pc) {
-    setCurrentState(state);
+void CRAX::onExecuteSyscallStart(S2EExecutionState *state) {
+    uint64_t rax = reg().readConcrete(Register::RAX);
+    uint64_t rdi = reg().readConcrete(Register::RDI);
+    uint64_t rsi = reg().readConcrete(Register::RSI);
+    uint64_t rdx = reg().readConcrete(Register::RDX);
+    uint64_t r10 = reg().readConcrete(Register::R10);
+    uint64_t r8  = reg().readConcrete(Register::R8);
+    uint64_t r9  = reg().readConcrete(Register::R9);
 
+    // Execute syscall hooks installed by the user.
+    beforeSyscallHooks.emit(state, rax, rdi, rsi, rdx, r10, r8, r9);
+}
+
+void CRAX::onExecuteSyscallEnd(S2EExecutionState *state) {
     uint64_t rax = reg().readConcrete(Register::RAX);
     uint64_t rdi = reg().readConcrete(Register::RDI);
     uint64_t rsi = reg().readConcrete(Register::RSI);
@@ -175,11 +216,11 @@ void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,
             << hexval(rdx) << ", "
             << hexval(r10) << ", "
             << hexval(r8) << ", "
-            << hexval(r9) << ")\n";
+            << hexval(r9) << '\n';
     }
 
     // Execute syscall hooks installed by the user.
-    syscallHooks.emit(state, rax, rdi, rsi, rdx, r10, r8, r9);
+    afterSyscallHooks.emit(state, rax, rdi, rsi, rdx, r10, r8, r9);
 }
 
 bool CRAX::generateExploit() {

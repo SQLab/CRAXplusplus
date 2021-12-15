@@ -75,10 +75,10 @@ void CRAX::initialize() {
 
 
 void CRAX::onSymbolicRip(S2EExecutionState *exploitableState,
-                            ref<Expr> symbolicRip,
-                            uint64_t concreteRip,
-                            bool &concretize,
-                            CorePlugin::symbolicAddressReason reason) {
+                         ref<Expr> symbolicRip,
+                         uint64_t concreteRip,
+                         bool &concretize,
+                         CorePlugin::symbolicAddressReason reason) {
     if (reason != CorePlugin::symbolicAddressReason::PC) {
         return;
     }
@@ -108,9 +108,9 @@ void CRAX::onSymbolicRip(S2EExecutionState *exploitableState,
 }
 
 void CRAX::onProcessLoad(S2EExecutionState *state,
-                            uint64_t cr3,
-                            uint64_t pid,
-                            const std::string &imageFileName) {
+                         uint64_t cr3,
+                         uint64_t pid,
+                         const std::string &imageFileName) {
     setCurrentState(state);
 
     log<WARN>() << "onProcessLoad: " << imageFileName << "\n";
@@ -124,9 +124,9 @@ void CRAX::onProcessLoad(S2EExecutionState *state,
 }
 
 void CRAX::onTranslateInstructionEnd(ExecutionSignal *onInstructionExecute,
-                                        S2EExecutionState *state,
-                                        TranslationBlock *tb,
-                                        uint64_t pc) {
+                                     S2EExecutionState *state,
+                                     TranslationBlock *tb,
+                                     uint64_t pc) {
     setCurrentState(state);
 
     if (!m_linuxMonitor->isKernelAddress(pc)) {
@@ -137,7 +137,7 @@ void CRAX::onTranslateInstructionEnd(ExecutionSignal *onInstructionExecute,
 }
 
 void CRAX::onExecuteInstructionEnd(S2EExecutionState *state,
-                                      uint64_t pc) {
+                                   uint64_t pc) {
     setCurrentState(state);
 
     Instruction i = m_disassembler.disasm(pc);
@@ -156,7 +156,7 @@ void CRAX::onExecuteInstructionEnd(S2EExecutionState *state,
 }
 
 void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,
-                                  uint64_t pc) {
+                               uint64_t pc) {
     setCurrentState(state);
 
     uint64_t rax = reg().readConcrete(Register::RAX);

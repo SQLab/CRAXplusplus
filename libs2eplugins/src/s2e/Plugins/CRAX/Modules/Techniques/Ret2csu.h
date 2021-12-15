@@ -21,7 +21,7 @@
 #ifndef S2E_PLUGINS_CRAX_RET2CSU_H
 #define S2E_PLUGINS_CRAX_RET2CSU_H
 
-#include <s2e/Plugins/CRAX/Techniques/Technique.h>
+#include <s2e/Plugins/CRAX/Modules/Techniques/Technique.h>
 
 #include <exception>
 #include <map>

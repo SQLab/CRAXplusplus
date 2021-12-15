@@ -18,34 +18,27 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <s2e/Plugins/CRAX/CRAX.h>
-#include <s2e/Plugins/CRAX/Techniques/Ret2csu.h>
-#include <s2e/Plugins/CRAX/Techniques/StackPivot.h>
-#include <s2e/Plugins/CRAX/Techniques/GotPartialOverwrite.h>
+#ifndef S2E_PLUGINS_CRAX_DEFAULT_STRATEGY_H
+#define S2E_PLUGINS_CRAX_DEFAULT_STRATEGY_H
 
-#include <memory>
-
-#include "DefaultStrategy.h"
+#include <s2e/Plugins/CRAX/Modules/Strategies/Strategy.h>
 
 namespace s2e::plugins::crax {
 
-DefaultStrategy::DefaultStrategy(CRAX &ctx) : Strategy(ctx) {
-    // Register auxiliary techniques>
-    addAuxiliaryTechnique(std::make_unique<Ret2csu>(ctx));
+// Forward declaration
+class CRAX;
 
-    // Register primary techniques.
-    addPrimaryTechnique(std::make_unique<BasicStackPivot>(ctx));
-    //addPrimaryTechnique(std::make_unique<AdvancedStackPivot>(ctx));
-    addPrimaryTechnique(std::make_unique<GotPartialOverwrite>(ctx));
-
-    /*
-    addPrimaryTechnique(
-            std::make_unique<Ret2csu>(ctx,
-                                      "0xdeadbeefdeadbeef",
-                                      "0xcafebabecafebabe",
-                                      "0xd00df00dd00df00d",
-                                      "elf.sym['ret2win']"));
-    */
-}
+// Default exploitation strategy:
+//
+// 1. migrate the stack to .bss
+// 2. use ret2csu to partially overwrite read@GOT to point to `syscall` gadget.
+// 3. use ret2csu to call sys_execve("/bin/sh", 0, 0)
+class DefaultStrategy : public Strategy {
+public:
+    explicit DefaultStrategy(CRAX &ctx);
+    virtual ~DefaultStrategy() = default;
+};
 
 }  // namespace s2e::plugins::crax
+
+#endif  // S2E_PLUGINS_CRAX_STRATEGY_H

@@ -27,8 +27,8 @@
 #include <s2e/Plugins/ExecutionMonitors/StackMonitor.h>
 #include <s2e/Plugins/CRAX/Core/RegisterManager.h>
 #include <s2e/Plugins/CRAX/Core/MemoryManager.h>
-#include <s2e/Plugins/CRAX/Strategies/Strategy.h>
-#include <s2e/Plugins/CRAX/Behaviors.h>
+#include <s2e/Plugins/CRAX/Modules/Strategies/Strategy.h>
+#include <s2e/Plugins/CRAX/Modules/Behaviors.h>
 #include <s2e/Plugins/CRAX/Disassembler.h>
 #include <s2e/Plugins/CRAX/Exploit.h>
 #include <s2e/Plugins/CRAX/RopChainBuilder.h>

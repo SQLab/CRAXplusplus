@@ -21,8 +21,8 @@
 #include <s2e/Plugins/CRAX/CRAX.h>
 #include <s2e/Plugins/CRAX/Core/RegisterManager.h>
 #include <s2e/Plugins/CRAX/Expr/BinaryExprEvaluator.h>
-#include <s2e/Plugins/CRAX/Techniques/Technique.h>
-#include <s2e/Plugins/CRAX/Techniques/StackPivot.h>
+#include <s2e/Plugins/CRAX/Modules/Techniques/Technique.h>
+#include <s2e/Plugins/CRAX/Modules/Techniques/StackPivot.h>
 
 #include <klee/Expr.h>
 

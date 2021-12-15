@@ -18,27 +18,37 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef S2E_PLUGINS_CRAX_DEFAULT_STRATEGY_H
-#define S2E_PLUGINS_CRAX_DEFAULT_STRATEGY_H
+#ifndef S2E_PLUGINS_CRAX_GOT_PARTIAL_OVERWRITE_H
+#define S2E_PLUGINS_CRAX_GOT_PARTIAL_OVERWRITE_H
 
-#include <s2e/Plugins/CRAX/Strategies/Strategy.h>
+#include <s2e/Plugins/CRAX/Modules/Techniques/Technique.h>
+
+#include <string>
+#include <vector>
 
 namespace s2e::plugins::crax {
 
 // Forward declaration
 class CRAX;
 
-// Default exploitation strategy:
-//
-// 1. migrate the stack to .bss
-// 2. use ret2csu to partially overwrite read@GOT to point to `syscall` gadget.
-// 3. use ret2csu to call sys_execve("/bin/sh", 0, 0)
-class DefaultStrategy : public Strategy {
+class GotPartialOverwrite : public Technique {
 public:
-    explicit DefaultStrategy(CRAX &ctx);
-    virtual ~DefaultStrategy() = default;
+    explicit GotPartialOverwrite(CRAX &ctx);
+    virtual ~GotPartialOverwrite() = default;
+
+    virtual bool checkRequirements() const override;
+    virtual void resolveRequiredGadgets() override;
+    virtual std::string getAuxiliaryFunctions() const override;
+
+    virtual std::vector<SymbolicRopPayload> getSymbolicRopPayloadList() const override;
+    virtual ConcreteRopPayload getExtraPayload() const override;
+
+    virtual std::string toString() const override;
+
+private:
+    uint8_t getLsbOfReadSyscall() const;
 };
 
 }  // namespace s2e::plugins::crax
 
-#endif  // S2E_PLUGINS_CRAX_STRATEGY_H
+#endif  // S2E_PLUGINS_CRAX_GOT_PARTIAL_OVERWRITE_H

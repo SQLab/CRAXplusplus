@@ -22,7 +22,7 @@
 #include <s2e/ConfigFile.h>
 #include <s2e/Plugins/OSMonitors/Support/ProcessExecutionDetector.h>
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
-#include <s2e/Plugins/CRAX/Strategies/DefaultStrategy.h>
+#include <s2e/Plugins/CRAX/Modules/Strategies/DefaultStrategy.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
 #include <fstream>

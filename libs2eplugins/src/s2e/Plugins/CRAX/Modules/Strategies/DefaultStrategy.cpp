@@ -18,37 +18,34 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef S2E_PLUGINS_CRAX_GOT_PARTIAL_OVERWRITE_H
-#define S2E_PLUGINS_CRAX_GOT_PARTIAL_OVERWRITE_H
+#include <s2e/Plugins/CRAX/CRAX.h>
+#include <s2e/Plugins/CRAX/Modules/Techniques/Ret2csu.h>
+#include <s2e/Plugins/CRAX/Modules/Techniques/StackPivot.h>
+#include <s2e/Plugins/CRAX/Modules/Techniques/GotPartialOverwrite.h>
 
-#include <s2e/Plugins/CRAX/Techniques/Technique.h>
+#include <memory>
 
-#include <string>
-#include <vector>
+#include "DefaultStrategy.h"
 
 namespace s2e::plugins::crax {
 
-// Forward declaration
-class CRAX;
+DefaultStrategy::DefaultStrategy(CRAX &ctx) : Strategy(ctx) {
+    // Register auxiliary techniques>
+    addAuxiliaryTechnique(std::make_unique<Ret2csu>(ctx));
 
-class GotPartialOverwrite : public Technique {
-public:
-    explicit GotPartialOverwrite(CRAX &ctx);
-    virtual ~GotPartialOverwrite() = default;
+    // Register primary techniques.
+    addPrimaryTechnique(std::make_unique<BasicStackPivot>(ctx));
+    //addPrimaryTechnique(std::make_unique<AdvancedStackPivot>(ctx));
+    addPrimaryTechnique(std::make_unique<GotPartialOverwrite>(ctx));
 
-    virtual bool checkRequirements() const override;
-    virtual void resolveRequiredGadgets() override;
-    virtual std::string getAuxiliaryFunctions() const override;
-
-    virtual std::vector<SymbolicRopPayload> getSymbolicRopPayloadList() const override;
-    virtual ConcreteRopPayload getExtraPayload() const override;
-
-    virtual std::string toString() const override;
-
-private:
-    uint8_t getLsbOfReadSyscall() const;
-};
+    /*
+    addPrimaryTechnique(
+            std::make_unique<Ret2csu>(ctx,
+                                      "0xdeadbeefdeadbeef",
+                                      "0xcafebabecafebabe",
+                                      "0xd00df00dd00df00d",
+                                      "elf.sym['ret2win']"));
+    */
+}
 
 }  // namespace s2e::plugins::crax
-
-#endif  // S2E_PLUGINS_CRAX_GOT_PARTIAL_OVERWRITE_H

@@ -47,12 +47,15 @@ template <enum LogLevel T>
 llvm::raw_ostream &log(S2EExecutionState *state = nullptr);
 
 template <>
+[[nodiscard]]
 llvm::raw_ostream &log<LogLevel::INFO>(S2EExecutionState *state);
 
 template <>
+[[nodiscard]]
 llvm::raw_ostream &log<LogLevel::DEBUG>(S2EExecutionState *state);
 
 template <>
+[[nodiscard]]
 llvm::raw_ostream &log<LogLevel::WARN>(S2EExecutionState *state);
 
 }  // namespace s2e::plugins::crax

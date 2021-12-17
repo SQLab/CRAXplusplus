@@ -39,6 +39,8 @@ enum LogLevel {
 };
 
 
+// This logging module provides straightforward logging APIs with
+// C++-style streams. There are three severity levels: INFO, DEBUG and WARN.
 void initCRAXLogging(CRAX *crax);
 
 template <enum LogLevel T>

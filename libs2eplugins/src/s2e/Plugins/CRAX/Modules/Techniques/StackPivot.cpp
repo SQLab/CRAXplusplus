@@ -168,7 +168,7 @@ std::vector<SymbolicRopPayload> AdvancedStackPivot::getSymbolicRopPayloadList() 
     Ret2csu *ret2csu = dynamic_cast<Ret2csu*>(Technique::mapper["Ret2csu"]);
 
     if (!ret2csu) {
-        m_ctx.log<WARN>() << "StackPivot: unable to get ret2csu technique!\n";
+        log<WARN>() << "StackPivot: unable to get ret2csu technique!\n";
     } else {
         std::vector<std::vector<std::string>> r = ret2csu->getRopPayloadList(
             "0",
@@ -225,8 +225,7 @@ uint64_t AdvancedStackPivot::determineOffset() const {
         --left;
     }
 
-    m_ctx.log<WARN>()
-        << hexval(target) << " is within " << syms[left].first << "\n";
+    log<WARN>() << hexval(target) << " is within " << syms[left].first << "\n";
 
     std::vector<Instruction> insns = m_ctx.getDisassembler().disasm(syms[left].first);
     uint64_t offset = 0;

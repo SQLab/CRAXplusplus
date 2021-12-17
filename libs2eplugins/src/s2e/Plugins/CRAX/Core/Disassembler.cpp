@@ -80,7 +80,7 @@ std::vector<Instruction> Disassembler::disasm(const std::vector<uint8_t> &code,
         }
         cs_free(insn, count);
     } else if (warnOnError) {
-        auto &os = m_ctx.log<WARN>();
+        auto &os = log<WARN>();
         os << "disassemble failed: ";
 
         for (size_t i = 0; i < code.size(); i++) {

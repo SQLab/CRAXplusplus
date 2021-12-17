@@ -35,7 +35,7 @@ void MemoryManager::initialize() {
     m_map = g_s2e->getPlugin<MemoryMap>();
 
     if (!m_map) {
-        m_ctx.log<WARN>() << "MemoryManager::showMapInfo() requires MemoryMap plugin.\n";
+        log<WARN>() << "MemoryManager::showMapInfo() requires MemoryMap plugin.\n";
     }
 }
 
@@ -55,7 +55,7 @@ std::vector<uint8_t> MemoryManager::readConcrete(uint64_t virtAddr, uint64_t siz
 
     if (concretize) {
         if (!m_ctx.getCurrentState()->mem()->read(virtAddr, ret.data(), size)) {
-            m_ctx.log<WARN>() << "Cannot read concrete data from memory: " << hexval(virtAddr) << "\n";
+            log<WARN>() << "Cannot read concrete data from memory: " << hexval(virtAddr) << "\n";
             ret.clear();
         }
     } else {
@@ -67,7 +67,7 @@ std::vector<uint8_t> MemoryManager::readConcrete(uint64_t virtAddr, uint64_t siz
                 continue;
             }
             if (!m_ctx.getCurrentState()->mem()->read(virtAddr + i, &ret[i], 1)) {
-                m_ctx.log<WARN>() << "Cannot read concrete data from memory: " << hexval(virtAddr + i) << "\n";
+                log<WARN>() << "Cannot read concrete data from memory: " << hexval(virtAddr + i) << "\n";
                 ret.clear();
                 break;
             }
@@ -80,7 +80,7 @@ std::vector<uint8_t> MemoryManager::readConcrete(uint64_t virtAddr, uint64_t siz
 bool MemoryManager::writeSymbolic(uint64_t virtAddr, const klee::ref<klee::Expr> &value) {
     bool success = m_ctx.getCurrentState()->mem()->write(virtAddr, value);
     if (!success) {
-        m_ctx.log<WARN>() << "Cannot write symbolic data to memory: " << hexval(virtAddr) << "\n";
+        log<WARN>() << "Cannot write symbolic data to memory: " << hexval(virtAddr) << "\n";
     }
     return success;
 }
@@ -88,7 +88,7 @@ bool MemoryManager::writeSymbolic(uint64_t virtAddr, const klee::ref<klee::Expr>
 bool MemoryManager::writeConcrete(uint64_t virtAddr, uint64_t value) {
     bool success = m_ctx.getCurrentState()->mem()->write(virtAddr, &value, sizeof(value));
     if (!success) {
-        m_ctx.log<WARN>() << "Cannot write concrete data to memory: " << hexval(virtAddr) << "\n";
+        log<WARN>() << "Cannot write concrete data to memory: " << hexval(virtAddr) << "\n";
     }
     return success;
 }
@@ -176,7 +176,7 @@ std::set<MemoryRegion, MemoryRegionCmp> MemoryManager::getMapInfo(uint64_t pid) 
 }
 
 void MemoryManager::showMapInfo(uint64_t pid) const {
-    auto &os = m_ctx.log<WARN>();
+    auto &os = log<WARN>();
 
     os << "Dummping memory map...\n"
         << "--------------- [VMMAP] ---------------\n"

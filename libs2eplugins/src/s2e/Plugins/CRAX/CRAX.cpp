@@ -52,8 +52,7 @@ CRAX::CRAX(S2E *s2e)
       m_registerManager(*this),
       m_memoryManager(*this),
       m_disassembler(*this),
-      m_exploit(*this,
-                g_s2e->getConfig()->getString(getConfigKey() + ".elfFilename"),
+      m_exploit(g_s2e->getConfig()->getString(getConfigKey() + ".elfFilename"),
                 g_s2e->getConfig()->getString(getConfigKey() + ".libcFilename")),
       m_ropChainBuilder(*this),
       m_ioStates(*this),
@@ -65,6 +64,9 @@ CRAX::CRAX(S2E *s2e)
 
 
 void CRAX::initialize() {
+    // Initialize CRAX++'s logging module.
+    initCRAXLogging(this);
+
     m_linuxMonitor = s2e()->getPlugin<LinuxMonitor>();
 
     m_registerManager.initialize();

@@ -57,7 +57,7 @@ bool RopChainBuilder::build(Exploit &exploit,
         }
 
         // Symbolic payload generation mode
-        m_ctx.log<WARN>() << "Building exploit constraints...\n";
+        log<WARN>() << "Building exploit constraints...\n";
         for (size_t i = 0; i < symbolicRopPayloadList[0].size(); i++) {
             const ref<Expr> &e = symbolicRopPayloadList[0][i];
             bool ok = false;
@@ -78,12 +78,12 @@ bool RopChainBuilder::build(Exploit &exploit,
         }
 
         if (shouldSwitchToDirectMode(t)) {
-            m_ctx.log<WARN>() << "Switching from symbolic mode to direct mode...\n";
+            log<WARN>() << "Switching from symbolic mode to direct mode...\n";
             m_symbolicMode = false;
 
             ConcreteInputs newInput;
             if (!m_ctx.getCurrentState()->getSymbolicSolution(newInput)) {
-                m_ctx.log<WARN>() << "Could not get symbolic solutions\n";
+                log<WARN>() << "Could not get symbolic solutions\n";
                 return false;
             }
 
@@ -123,8 +123,8 @@ bool RopChainBuilder::addRegisterConstraint(Register reg, const ref<Expr> &e) {
     auto regExpr = m_ctx.reg().readSymbolic(reg);
     auto constraint = EqExpr::create(regExpr, ConstantExpr::create(value, Expr::Int64));
 
-    m_ctx.log<INFO>()
-         << m_ctx.reg().getName(reg) << " = "
+    log<INFO>()
+        << m_ctx.reg().getName(reg) << " = "
         << BinaryExprEvaluator<std::string>().evaluate(e)
         << " (concretized=" << klee::hexval(value) << ")\n";
 
@@ -136,7 +136,7 @@ bool RopChainBuilder::addMemoryConstraint(uint64_t addr, const ref<Expr> &e) {
     auto memExpr = m_ctx.mem().readSymbolic(addr, klee::Expr::Int64);
     auto constraint = EqExpr::create(memExpr, ConstantExpr::create(value, Expr::Int64));
 
-    m_ctx.log<INFO>()
+    log<INFO>()
         << "[RSP + " << m_symbolicModeRspOffset << "] = "
         << BinaryExprEvaluator<std::string>().evaluate(e)
         << " (concretized=" << klee::hexval(value) << ")\n";

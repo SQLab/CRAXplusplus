@@ -31,6 +31,7 @@
 #include <s2e/Plugins/CRAX/Modules/Strategies/Strategy.h>
 #include <s2e/Plugins/CRAX/Modules/Behaviors.h>
 #include <s2e/Plugins/CRAX/Modules/IOStates.h>
+#include <s2e/Plugins/CRAX/Logging.h>
 #include <s2e/Plugins/CRAX/Exploit.h>
 #include <s2e/Plugins/CRAX/RopChainBuilder.h>
 
@@ -41,37 +42,12 @@
 
 namespace s2e::plugins::crax {
 
-// Logging
-enum LogLevel {
-    INFO,
-    DEBUG,
-    WARN,
-};
-
 class CRAX : public Plugin, IPluginInvoker {
     S2E_PLUGIN
 
 public:
     CRAX(S2E *s2e);
     void initialize();
-
-    template <enum LogLevel T>
-    llvm::raw_ostream &log(S2EExecutionState *state = nullptr) const;
-
-    template <>
-    llvm::raw_ostream &log<LogLevel::INFO>(S2EExecutionState *state) const {
-        return state ? getInfoStream(state) : getInfoStream(m_currentState);
-    }
-
-    template <>
-    llvm::raw_ostream &log<LogLevel::DEBUG>(S2EExecutionState *state) const {
-        return state ? getDebugStream(state) : getDebugStream(m_currentState);
-    }
-
-    template <>
-    llvm::raw_ostream &log<LogLevel::WARN>(S2EExecutionState *state) const {
-        return state ? getWarningsStream(state) : getWarningsStream(m_currentState);
-    }
 
 
     [[nodiscard]]

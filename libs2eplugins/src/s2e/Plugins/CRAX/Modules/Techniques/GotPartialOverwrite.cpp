@@ -95,7 +95,7 @@ std::vector<SymbolicRopPayload> GotPartialOverwrite::getSymbolicRopPayloadList()
     part1.insert(part1.end(), read3.begin(), read3.end());
     part1.insert(part1.end(), read4.begin(), read4.end());
 
-    m_ctx.log<WARN>() << "read syscall gadget LSByte = " << klee::hexval(getLsbOfReadSyscall()) << '\n';
+    log<WARN>() << "read syscall gadget LSByte = " << klee::hexval(getLsbOfReadSyscall()) << '\n';
     part2 = { ByteVectorExpr::create(std::vector<uint8_t> { getLsbOfReadSyscall() }) };
     part3 = { ByteVectorExpr::create(ljust("/bin/sh", 59, 0x00)) };
 

@@ -60,7 +60,7 @@ ref<Expr> RegisterManager::readSymbolic(Register reg, bool verbose) {
     }
 
     if (verbose && isa<klee::ConstantExpr>(ret)) {
-        m_ctx.log<WARN>() << "readSymbolic(" << getName(reg) << "), but register isn't symbolic.\n";
+        log<WARN>() << "readSymbolic(" << getName(reg) << "), but register isn't symbolic.\n";
     }
     return ret;
 }
@@ -70,7 +70,7 @@ uint64_t RegisterManager::readConcrete(Register reg, bool verbose) {
 
     if (verbose &&
         !m_ctx.getCurrentState()->regs()->read(getOffset(reg), &ret, sizeof(ret), /*concretize=*/false)) {
-        m_ctx.log<WARN>()
+        log<WARN>()
             << "Cannot read concrete data from register: " << getName(reg) << "\n";
     }
     return ret;
@@ -79,7 +79,7 @@ uint64_t RegisterManager::readConcrete(Register reg, bool verbose) {
 bool RegisterManager::writeSymbolic(Register reg, const klee::ref<klee::Expr> &value, bool verbose) {
     bool success = m_ctx.getCurrentState()->regs()->write(getOffset(reg), value);
     if (verbose && !success) {
-        m_ctx.log<WARN>()
+        log<WARN>()
             << "Cannot write symbolic data to register: " << getName(reg) << "\n";
     }
     return success;
@@ -88,14 +88,14 @@ bool RegisterManager::writeSymbolic(Register reg, const klee::ref<klee::Expr> &v
 bool RegisterManager::writeConcrete(Register reg, uint64_t value, bool verbose) {
     bool success = m_ctx.getCurrentState()->regs()->write(getOffset(reg), &value, sizeof(value));
     if (verbose && !success) {
-        m_ctx.log<WARN>()
+        log<WARN>()
             << "Cannot write concrete data to register: " << getName(reg) << "\n";
     }
     return success;
 }
 
 void RegisterManager::showRegInfo() {
-    auto &os = m_ctx.log<WARN>();
+    auto &os = log<WARN>();
 
     os << "Dumping CPU registers...\n"
         << "---------- [REGISTERS] ----------\n";

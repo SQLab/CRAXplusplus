@@ -34,6 +34,18 @@ public:
     using SymbolMap = std::map<std::string, uint64_t>;
     using FunctionMap = std::map<std::string, Function>;
 
+    struct Checksec {
+        Checksec(const std::string &filename);
+
+        bool hasCanary;
+        bool hasFullRELRO;
+        bool hasNX;
+        bool hasPIE;
+
+        // The value of canary won't change during program lifetime.
+        uint64_t canary;
+    };
+
     ELF(pybind11::module pwnlib,
         const std::string &filename); 
 
@@ -50,6 +62,7 @@ private:
     pybind11::object m_elf;
 
     uint64_t m_base;
+    ELF::Checksec m_checksec;
 };
 
 }  // namespace s2e::plugins::crax

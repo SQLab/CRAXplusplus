@@ -18,6 +18,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <s2e/Plugins/CRAX/Utils/Subprocess.h>
+#include <s2e/Plugins/CRAX/Utils/StringUtil.h>
+
+#include <cassert>
+#include <string>
+#include <vector>
 #include <pybind11/embed.h>
 #include <pybind11/stl.h>
 
@@ -31,7 +37,8 @@ ELF::ELF(py::module pwnlib,
          const std::string &filename)
     : m_pwnlib(pwnlib),
       m_elf(pwnlib.attr("elf").attr("ELF").call(filename)),
-      m_base() {}
+      m_base(),
+      m_checksec(filename) {}
 
 
 ELF::SymbolMap ELF::symbols() const {
@@ -64,6 +71,50 @@ ELF::FunctionMap ELF::functions() const {
 
 uint64_t ELF::bss() const {
     return m_elf.attr("bss").call().cast<uint64_t>();
+}
+
+
+
+ELF::Checksec::Checksec(const std::string &filename)
+    : hasCanary(),
+      hasFullRELRO(),
+      hasNX(),
+      hasPIE(),
+      canary() {
+    // Get the output of `checksec --file <m_elfFilename>`
+    // and store it in `output`.
+    subprocess::popen checksec("checksec", {"--file", filename});
+    std::string output = toString(checksec.stderr());
+
+    // Example output:
+    // [*] '/lib/x86_64-linux-gnu/libc.so.6'
+    //     Arch:     amd64-64-little
+    //     RELRO:    Partial RELRO
+    //     Stack:    Canary found
+    //     NX:       NX enabled
+    //     PIE:      PIE enabled
+    // 
+    // The first thing to do is checking if the output seems correct.
+    assert(startsWith(output, "[*] ") && "checksec not installed?");
+    output = output.substr(output.find('\n') + 1);
+    output = strip(output);
+
+    for (auto line : split(output, '\n')) {
+        std::vector<std::string> keyVal = split(line, ':');
+        assert(keyVal.size() == 2);
+        std::string key = strip(keyVal[0]);
+        std::string val = strip(keyVal[1]);
+
+        if (key == "RELRO") {
+            hasFullRELRO = (val == "Full RELRO");
+        } else if (key == "Stack") {
+            hasCanary = (val == "Canary found");
+        } else if (key == "NX") {
+            hasNX = (val == "NX enabled");
+        } else if (key == "PIE") {
+            hasPIE = (val == "PIE enabled");
+        }
+    }
 }
 
 }  // namespace s2e::plugins::crax

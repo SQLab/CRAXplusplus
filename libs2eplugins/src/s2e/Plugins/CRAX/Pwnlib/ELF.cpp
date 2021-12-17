@@ -99,7 +99,7 @@ ELF::Checksec::Checksec(const std::string &filename)
     output = output.substr(output.find('\n') + 1);
     output = strip(output);
 
-    for (auto line : split(output, '\n')) {
+    for (const auto &line : split(output, '\n')) {
         std::vector<std::string> keyVal = split(line, ':');
         assert(keyVal.size() == 2);
         std::string key = strip(keyVal[0]);

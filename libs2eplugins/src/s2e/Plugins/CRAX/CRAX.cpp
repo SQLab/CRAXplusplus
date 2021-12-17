@@ -38,6 +38,9 @@ namespace s2e::plugins::crax {
 
 S2E_DEFINE_PLUGIN(CRAX, "Automatic Exploit Generation Engine", "", );
 
+pybind11::scoped_interpreter CRAX::s_pybind11;
+pybind11::module CRAX::s_pwnlib(pybind11::module::import("pwnlib.elf"));
+
 
 CRAX::CRAX(S2E *s2e)
     : Plugin(s2e),
@@ -46,8 +49,6 @@ CRAX::CRAX(S2E *s2e)
       beforeSyscallHooks(),
       afterSyscallHooks(),
       m_linuxMonitor(),
-      m_pybind11(),
-      m_pwnlib(pybind11::module::import("pwnlib.elf")),
       m_registerManager(*this),
       m_memoryManager(*this),
       m_disassembler(*this),

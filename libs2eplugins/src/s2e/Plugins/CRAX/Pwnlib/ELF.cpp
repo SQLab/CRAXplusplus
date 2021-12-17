@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <s2e/Plugins/CRAX/CRAX.h>
 #include <s2e/Plugins/CRAX/Utils/Subprocess.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
@@ -33,10 +34,8 @@ namespace py = pybind11;
 
 namespace s2e::plugins::crax {
 
-ELF::ELF(py::module pwnlib,
-         const std::string &filename)
-    : m_pwnlib(pwnlib),
-      m_elf(pwnlib.attr("elf").attr("ELF").call(filename)),
+ELF::ELF(const std::string &filename)
+    : m_elf(CRAX::s_pwnlib.attr("elf").attr("ELF").call(filename)),
       m_base(),
       m_checksec(filename) {}
 

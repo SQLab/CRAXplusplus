@@ -80,9 +80,6 @@ public:
     void setCurrentState(S2EExecutionState *state) { m_currentState = state; }
 
     [[nodiscard]]
-    pybind11::module &pwnlib() { return m_pwnlib; }
-
-    [[nodiscard]]
     RegisterManager &reg() { return m_registerManager; }
 
     [[nodiscard]]
@@ -136,8 +133,11 @@ public:
                  uint64_t /* r8 */,
                  uint64_t /* r9 */>
         afterSyscallHooks;
-
     // clang-format on
+
+    // Embedded Python interpreter from pybind11 library.
+    static pybind11::scoped_interpreter s_pybind11;
+    static pybind11::module s_pwnlib;
 
 private:
     // Allow the guest to communicate with this plugin using s2e_invoke_plugin
@@ -179,16 +179,11 @@ private:
     [[nodiscard]]
     bool generateExploit();
 
- 
+
+
     // S2E
     S2EExecutionState *m_currentState;
-
-    // S2E built-in plugins.
     LinuxMonitor *m_linuxMonitor;
-
-    // Embedded Python interpreter from pybind11 library.
-    pybind11::scoped_interpreter m_pybind11;
-    pybind11::module m_pwnlib;
 
     // CRAX's attributes.
     RegisterManager m_registerManager;

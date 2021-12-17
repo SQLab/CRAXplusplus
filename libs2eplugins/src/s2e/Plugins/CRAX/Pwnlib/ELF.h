@@ -22,6 +22,7 @@
 #define S2E_PLUGINS_CRAX_PWNLIB_ELF_H
 
 #include <s2e/Plugins/CRAX/Pwnlib/Function.h>
+
 #include <pybind11/embed.h>
 
 #include <map>
@@ -46,8 +47,7 @@ public:
         uint64_t canary;
     };
 
-    ELF(pybind11::module pwnlib,
-        const std::string &filename); 
+    ELF(const std::string &filename); 
 
     SymbolMap symbols() const;
     SymbolMap got() const;
@@ -58,9 +58,7 @@ public:
     void setBase(uint64_t base) { m_base= base; }
 
 private:
-    pybind11::module m_pwnlib;
     pybind11::object m_elf;
-
     uint64_t m_base;
     ELF::Checksec m_checksec;
 };

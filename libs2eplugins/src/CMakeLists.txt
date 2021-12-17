@@ -25,11 +25,11 @@ add_library(
 
     # Exploit generation
     s2e/Plugins/CRAX/CRAX.cpp
-    s2e/Plugins/CRAX/Disassembler.cpp
     s2e/Plugins/CRAX/Exploit.cpp
     s2e/Plugins/CRAX/RopChainBuilder.cpp
     s2e/Plugins/CRAX/Core/RegisterManager.cpp
     s2e/Plugins/CRAX/Core/MemoryManager.cpp
+    s2e/Plugins/CRAX/Core/Disassembler.cpp
     s2e/Plugins/CRAX/Modules/Strategies/DefaultStrategy.cpp
     s2e/Plugins/CRAX/Modules/Techniques/Technique.cpp
     s2e/Plugins/CRAX/Modules/Techniques/Ret2csu.cpp

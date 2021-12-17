@@ -20,6 +20,7 @@
 
 #include <s2e/Plugins/CRAX/CRAX.h>
 #include <s2e/Plugins/CRAX/Pwnlib/Function.h>
+
 #include <capstone/capstone.h>
 
 #include <cassert>

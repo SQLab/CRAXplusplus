@@ -27,10 +27,10 @@
 #include <s2e/Plugins/ExecutionMonitors/StackMonitor.h>
 #include <s2e/Plugins/CRAX/Core/RegisterManager.h>
 #include <s2e/Plugins/CRAX/Core/MemoryManager.h>
+#include <s2e/Plugins/CRAX/Core/Disassembler.h>
 #include <s2e/Plugins/CRAX/Modules/Strategies/Strategy.h>
 #include <s2e/Plugins/CRAX/Modules/Behaviors.h>
 #include <s2e/Plugins/CRAX/Modules/IOStates.h>
-#include <s2e/Plugins/CRAX/Disassembler.h>
 #include <s2e/Plugins/CRAX/Exploit.h>
 #include <s2e/Plugins/CRAX/RopChainBuilder.h>
 
@@ -193,8 +193,8 @@ private:
     // CRAX's attributes.
     RegisterManager m_registerManager;
     MemoryManager m_memoryManager;
-    Exploit m_exploit;
     Disassembler m_disassembler;
+    Exploit m_exploit;
     RopChainBuilder m_ropChainBuilder;
     IOStates m_ioStates;
     uint64_t m_targetProcessPid;

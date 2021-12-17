@@ -46,12 +46,15 @@ std::string format(const std::string &fmt, Args &&...args) {
 }
 
 std::string toString(const std::istream &is);
+std::string toString(const std::ostream &os);
 std::vector<std::string> split(const std::string &s, const char delim);
 std::string join(const std::vector<std::string> &strings, const char delim);
 std::string replace(std::string s, const std::string &keyword, const std::string &newword);
 std::string slice(std::string s, size_t start, size_t end = std::string::npos);  // [start, end)
 std::string strip(std::string s);
 std::string ljust(std::string s, size_t size, char c);
+bool startsWith(const std::string &s, const std::string &prefix);
+bool endsWith(const std::string &s, const std::string &suffix);
 bool isNumString(const std::string &s);
 
 }  // namespace s2e::plugins::crax

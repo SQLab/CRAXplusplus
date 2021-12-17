@@ -30,6 +30,12 @@ std::string toString(const std::istream &is) {
     return ss.str();
 }
 
+std::string toString(const std::ostream &os) {
+    std::stringstream ss;
+    ss << os.rdbuf();
+    return ss.str();
+}
+
 std::vector<std::string> split(const std::string &s, const char delim) {
     std::stringstream ss(s);
     std::vector<std::string> tokens;
@@ -88,6 +94,15 @@ std::string ljust(std::string s, size_t size, char c) {
     s.resize(size);
     std::fill_n(s.begin() + s.size(), size - s.size(), c);
     return s;
+}
+
+bool startsWith(const std::string &s, const std::string &prefix) {
+    return s.find(prefix) == 0;
+}
+
+bool endsWith(const std::string &s, const std::string &suffix) {
+    return suffix.size() <= s.size() &&
+           std::equal(suffix.rbegin(), suffix.rend(), s.rbegin());
 }
 
 bool isNumString(const std::string &s) {

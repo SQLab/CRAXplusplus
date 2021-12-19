@@ -29,7 +29,8 @@ namespace s2e::plugins::crax {
 
 MemoryManager::MemoryManager(CRAX &ctx)
     : m_map(),
-      m_ctx(ctx) {}
+      m_ctx(ctx),
+      m_mappedSections() {}
 
 void MemoryManager::initialize() {
     m_map = g_s2e->getPlugin<MemoryMap>();
@@ -143,14 +144,60 @@ MemoryManager::getSymbolicMemory(uint64_t start, uint64_t end) const {
 std::set<MemoryRegion, MemoryRegionCmp> MemoryManager::getMapInfo(uint64_t pid) const {
     std::set<MemoryRegion, MemoryRegionCmp> ret;
 
-    auto callback = [&ret](uint64_t start,
-                           uint64_t end,
-                           const MemoryMapRegionType &prot) -> bool {
-        ret.insert({start, end, prot});
+    auto callback = [this, &ret](uint64_t start,
+                                 uint64_t end,
+                                 const MemoryMapRegionType &prot) -> bool {
+        std::string image = "unknown";
+
+        // XXX: This workaround should be overhauled!!!
+        //
+        // Currently, we use LinuxMonitor::onModuleLoad to keep track of
+        // which binaries are loaded by linux kernel's load_elf_binary().
+        // However, since libc is loaded by ld.so, we will never be able
+        // to know where libc resides in the (guest) virtual address space
+        // of the target process.
+        //
+        // Maybe we should modify s2e linux kernel (mm/util.c:vm_mmap_pgoff())
+        // and return the image pathname of each mapped region from the guest kernel.
+        for (const auto &section : m_mappedSections) {
+            uint64_t addr = section.runtimeLoadBase + section.size;
+            if (addr >= start && addr <= end) {
+                image = section.name;
+            }
+        }
+
+        ret.insert({start, end, prot, image});
         return true;
     };
     
     m_map->iterateRegions(m_ctx.getCurrentState(), pid, callback);
+
+    // XXX: This workaround should be overhauled!!!
+    // Some entries in the map info is "unknown" due to the reason stated above.
+    // For now, we'll mark all the entries between the two ld-linux-x86-64.so.2
+    // as ld-linux-x86-64.so.2 as well.
+    //
+    // --------------- [VMMAP] ---------------
+    // Start           End             Perm    Image
+    // 0x400000        0x400fff        r--     target
+    // 0x401000        0x401fff        r-x     target
+    // 0x402000        0x403fff        r--     target
+    // 0x404000        0x404fff        rw-     target
+    // 0x7fe232d7c000  0x7fe232f10fff  r-x     unknown
+    // 0x7fe232f11000  0x7fe233110fff  ---     unknown
+    // 0x7fe233111000  0x7fe233114fff  r--     unknown
+    // 0x7fe233115000  0x7fe23311afff  rw-     unknown
+    // 0x7fe23311b000  0x7fe23313dfff  r-x     ld-linux-x86-64.so.2
+    // 0x7fe233334000  0x7fe233335fff  rw-     unknown              <--
+    // 0x7fe23333e000  0x7fe23333efff  r--     unknown              <--
+    // 0x7fe23333f000  0x7fe23333ffff  rw-     ld-linux-x86-64.so.2
+    // 0x7ffe0939e000  0x7ffe093a0000  rw-     [stack]
+    for (const auto &__region : ret) {
+        MemoryRegion &region = const_cast<MemoryRegion &>(__region);
+        if (region.image == "unknown") {
+            region.image = "x";
+        }
+    }
 
     // The MemoryMap plugin cannot keep track of the stack mapping,
     // so we have to find it by ourselves.
@@ -171,7 +218,7 @@ std::set<MemoryRegion, MemoryRegionCmp> MemoryManager::getMapInfo(uint64_t pid) 
     }
     stackEnd -= TARGET_PAGE_SIZE;
 
-    ret.insert({stackBegin, stackEnd, MM_READ | MM_WRITE});
+    ret.insert({stackBegin, stackEnd, MM_READ | MM_WRITE, "[stack]"});
     return ret;
 }
 
@@ -180,15 +227,15 @@ void MemoryManager::showMapInfo(uint64_t pid) const {
 
     os << "Dummping memory map...\n"
         << "--------------- [VMMAP] ---------------\n"
-        << "Start\t\tEnd\t\tPerm\n";
+        << "Start\t\tEnd\t\tPerm\tImage\n";
 
     for (const auto &region : getMapInfo(pid)) {
-        os << hexval(region.start) << "\t"
-            << hexval(region.end) << "\t"
-            << (region.prot & MM_READ ? 'R' : '-')
-            << (region.prot & MM_WRITE ? 'W' : '-')
-            << (region.prot & MM_EXEC ? 'X' : '-')
-            << "\n";
+        os << hexval(region.start) << '\t'
+            << hexval(region.end) << '\t'
+            << (region.prot & MM_READ ? 'r' : '-')
+            << (region.prot & MM_WRITE ? 'w' : '-')
+            << (region.prot & MM_EXEC ? 'x' : '-') << '\t'
+            << region.image << '\n';
     }
 }
 

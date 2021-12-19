@@ -24,6 +24,7 @@
 #include <s2e/S2E.h>
 #include <s2e/S2EExecutionState.h>
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -44,7 +45,7 @@ public:
     explicit Disassembler(CRAX &ctx) : m_ctx(ctx) {}
 
     // Disassemble one instruction at the specificed address.
-    Instruction disasm(uint64_t pc);
+    std::optional<Instruction> disasm(uint64_t pc);
 
     // Disassemble a function by its symbol.
     std::vector<Instruction> disasm(const std::string &symbol);

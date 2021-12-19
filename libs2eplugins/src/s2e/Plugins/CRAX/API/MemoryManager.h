@@ -22,10 +22,12 @@
 #define S2E_PLUGINS_CRAX_MEMORY_MANAGER_H
 
 #include <s2e/S2EExecutionState.h>
+#include <s2e/Plugins/OSMonitors/ModuleDescriptor.h>
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
 
 #include <map>
 #include <set>
+#include <string>
 
 namespace s2e::plugins::crax {
 
@@ -39,6 +41,7 @@ struct MemoryRegion {
     uint64_t start;
     uint64_t end;
     MemoryMapRegionType prot;
+    std::string image;
 };
 
 struct MemoryRegionCmp {
@@ -93,12 +96,15 @@ public:
     // Show all the mapped memory region.
     void showMapInfo(uint64_t pid) const;
 
+    ModuleSections &getMappedSections() { return m_mappedSections; }
+
 private:
     // S2E built-in Plugins.
     MemoryMap *m_map;
 
     // CRAX's attributes.
     CRAX &m_ctx;
+    ModuleSections m_mappedSections;
 };
 
 }  // namespace s2e::plugins::crax

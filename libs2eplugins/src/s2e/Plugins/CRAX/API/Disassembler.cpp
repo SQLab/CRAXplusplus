@@ -31,12 +31,15 @@
 
 namespace s2e::plugins::crax {
 
-Instruction Disassembler::disasm(uint64_t pc) {
+std::optional<Instruction> Disassembler::disasm(uint64_t pc) {
     std::vector<uint8_t> code = m_ctx.mem().readConcrete(pc, X86_64_INSN_MAX_NR_BYTES);
     std::vector<Instruction> insns = disasm(code, pc);
 
-    assert(insns.size());
-    return insns[0];
+    if (insns.empty()) {
+        return std::nullopt;
+    } else {
+        return insns.front();
+    }
 }
 
 std::vector<Instruction> Disassembler::disasm(const std::string &symbol) {
@@ -81,7 +84,7 @@ std::vector<Instruction> Disassembler::disasm(const std::vector<uint8_t> &code,
         cs_free(insn, count);
     } else if (warnOnError) {
         auto &os = log<WARN>();
-        os << "disassemble failed: ";
+        os << "disassemble failed at " << klee::hexval(virtAddr) << ": ";
 
         for (size_t i = 0; i < code.size(); i++) {
             os << hexval(code[i]);

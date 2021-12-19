@@ -41,14 +41,7 @@ std::vector<uint8_t> p64(uint64_t value) {
 
 uint64_t u64(const std::vector<uint8_t> &bytes) {
     assert(bytes.size() <= 8);
-
-    uint64_t ret = 0;
-
-    for (size_t i = 0; i < bytes.size(); i++) {
-        ret += bytes[i] << (i * 8);
-    }
-
-    return ret;
+    return *reinterpret_cast<const uint64_t *>(bytes.data());
 }
 
 }  // namespace s2e::plugins::crax

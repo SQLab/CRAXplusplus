@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
+#include <s2e/Plugins/CRAX/Pwnlib/Util.h>
 
 #include <unistd.h>
 
@@ -27,49 +28,90 @@
 namespace s2e::plugins::crax {
 
 IOStates::IOStates(CRAX &ctx)
-    : m_ctx(ctx) {
+    : m_ctx(ctx),
+      m_canaryHookConnection() {
+    // Install IOStates hook.
     ctx.beforeSyscallHooks.connect(
             sigc::mem_fun(*this, &IOStates::maybeAnalyzeState));
+
+    // If stack canary is enabled, install a hook
+    // to intercept canary values.
+    if (m_ctx.getExploit().getElf().getChecksec().hasCanary) {
+        m_canaryHookConnection = ctx.afterInstructionHooks.connect(
+                sigc::mem_fun(*this, &IOStates::maybeInterceptStackCanary));
+    }
 }
 
 
 void IOStates::maybeAnalyzeState(S2EExecutionState *state,
-                                 uint64_t rax,
-                                 uint64_t rdi,
-                                 uint64_t rsi,
-                                 uint64_t rdx,
-                                 uint64_t r10,
-                                 uint64_t r8,
-                                 uint64_t r9) {
+                                 uint64_t nr_syscall,
+                                 uint64_t arg1,
+                                 uint64_t arg2,
+                                 uint64_t arg3,
+                                 uint64_t arg4,
+                                 uint64_t arg5,
+                                 uint64_t arg6) {
     // XXX: don't hardcode the syscall numbers.
-    if (rax == 0 && rdi == STDIN_FILENO) {
-        m_ctx.log<WARN>() << "input state here :)\n";
-        analyzeLeak(state, rax, rdi, rsi, rdx, r10, r8, r9);
-    } else if (rax == 1 && rdi == STDOUT_FILENO) {
-        m_ctx.log<WARN>() << "output state here :)\n";
+    if (nr_syscall == 0 && arg1 == STDIN_FILENO) {
+        log<WARN>() << "input state here :)\n";
+        analyzeLeak(state, arg2, arg3);
+
+    } else if (nr_syscall == 1 && arg1 == STDOUT_FILENO) {
+        log<WARN>() << "output state here :)\n";
+        detectLeak(state, arg2, arg3);
     }
 }
 
-void IOStates::analyzeLeak(S2EExecutionState *inputState,
-                           uint64_t rax,
-                           uint64_t rdi,
-                           uint64_t rsi,
-                           uint64_t rdx,
-                           uint64_t r10,
-                           uint64_t r8,
-                           uint64_t r9) {
+void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
+                                         const Instruction &i) {
+    if (i.mnemonic == "mov" && i.opStr == "rax, qword ptr fs:[0x28]") {
+        if (!m_ctx.getExploit().getElf().getCanary()) {
+            uint64_t canary = m_ctx.reg().readConcrete(Register::X64::RAX);
+            log<INFO>() << "Intercepted canary: " << klee::hexval(canary) << '\n';
+            m_ctx.getExploit().getElf().setCanary(canary);
+            m_canaryHookConnection.disconnect();
+        }
+    }
+}
+
+std::vector<IOStates::LeakInfo>
+IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len) {
+    auto mapInfo = m_ctx.mem().getMapInfo(m_ctx.getTargetProcessPid());
+    uint64_t canary = m_ctx.getExploit().getElf().getCanary();
+    std::vector<IOStates::LeakInfo> leakInfo;
+
+    for (uint64_t i = 0; i < len; i += 8) {
+        uint64_t value = u64(m_ctx.mem().readConcrete(buf + i, 8));
+        if (value == canary) {
+            log<WARN>() << "found canary on stack\n";
+            leakInfo.push_back({i, 0, LeakType::CANARY});
+        } else {
+            for (const auto &region : mapInfo) {
+                if (value >= region.start && value <= region.end) {
+                    leakInfo.push_back({i, value - region.start, getLeakType(region.image)});
+                }
+            }
+        }
+    }
+
+    return leakInfo;
+}
+
+void IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len) {
 
 }
 
-void IOStates::detectLeak(S2EExecutionState *outputState,
-                          uint64_t rax,
-                          uint64_t rdi,
-                          uint64_t rsi,
-                          uint64_t rdx,
-                          uint64_t r10,
-                          uint64_t r8,
-                          uint64_t r9) {
 
+IOStates::LeakType IOStates::getLeakType(const std::string &image) const {
+    if (image == m_ctx.getExploit().getElfFilename()) {
+        return IOStates::LeakType::CODE;
+    } else if (image == "[shared library]") {
+        return IOStates::LeakType::LIBC;
+    } else if (image == "[stack]") {
+        return IOStates::LeakType::STACK;
+    } else {
+        return IOStates::LeakType::UNKNOWN;
+    }
 }
 
 }  // namespace s2e::plugins::crax

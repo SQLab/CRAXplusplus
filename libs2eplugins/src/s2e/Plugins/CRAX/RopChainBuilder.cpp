@@ -19,7 +19,6 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
-#include <s2e/Plugins/CRAX/Core/RegisterManager.h>
 #include <s2e/Plugins/CRAX/Expr/BinaryExprEvaluator.h>
 #include <s2e/Plugins/CRAX/Modules/Techniques/Technique.h>
 #include <s2e/Plugins/CRAX/Modules/Techniques/StackPivot.h>
@@ -63,11 +62,11 @@ bool RopChainBuilder::build(Exploit &exploit,
             bool ok = false;
 
             if (i == 0) {
-                ok = addRegisterConstraint(Register::RBP, e);
+                ok = addRegisterConstraint(Register::X64::RBP, e);
             } else if (i == 1) {
-                ok = addRegisterConstraint(Register::RIP, e);
+                ok = addRegisterConstraint(Register::X64::RIP, e);
             } else {
-                uint64_t addr = m_ctx.reg().readConcrete(Register::RSP) + m_symbolicModeRspOffset;
+                uint64_t addr = m_ctx.reg().readConcrete(Register::X64::RSP) + m_symbolicModeRspOffset;
                 ok = addMemoryConstraint(addr, e);
                 m_symbolicModeRspOffset += 8;
             }
@@ -118,7 +117,7 @@ bool RopChainBuilder::shouldSwitchToDirectMode(const Technique *t) const {
     return dynamic_cast<const StackPivot *>(t);
 }
 
-bool RopChainBuilder::addRegisterConstraint(Register reg, const ref<Expr> &e) {
+bool RopChainBuilder::addRegisterConstraint(Register::X64 reg, const ref<Expr> &e) {
     uint64_t value = BinaryExprEvaluator<uint64_t>().evaluate(e);
     auto regExpr = m_ctx.reg().readSymbolic(reg);
     auto constraint = EqExpr::create(regExpr, ConstantExpr::create(value, Expr::Int64));

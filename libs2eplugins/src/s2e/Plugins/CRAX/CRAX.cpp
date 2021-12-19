@@ -49,8 +49,8 @@ CRAX::CRAX(S2E *s2e)
       beforeSyscallHooks(),
       afterSyscallHooks(),
       m_linuxMonitor(),
-      m_registerManager(*this),
-      m_memoryManager(*this),
+      m_register(*this),
+      m_memory(*this),
       m_disassembler(*this),
       m_exploit(g_s2e->getConfig()->getString(getConfigKey() + ".elfFilename"),
                 g_s2e->getConfig()->getString(getConfigKey() + ".libcFilename")),
@@ -67,10 +67,10 @@ void CRAX::initialize() {
     // Initialize CRAX++'s logging module.
     initCRAXLogging(this);
 
-    m_linuxMonitor = s2e()->getPlugin<LinuxMonitor>();
+    m_register.initialize();
+    m_memory.initialize();
 
-    m_registerManager.initialize();
-    m_memoryManager.initialize();
+    m_linuxMonitor = s2e()->getPlugin<LinuxMonitor>();
 
     m_linuxMonitor->onProcessLoad.connect(
             sigc::mem_fun(*this, &CRAX::onProcessLoad));
@@ -95,7 +95,7 @@ void CRAX::onSymbolicRip(S2EExecutionState *exploitableState,
 
     log<WARN>()
         << "Detected symbolic RIP: " << hexval(concreteRip)
-        << ", original value is: " << hexval(reg().readConcrete(Register::RIP))
+        << ", original value is: " << hexval(reg().readConcrete(Register::X64::RIP))
         << "\n";
 
     reg().setRipSymbolic(symbolicRip);
@@ -124,12 +124,42 @@ void CRAX::onProcessLoad(S2EExecutionState *state,
     if (imageFileName.find(m_exploit.getElfFilename()) != imageFileName.npos) {
         m_targetProcessPid = pid;
 
+        m_linuxMonitor->onModuleLoad.connect(
+                sigc::mem_fun(*this, &CRAX::onModuleLoad));
+
         s2e()->getCorePlugin()->onTranslateInstructionStart.connect(
                 sigc::mem_fun(*this, &CRAX::onTranslateInstructionStart));
 
         s2e()->getCorePlugin()->onTranslateInstructionEnd.connect(
                 sigc::mem_fun(*this, &CRAX::onTranslateInstructionEnd));
     }
+}
+
+void CRAX::onModuleLoad(S2EExecutionState *state,
+                        const ModuleDescriptor &md) {
+    setCurrentState(state);
+
+    auto &os = log<WARN>();
+    os << "onModuleLoad: " << md.Name << '\n';
+
+    for (auto section : md.Sections) {
+        section.name = md.Name;
+        mem().getMappedSections().push_back(section);
+    }
+
+    /*
+    for (const auto &section : md.Sections) {
+        os << "name = " << section.name << '\n'
+            << "runtimeLoadBase = " << klee::hexval(section.runtimeLoadBase) << '\n'
+            << "nativeLoadBase = " << klee::hexval(section.nativeLoadBase) << '\n'
+            << "size = " << klee::hexval(section.size) << '\n'
+            << "perm = "
+            << (section.readable ? 'r' : '-')
+            << (section.writable ? 'w' : '-')
+            << (section.executable ? 'x' : '-')
+            << '\n';
+    }
+    */
 }
 
 void CRAX::onTranslateInstructionStart(ExecutionSignal *onInstructionExecute,
@@ -160,56 +190,65 @@ void CRAX::onExecuteInstructionStart(S2EExecutionState *state,
                                      uint64_t pc) {
     setCurrentState(state);
 
-    Instruction i = m_disassembler.disasm(pc);
+    std::optional<Instruction> i = m_disassembler.disasm(pc);
 
-    if (i.mnemonic == "syscall") {
+    if (!i) {
+        return;
+    }
+
+    if (i->mnemonic == "syscall") {
         onExecuteSyscallStart(state);
     }
 
     // Execute instruction hooks installed by the user.
-    beforeInstructionHooks.emit(state, i);
+    beforeInstructionHooks.emit(state, *i);
 }
 
 void CRAX::onExecuteInstructionEnd(S2EExecutionState *state,
                                    uint64_t pc) {
     setCurrentState(state);
 
-    Instruction i = m_disassembler.disasm(pc);
+    std::optional<Instruction> i = m_disassembler.disasm(pc);
+
+    if (!i) {
+        return;
+    }
 
     if (s2e()->getConfig()->getBool(getConfigKey() + ".showInstructions", false) &&
         !m_linuxMonitor->isKernelAddress(pc)) {
-        log<INFO>() << hexval(i.address) << ": " << i.mnemonic << ' ' << i.opStr << '\n';
+        log<INFO>()
+            << hexval(i->address) << ": " << i->mnemonic << ' ' << i->opStr << '\n';
     }
 
-    if (i.mnemonic == "syscall") {
+    if (i->mnemonic == "syscall") {
         onExecuteSyscallEnd(state);
     }
 
     // Execute instruction hooks installed by the user.
-    afterInstructionHooks.emit(state, i);
+    afterInstructionHooks.emit(state, *i);
 }
 
 void CRAX::onExecuteSyscallStart(S2EExecutionState *state) {
-    uint64_t rax = reg().readConcrete(Register::RAX);
-    uint64_t rdi = reg().readConcrete(Register::RDI);
-    uint64_t rsi = reg().readConcrete(Register::RSI);
-    uint64_t rdx = reg().readConcrete(Register::RDX);
-    uint64_t r10 = reg().readConcrete(Register::R10);
-    uint64_t r8  = reg().readConcrete(Register::R8);
-    uint64_t r9  = reg().readConcrete(Register::R9);
+    uint64_t rax = reg().readConcrete(Register::X64::RAX);
+    uint64_t rdi = reg().readConcrete(Register::X64::RDI);
+    uint64_t rsi = reg().readConcrete(Register::X64::RSI);
+    uint64_t rdx = reg().readConcrete(Register::X64::RDX);
+    uint64_t r10 = reg().readConcrete(Register::X64::R10);
+    uint64_t r8  = reg().readConcrete(Register::X64::R8);
+    uint64_t r9  = reg().readConcrete(Register::X64::R9);
 
     // Execute syscall hooks installed by the user.
     beforeSyscallHooks.emit(state, rax, rdi, rsi, rdx, r10, r8, r9);
 }
 
 void CRAX::onExecuteSyscallEnd(S2EExecutionState *state) {
-    uint64_t rax = reg().readConcrete(Register::RAX);
-    uint64_t rdi = reg().readConcrete(Register::RDI);
-    uint64_t rsi = reg().readConcrete(Register::RSI);
-    uint64_t rdx = reg().readConcrete(Register::RDX);
-    uint64_t r10 = reg().readConcrete(Register::R10);
-    uint64_t r8  = reg().readConcrete(Register::R8);
-    uint64_t r9  = reg().readConcrete(Register::R9);
+    uint64_t rax = reg().readConcrete(Register::X64::RAX);
+    uint64_t rdi = reg().readConcrete(Register::X64::RDI);
+    uint64_t rsi = reg().readConcrete(Register::X64::RSI);
+    uint64_t rdx = reg().readConcrete(Register::X64::RDX);
+    uint64_t r10 = reg().readConcrete(Register::X64::R10);
+    uint64_t r8  = reg().readConcrete(Register::X64::R8);
+    uint64_t r9  = reg().readConcrete(Register::X64::R9);
 
     if (s2e()->getConfig()->getBool(getConfigKey() + ".showSyscalls", true)) {
         log<INFO>()

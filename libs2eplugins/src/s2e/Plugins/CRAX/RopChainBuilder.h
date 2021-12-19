@@ -56,7 +56,7 @@ private:
     // exploit constraints are added to the input constraints
     // in order to generate ROP payload.
     [[nodiscard]]
-    bool addRegisterConstraint(Register reg, const klee::ref<klee::Expr> &e);
+    bool addRegisterConstraint(Register::X64 reg, const klee::ref<klee::Expr> &e);
 
     [[nodiscard]]
     bool addMemoryConstraint(uint64_t addr, const klee::ref<klee::Expr> &e);

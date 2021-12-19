@@ -23,48 +23,61 @@
 
 #include <s2e/S2EExecutionState.h>
 
+#include <string>
+#include <vector>
+
 namespace s2e::plugins::crax {
 
 // Forward declaration
 class CRAX;
 
+
 // This is an implementation of "IOState" from balsn's LAEG.
 class IOStates {
 public:
+    enum class LeakType {
+        UNKNOWN,
+        CODE,
+        LIBC,
+        HEAP,
+        STACK,
+        CANARY,
+        LAST
+    };
+
+    struct LeakInfo {
+        uint64_t bufIndex;
+        uint64_t offset;
+        LeakType leakType;
+    };
+
+
     IOStates(CRAX &ctx);
 
     void maybeAnalyzeState(S2EExecutionState *inputState,
-                           uint64_t rax,
-                           uint64_t rdi,
-                           uint64_t rsi,
-                           uint64_t rdx,
-                           uint64_t r10,
-                           uint64_t r8,
-                           uint64_t r9);
+                           uint64_t nr_syscall,
+                           uint64_t arg1,
+                           uint64_t arg2,
+                           uint64_t arg3,
+                           uint64_t arg4,
+                           uint64_t arg5,
+                           uint64_t arg6);
+
+    void maybeInterceptStackCanary(S2EExecutionState *state,
+                                   const Instruction &i);
 
     // Called at input states.
-    void analyzeLeak(S2EExecutionState *inputState,
-                     uint64_t rax,
-                     uint64_t rdi,
-                     uint64_t rsi,
-                     uint64_t rdx,
-                     uint64_t r10,
-                     uint64_t r8,
-                     uint64_t r9);
+    std::vector<IOStates::LeakInfo>
+    analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len);
 
     // Called at output states.
-    void detectLeak(S2EExecutionState *outputState,
-                    uint64_t rax,
-                    uint64_t rdi,
-                    uint64_t rsi,
-                    uint64_t rdx,
-                    uint64_t r10,
-                    uint64_t r8,
-                    uint64_t r9);
+    void detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len);
 
 private:
+    LeakType getLeakType(const std::string &image) const;
+
     CRAX &m_ctx;
-    //uint64_t m_stackCanary;
+    sigc::connection m_canaryHookConnection;
 };
 
 }  // namespace s2e::plugins::crax

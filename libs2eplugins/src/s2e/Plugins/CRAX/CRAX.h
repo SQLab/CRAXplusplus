@@ -23,15 +23,16 @@
 
 #include <s2e/Plugin.h>
 #include <s2e/Plugins/Core/BaseInstructions.h>
+#include <s2e/Plugins/OSMonitors/ModuleDescriptor.h>
 #include <s2e/Plugins/OSMonitors/Linux/LinuxMonitor.h>
 #include <s2e/Plugins/ExecutionMonitors/StackMonitor.h>
-#include <s2e/Plugins/CRAX/Core/RegisterManager.h>
-#include <s2e/Plugins/CRAX/Core/MemoryManager.h>
-#include <s2e/Plugins/CRAX/Core/Disassembler.h>
+#include <s2e/Plugins/CRAX/API/Register.h>
+#include <s2e/Plugins/CRAX/API/Memory.h>
+#include <s2e/Plugins/CRAX/API/Disassembler.h>
+#include <s2e/Plugins/CRAX/API/Logging.h>
 #include <s2e/Plugins/CRAX/Modules/Strategies/Strategy.h>
 #include <s2e/Plugins/CRAX/Modules/Behaviors.h>
 #include <s2e/Plugins/CRAX/Modules/IOStates.h>
-#include <s2e/Plugins/CRAX/Logging.h>
 #include <s2e/Plugins/CRAX/Exploit.h>
 #include <s2e/Plugins/CRAX/RopChainBuilder.h>
 
@@ -56,10 +57,10 @@ public:
     void setCurrentState(S2EExecutionState *state) { m_currentState = state; }
 
     [[nodiscard]]
-    RegisterManager &reg() { return m_registerManager; }
+    Register &reg() { return m_register; }
 
     [[nodiscard]]
-    MemoryManager &mem() { return m_memoryManager; }
+    Memory &mem() { return m_memory; }
 
     [[nodiscard]]
     Disassembler &getDisassembler() { return m_disassembler; }
@@ -126,6 +127,9 @@ private:
                        uint64_t pid,
                        const std::string &imageFileName);
 
+    void onModuleLoad(S2EExecutionState *state,
+                      const ModuleDescriptor &md);
+
     void onSymbolicRip(S2EExecutionState *state,
                        klee::ref<klee::Expr> symbolicRip,
                        uint64_t concreteRip,
@@ -162,8 +166,8 @@ private:
     LinuxMonitor *m_linuxMonitor;
 
     // CRAX's attributes.
-    RegisterManager m_registerManager;
-    MemoryManager m_memoryManager;
+    Register m_register;
+    Memory m_memory;
     Disassembler m_disassembler;
     Exploit m_exploit;
     RopChainBuilder m_ropChainBuilder;

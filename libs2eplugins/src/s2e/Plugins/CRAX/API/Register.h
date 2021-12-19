@@ -18,8 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef S2E_PLUGINS_CRAX_REGISTER_MANAGER_H
-#define S2E_PLUGINS_CRAX_REGISTER_MANAGER_H
+#ifndef S2E_PLUGINS_CRAX_REGISTER_H
+#define S2E_PLUGINS_CRAX_REGISTER_H
 
 #include <s2e/cpu.h>
 #include <s2e/S2EExecutionState.h>
@@ -32,59 +32,57 @@ namespace s2e::plugins::crax {
 // Forward declaration.
 class CRAX;
 
-// libcpu/include/cpu/i386/defs.h
-enum Register {
-    RAX,  // 0
-    RCX,  // 1
-    RDX,  // 2
-    RBX,  // 3
-    RSP,  // 4
-    RBP,  // 5
-    RSI,  // 6
-    RDI,  // 7
-    R8,   // 8
-    R9,   // 9
-    R10,  // 10
-    R11,  // 11
-    R12,  // 12
-    R13,  // 13
-    R14,  // 14
-    R15,  // 15
-    LAST,
-    RIP
-};
-
-
-// x86_64 Register Manager.
-class RegisterManager {
+class Register {
 public:
-    explicit RegisterManager(CRAX &ctx);
-    void initialize();
+    // libcpu/include/cpu/i386/defs.h
+    enum X64 {
+        RAX,  // 0
+        RCX,  // 1
+        RDX,  // 2
+        RBX,  // 3
+        RSP,  // 4
+        RBP,  // 5
+        RSI,  // 6
+        RDI,  // 7
+        R8,   // 8
+        R9,   // 9
+        R10,  // 10
+        R11,  // 11
+        R12,  // 12
+        R13,  // 13
+        R14,  // 14
+        R15,  // 15
+        LAST,
+        RIP
+    };
 
+
+    explicit Register(CRAX &ctx);
+    void initialize();
 
     // Determine if the given register contains symbolic data.
     [[nodiscard]]
-    bool isSymbolic(Register reg);
+    bool isSymbolic(Register::X64 reg);
 
     // Read symbolic data from the register file.
     [[nodiscard]]
-    klee::ref<klee::Expr> readSymbolic(Register reg,
+    klee::ref<klee::Expr> readSymbolic(Register::X64 reg,
                                        bool verbose = true);
 
     // Read concrete data from the register file.
     [[nodiscard]]
-    uint64_t readConcrete(Register reg,
+    uint64_t readConcrete(Register::X64 reg,
                           bool verbose = true);
 
     // Write symbolic data to the register file.
     [[nodiscard]]
-    bool writeSymbolic(Register reg,
+    bool writeSymbolic(Register::X64 reg,
                        const klee::ref<klee::Expr> &value,
                        bool verbose = true);
 
     // Write concrete data to the register file.
     [[nodiscard]]
-    bool writeConcrete(Register reg,
+    bool writeConcrete(Register::X64 reg,
                        uint64_t value,
                        bool verbose = true);
 
@@ -92,14 +90,14 @@ public:
     // This method returns the offset of the specified register file.
     // See libcpu/include/cpu/i386/cpu.h
     [[nodiscard, gnu::always_inline]] inline
-    unsigned getOffset(Register reg) const {
-        return (reg == Register::RIP) ? CPU_OFFSET(eip) : CPU_OFFSET(regs[reg]);
+    unsigned getOffset(Register::X64 reg) const {
+        return (reg == Register::X64::RIP) ? CPU_OFFSET(eip) : CPU_OFFSET(regs[reg]);
     }
 
     // Get the name of the specified register file.
     [[nodiscard, gnu::always_inline]] inline
-    std::string getName(Register reg) const {
-        return (reg == Register::RIP) ? "RIP" : s_regs64[reg];
+    std::string getName(Register::X64 reg) const {
+        return (reg == Register::X64::RIP) ? "RIP" : s_regs64[reg];
     }
 
     // Dump all register values.
@@ -122,4 +120,4 @@ private:
 
 }  // namespace s2e::plugins::crax
 
-#endif  // S2E_PLUGINS_CRAX_REGISTER_MANAGER_H
+#endif  // S2E_PLUGINS_CRAX_REGISTER_H

@@ -21,37 +21,39 @@
 #include <s2e/Plugins/CRAX/CRAX.h>
 #include <s2e/Plugins/CRAX/Utils/Algorithm.h>
 
-#include "MemoryManager.h"
+#include <algorithm>
+
+#include "Memory.h"
 
 using namespace klee;
 
 namespace s2e::plugins::crax {
 
-MemoryManager::MemoryManager(CRAX &ctx)
+Memory::Memory(CRAX &ctx)
     : m_map(),
       m_ctx(ctx),
       m_mappedSections() {}
 
-void MemoryManager::initialize() {
+void Memory::initialize() {
     m_map = g_s2e->getPlugin<MemoryMap>();
 
     if (!m_map) {
-        log<WARN>() << "MemoryManager::showMapInfo() requires MemoryMap plugin.\n";
+        log<WARN>() << "Memory::showMapInfo() requires MemoryMap plugin.\n";
     }
 }
 
 
-bool MemoryManager::isSymbolic(uint64_t virtAddr, uint64_t size) const {
+bool Memory::isSymbolic(uint64_t virtAddr, uint64_t size) const {
     return m_ctx.getCurrentState()->mem()->symbolic(virtAddr, size);
 }
 
-ref<Expr> MemoryManager::readSymbolic(uint64_t virtAddr, uint64_t size) const {
+ref<Expr> Memory::readSymbolic(uint64_t virtAddr, uint64_t size) const {
     // XXX: check `size`.
     // See: klee/include/klee/Expr.h
     return m_ctx.getCurrentState()->mem()->read(virtAddr, size);
 }
 
-std::vector<uint8_t> MemoryManager::readConcrete(uint64_t virtAddr, uint64_t size, bool concretize) const {
+std::vector<uint8_t> Memory::readConcrete(uint64_t virtAddr, uint64_t size, bool concretize) const {
     std::vector<uint8_t> ret(size);
 
     if (concretize) {
@@ -78,7 +80,7 @@ std::vector<uint8_t> MemoryManager::readConcrete(uint64_t virtAddr, uint64_t siz
     return ret;
 }
 
-bool MemoryManager::writeSymbolic(uint64_t virtAddr, const klee::ref<klee::Expr> &value) {
+bool Memory::writeSymbolic(uint64_t virtAddr, const klee::ref<klee::Expr> &value) {
     bool success = m_ctx.getCurrentState()->mem()->write(virtAddr, value);
     if (!success) {
         log<WARN>() << "Cannot write symbolic data to memory: " << hexval(virtAddr) << "\n";
@@ -86,7 +88,7 @@ bool MemoryManager::writeSymbolic(uint64_t virtAddr, const klee::ref<klee::Expr>
     return success;
 }
 
-bool MemoryManager::writeConcrete(uint64_t virtAddr, uint64_t value) {
+bool Memory::writeConcrete(uint64_t virtAddr, uint64_t value) {
     bool success = m_ctx.getCurrentState()->mem()->write(virtAddr, &value, sizeof(value));
     if (!success) {
         log<WARN>() << "Cannot write concrete data to memory: " << hexval(virtAddr) << "\n";
@@ -94,18 +96,18 @@ bool MemoryManager::writeConcrete(uint64_t virtAddr, uint64_t value) {
     return success;
 }
 
-bool MemoryManager::isMapped(uint64_t virtAddr) const {
+bool Memory::isMapped(uint64_t virtAddr) const {
     return m_ctx.getCurrentState()->mem()->getHostAddress(virtAddr) != -1;
 }
 
-std::vector<uint64_t> MemoryManager::search(const std::vector<uint8_t> &needle) const {
+std::vector<uint64_t> Memory::search(const std::vector<uint8_t> &needle) const {
     std::vector<uint64_t> ret;
 
     // Iterate over all the mapped memory regions.
     for (auto region : getMapInfo(m_ctx.getTargetProcessPid())) {
         // XXX: Some regions might be unaccessible even though it's mapped,
         // which I believe this is a bug in S2E. Just in case this happens,
-        // we'll use `MemoryManager::isMapped()` to scan through every address
+        // we'll use `Memory::isMapped()` to scan through every address
         // within this region until an accessible address is found.
         while (!isMapped(region.start) && region.start < region.end) {
             ++region.start;
@@ -137,11 +139,11 @@ std::vector<uint64_t> MemoryManager::search(const std::vector<uint8_t> &needle) 
 
 
 std::map<uint64_t, uint64_t>
-MemoryManager::getSymbolicMemory(uint64_t start, uint64_t end) const {
+Memory::getSymbolicMemory(uint64_t start, uint64_t end) const {
     return {};
 }
 
-std::set<MemoryRegion, MemoryRegionCmp> MemoryManager::getMapInfo(uint64_t pid) const {
+std::set<MemoryRegion, MemoryRegionCmp> Memory::getMapInfo(uint64_t pid) const {
     std::set<MemoryRegion, MemoryRegionCmp> ret;
 
     auto callback = [this, &ret](uint64_t start,
@@ -173,9 +175,6 @@ std::set<MemoryRegion, MemoryRegionCmp> MemoryManager::getMapInfo(uint64_t pid) 
     m_map->iterateRegions(m_ctx.getCurrentState(), pid, callback);
 
     // XXX: This workaround should be overhauled!!!
-    // Some entries in the map info is "unknown" due to the reason stated above.
-    // For now, we'll mark all the entries between the two ld-linux-x86-64.so.2
-    // as ld-linux-x86-64.so.2 as well.
     //
     // --------------- [VMMAP] ---------------
     // Start           End             Perm    Image
@@ -192,16 +191,38 @@ std::set<MemoryRegion, MemoryRegionCmp> MemoryManager::getMapInfo(uint64_t pid) 
     // 0x7fe23333e000  0x7fe23333efff  r--     unknown              <--
     // 0x7fe23333f000  0x7fe23333ffff  rw-     ld-linux-x86-64.so.2
     // 0x7ffe0939e000  0x7ffe093a0000  rw-     [stack]
-    for (const auto &__region : ret) {
-        MemoryRegion &region = const_cast<MemoryRegion &>(__region);
+    const std::string ld = "ld-linux-x86-64.so.2";
+
+    auto it1 = std::find_if(ret.begin(),
+                            ret.end(),
+                            [&ld](const MemoryRegion &r) { return r.image == ld; });
+    assert(it1 != ret.end() && "Cannot find the first ld-linux-x86-64.so.2 in vmmap.");
+
+    auto rit2 = std::find_if(ret.rbegin(),
+                             ret.rend(),
+                             [&ld](const MemoryRegion &r) { return r.image == ld; });
+    assert(rit2 != ret.rend() && "Cannot find the last ld-linux-x86-64.so.2 in vmmap.");
+
+    auto it2 = std::next(rit2).base();
+    assert(it1 != it2 && "Only one ld-linux-x86-64.so.2 is present in vmmap.");
+
+    for (auto it = ++it1; it != it2; it++) {
+        MemoryRegion &region = const_cast<MemoryRegion &>(*it);
+        assert(region.image == "unknown");
+        region.image = ld;
+    }
+
+    // Mark the rest of the unknown images as libc.
+    for (auto &region : ret) {
         if (region.image == "unknown") {
-            region.image = "x";
+            MemoryRegion &__region = const_cast<MemoryRegion &>(region);
+            __region.image = "[shared library]";
         }
     }
 
     // The MemoryMap plugin cannot keep track of the stack mapping,
     // so we have to find it by ourselves.
-    uint64_t rsp = m_ctx.reg().readConcrete(Register::RSP);
+    uint64_t rsp = m_ctx.reg().readConcrete(Register::X64::RSP);
     uint64_t page_mask = ~(TARGET_PAGE_SIZE - 1);
     uint64_t stackBegin = 0;
     uint64_t stackEnd = 0;
@@ -222,7 +243,7 @@ std::set<MemoryRegion, MemoryRegionCmp> MemoryManager::getMapInfo(uint64_t pid) 
     return ret;
 }
 
-void MemoryManager::showMapInfo(uint64_t pid) const {
+void Memory::showMapInfo(uint64_t pid) const {
     auto &os = log<WARN>();
 
     os << "Dummping memory map...\n"

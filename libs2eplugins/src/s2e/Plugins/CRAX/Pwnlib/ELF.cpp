@@ -36,8 +36,9 @@ namespace s2e::plugins::crax {
 
 ELF::ELF(const std::string &filename)
     : m_elf(CRAX::s_pwnlib.attr("elf").attr("ELF").call(filename)),
+      m_checksec(filename),
       m_base(),
-      m_checksec(filename) {}
+      m_canary() {}
 
 
 ELF::SymbolMap ELF::symbols() const {
@@ -78,8 +79,7 @@ ELF::Checksec::Checksec(const std::string &filename)
     : hasCanary(),
       hasFullRELRO(),
       hasNX(),
-      hasPIE(),
-      canary() {
+      hasPIE() {
     // Get the output of `checksec --file <m_elfFilename>`
     // and store it in `output`.
     subprocess::popen checksec("checksec", {"--file", filename});

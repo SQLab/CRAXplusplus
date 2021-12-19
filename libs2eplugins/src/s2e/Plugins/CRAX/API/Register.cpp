@@ -22,38 +22,38 @@
 #include <s2e/S2EExecutionStateRegisters.h>
 #include <s2e/Plugins/CRAX/CRAX.h>
 
-#include "RegisterManager.h"
+#include "Register.h"
 
 using namespace klee;
 
 namespace s2e::plugins::crax {
 
-const std::array<std::string, 10> RegisterManager::s_regs32 = {
+const std::array<std::string, 10> Register::s_regs32 = {
     "EAX", "ECX", "EDX", "EBX", "ESP", "EBP", "ESI", "EDI"
 };
 
-const std::array<std::string, 18> RegisterManager::s_regs64 = {
+const std::array<std::string, 18> Register::s_regs64 = {
     "RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI",
     "R8", "R9",  "R10", "R11", "R12", "R13", "R14", "R15"
 };
 
 
-RegisterManager::RegisterManager(CRAX &ctx)
+Register::Register(CRAX &ctx)
     : m_ctx(ctx),
       m_isRipSymbolic(),
       m_ripExpr() {}
 
-void RegisterManager::initialize() {}
+void Register::initialize() {}
 
 
-bool RegisterManager::isSymbolic(Register reg) {
+bool Register::isSymbolic(Register::X64 reg) {
     return !isa<klee::ConstantExpr>(readSymbolic(reg, /*verbose=*/false));
 }
 
-ref<Expr> RegisterManager::readSymbolic(Register reg, bool verbose) {
+ref<Expr> Register::readSymbolic(Register::X64 reg, bool verbose) {
     ref<Expr> ret = nullptr;
 
-    if (reg == Register::RIP && m_isRipSymbolic) {
+    if (reg == Register::X64::RIP && m_isRipSymbolic) {
         ret = m_ripExpr;
     } else {
         ret = m_ctx.getCurrentState()->regs()->read(getOffset(reg), klee::Expr::Int64);
@@ -65,7 +65,7 @@ ref<Expr> RegisterManager::readSymbolic(Register reg, bool verbose) {
     return ret;
 }
 
-uint64_t RegisterManager::readConcrete(Register reg, bool verbose) {
+uint64_t Register::readConcrete(Register::X64 reg, bool verbose) {
     uint64_t ret = 0;
 
     if (verbose &&
@@ -76,7 +76,7 @@ uint64_t RegisterManager::readConcrete(Register reg, bool verbose) {
     return ret;
 }
 
-bool RegisterManager::writeSymbolic(Register reg, const klee::ref<klee::Expr> &value, bool verbose) {
+bool Register::writeSymbolic(Register::X64 reg, const klee::ref<klee::Expr> &value, bool verbose) {
     bool success = m_ctx.getCurrentState()->regs()->write(getOffset(reg), value);
     if (verbose && !success) {
         log<WARN>()
@@ -85,7 +85,7 @@ bool RegisterManager::writeSymbolic(Register reg, const klee::ref<klee::Expr> &v
     return success;
 }
 
-bool RegisterManager::writeConcrete(Register reg, uint64_t value, bool verbose) {
+bool Register::writeConcrete(Register::X64 reg, uint64_t value, bool verbose) {
     bool success = m_ctx.getCurrentState()->regs()->write(getOffset(reg), &value, sizeof(value));
     if (verbose && !success) {
         log<WARN>()
@@ -94,14 +94,14 @@ bool RegisterManager::writeConcrete(Register reg, uint64_t value, bool verbose) 
     return success;
 }
 
-void RegisterManager::showRegInfo() {
+void Register::showRegInfo() {
     auto &os = log<WARN>();
 
     os << "Dumping CPU registers...\n"
         << "---------- [REGISTERS] ----------\n";
 
-    for (int i = 0; i < Register::LAST; i++) {
-        auto reg = static_cast<Register>(i);
+    for (int i = 0; i < Register::X64::LAST; i++) {
+        auto reg = static_cast<Register::X64>(i);
         os << getName(reg) << "\t";
 
         if (isSymbolic(reg)) {
@@ -121,7 +121,7 @@ void RegisterManager::showRegInfo() {
     os << "\n";
 }
 
-void RegisterManager::setRipSymbolic(klee::ref<klee::Expr> ripExpr) {
+void Register::setRipSymbolic(klee::ref<klee::Expr> ripExpr) {
     m_isRipSymbolic = true;
     m_ripExpr = ripExpr;
 }

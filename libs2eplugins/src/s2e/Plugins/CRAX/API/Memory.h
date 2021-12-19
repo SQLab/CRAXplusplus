@@ -18,8 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef S2E_PLUGINS_CRAX_MEMORY_MANAGER_H
-#define S2E_PLUGINS_CRAX_MEMORY_MANAGER_H
+#ifndef S2E_PLUGINS_CRAX_MEMORY_H
+#define S2E_PLUGINS_CRAX_MEMORY_H
 
 #include <s2e/S2EExecutionState.h>
 #include <s2e/Plugins/OSMonitors/ModuleDescriptor.h>
@@ -50,9 +50,9 @@ struct MemoryRegionCmp {
     }
 };
 
-class MemoryManager {
+class Memory {
 public:
-    explicit MemoryManager(CRAX &ctx);
+    explicit Memory(CRAX &ctx);
     void initialize();
 
     // Determine if the given memory area contains symbolic data.
@@ -109,4 +109,4 @@ private:
 
 }  // namespace s2e::plugins::crax
 
-#endif  // S2E_PLUGINS_CRAX_MEMORY_MANAGER_H
+#endif  // S2E_PLUGINS_CRAX_MEMORY_H

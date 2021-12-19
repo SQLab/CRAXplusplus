@@ -65,12 +65,10 @@ void IOStates::maybeAnalyzeState(S2EExecutionState *state,
 void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
                                          const Instruction &i) {
     if (i.mnemonic == "mov" && i.opStr == "rax, qword ptr fs:[0x28]") {
-        if (!m_ctx.getExploit().getElf().getCanary()) {
-            uint64_t canary = m_ctx.reg().readConcrete(Register::X64::RAX);
-            log<INFO>() << "Intercepted canary: " << klee::hexval(canary) << '\n';
-            m_ctx.getExploit().getElf().setCanary(canary);
-            m_canaryHookConnection.disconnect();
-        }
+        // XXX: we should only intercept canary after main().
+        uint64_t canary = m_ctx.reg().readConcrete(Register::X64::RAX);
+        log<WARN>() << "Intercepted canary: " << klee::hexval(canary) << '\n';
+        m_ctx.getExploit().getElf().setCanary(canary);
     }
 }
 
@@ -82,8 +80,9 @@ IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len)
 
     for (uint64_t i = 0; i < len; i += 8) {
         uint64_t value = u64(m_ctx.mem().readConcrete(buf + i, 8));
+        log<WARN>() << "addr = " << klee::hexval(buf + i) << " value = " << klee::hexval(value) << '\n';
         if (value == canary) {
-            log<WARN>() << "found canary on stack\n";
+            log<WARN>() << "found canary on stack at buf + " << klee::hexval(i) << "\n";
             leakInfo.push_back({i, 0, LeakType::CANARY});
         } else {
             for (const auto &region : mapInfo) {

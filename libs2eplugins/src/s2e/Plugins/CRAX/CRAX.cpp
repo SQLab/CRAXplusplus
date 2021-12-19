@@ -146,20 +146,6 @@ void CRAX::onModuleLoad(S2EExecutionState *state,
         section.name = md.Name;
         mem().getMappedSections().push_back(section);
     }
-
-    /*
-    for (const auto &section : md.Sections) {
-        os << "name = " << section.name << '\n'
-            << "runtimeLoadBase = " << klee::hexval(section.runtimeLoadBase) << '\n'
-            << "nativeLoadBase = " << klee::hexval(section.nativeLoadBase) << '\n'
-            << "size = " << klee::hexval(section.size) << '\n'
-            << "perm = "
-            << (section.readable ? 'r' : '-')
-            << (section.writable ? 'w' : '-')
-            << (section.executable ? 'x' : '-')
-            << '\n';
-    }
-    */
 }
 
 void CRAX::onTranslateInstructionStart(ExecutionSignal *onInstructionExecute,

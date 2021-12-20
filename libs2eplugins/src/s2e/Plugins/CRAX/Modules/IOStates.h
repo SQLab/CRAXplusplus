@@ -23,6 +23,7 @@
 
 #include <s2e/S2EExecutionState.h>
 
+#include <array>
 #include <string>
 #include <vector>
 
@@ -35,7 +36,7 @@ class CRAX;
 // This is an implementation of "IOState" from balsn's LAEG.
 class IOStates {
 public:
-    enum class LeakType {
+    enum LeakType {
         UNKNOWN,
         CODE,
         LIBC,
@@ -52,7 +53,7 @@ public:
     };
 
 
-    IOStates(CRAX &ctx);
+    explicit IOStates(CRAX &ctx);
 
     void maybeAnalyzeState(S2EExecutionState *inputState,
                            uint64_t nr_syscall,
@@ -67,11 +68,12 @@ public:
                                    const Instruction &i);
 
     // Called at input states.
-    std::vector<IOStates::LeakInfo>
+    std::array<std::vector<uint64_t>, IOStates::LeakType::LAST>
     analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len);
 
     // Called at output states.
-    void detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len);
+    std::vector<IOStates::LeakInfo>
+    detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len);
 
 private:
     LeakType getLeakType(const std::string &image) const;

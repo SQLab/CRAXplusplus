@@ -72,17 +72,39 @@ void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
     }
 }
 
-std::vector<IOStates::LeakInfo>
+std::array<std::vector<uint64_t>, IOStates::LeakType::LAST>
 IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len) {
+    auto mapInfo = m_ctx.mem().getMapInfo(m_ctx.getTargetProcessPid());
+    uint64_t canary = m_ctx.getExploit().getElf().getCanary();
+    std::array<std::vector<uint64_t>, IOStates::LeakType::LAST> bufInfo;
+
+    for (uint64_t i = 0; i < len; i += 8) {
+        uint64_t value = u64(m_ctx.mem().readConcrete(buf + i, 8));
+        //log<WARN>() << "addr = " << klee::hexval(buf + i) << " value = " << klee::hexval(value) << '\n';
+        if (value == canary) {
+            log<WARN>() << "found canary on stack at buf + " << klee::hexval(i) << "\n";
+            bufInfo[LeakType::CANARY].push_back(i);
+        } else {
+            for (const auto &region : mapInfo) {
+                if (value >= region.start && value <= region.end) {
+                    bufInfo[getLeakType(region.image)].push_back(i);
+                }
+            }
+        }
+    }
+
+    return bufInfo;
+}
+
+std::vector<IOStates::LeakInfo>
+IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len) {
     auto mapInfo = m_ctx.mem().getMapInfo(m_ctx.getTargetProcessPid());
     uint64_t canary = m_ctx.getExploit().getElf().getCanary();
     std::vector<IOStates::LeakInfo> leakInfo;
 
     for (uint64_t i = 0; i < len; i += 8) {
         uint64_t value = u64(m_ctx.mem().readConcrete(buf + i, 8));
-        log<WARN>() << "addr = " << klee::hexval(buf + i) << " value = " << klee::hexval(value) << '\n';
         if (value == canary) {
-            log<WARN>() << "found canary on stack at buf + " << klee::hexval(i) << "\n";
             leakInfo.push_back({i, 0, LeakType::CANARY});
         } else {
             for (const auto &region : mapInfo) {
@@ -94,10 +116,6 @@ IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len)
     }
 
     return leakInfo;
-}
-
-void IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len) {
-
 }
 
 

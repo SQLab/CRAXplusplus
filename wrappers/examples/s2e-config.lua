@@ -388,4 +388,13 @@ add_plugin("CRAX")
 pluginsConfig.CRAX = {
     elfFilename = "target",
     libcFilename = "/lib/x86_64-linux-gnu/libc.so.6",
+
+    showInstructions = false,
+    showSyscalls = false,
+
+    modules = {
+        "Ret2csu",
+        "BasicStackPivot",
+        "GotPartialOverwrite",
+    },
 }

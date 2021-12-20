@@ -65,8 +65,13 @@ std::vector<uint8_t> Memory::readConcrete(uint64_t virtAddr, uint64_t size, bool
         // XXX: The performance seems fast enough even though I bruteforce it byte by byte,
         // but maybe we can optimize it directly in libs2ecore at some point.
         for (uint64_t i = 0; i < size; i++) {
-            // Skip symbolic bytes.
+            // Read the underlying concrete bytes, but don't concretize them.
             if (isSymbolic(virtAddr + i, 1)) {
+                if (!m_ctx.getCurrentState()->mem()->read(virtAddr + i, &ret[i], VirtualAddress, false)) {
+                    log<WARN>() << "Non-concretizing read() from memory failed: " << hexval(virtAddr + i) << "\n";
+                    ret.clear();
+                    break;
+                }
                 continue;
             }
             if (!m_ctx.getCurrentState()->mem()->read(virtAddr + i, &ret[i], 1)) {

@@ -28,14 +28,14 @@ using namespace klee;
 
 namespace s2e::plugins::crax {
 
-const std::array<std::string, 10> Register::s_regs32 = {
+const std::array<std::string, 10> Register::s_regs32 = {{
     "EAX", "ECX", "EDX", "EBX", "ESP", "EBP", "ESI", "EDI"
-};
+}};
 
-const std::array<std::string, 18> Register::s_regs64 = {
+const std::array<std::string, 18> Register::s_regs64 = {{
     "RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI",
     "R8", "R9",  "R10", "R11", "R12", "R13", "R14", "R15"
-};
+}};
 
 
 Register::Register(CRAX &ctx)

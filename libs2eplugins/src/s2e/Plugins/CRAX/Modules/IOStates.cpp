@@ -69,13 +69,33 @@ void IOStates::inputStateHook(S2EExecutionState *inputState,
     auto bufInfo = analyzeLeak(inputState, arg2, arg3);
 
     auto &os = log<WARN>();
-    os << "\n ---------- Analyzing input state ----------\n";
+    os << " ---------- Analyzing input state ----------\n";
     for (size_t i = 0; i < bufInfo.size(); i++) {
         os << "[" << IOStates::s_leakTypes[i] << "]: ";
-        for (const auto &offset : bufInfo[i]) {
+        for (uint64_t offset : bufInfo[i]) {
             os << klee::hexval(offset) << ' ';
         }
         os << '\n';
+    }
+
+    for (uint64_t offset : bufInfo[IOStates::LeakType::CANARY]) {
+        // Create input state snapshot.
+        if (inputState->needToJumpToSymbolic()) {
+            inputState->jumpToSymbolic();
+        }
+
+        S2EExecutor::StatePair sp = m_ctx.s2e()->getExecutor()->fork(*inputState);
+        auto forkedState = dynamic_cast<S2EExecutionState *>(sp.second);
+
+        log<WARN>()
+            << "forked output state for leak detection (id="
+            << forkedState->getID() << ")\n";
+
+        // Hijack sys_read(0, buf, len), setting len to `value`.
+        // Since the forked state is currently in symbolic mode,
+        // we have to write a klee::ConstantExpr instead of uint64_t.
+        ref<Expr> value = ConstantExpr::create(offset + 1, Expr::Int64);
+        forkedState->regs()->write(CPU_OFFSET(regs[Register::X64::RDX]), value);
     }
 }
 
@@ -95,11 +115,15 @@ void IOStates::outputStateHook(S2EExecutionState *outputState,
     auto leakInfo = detectLeak(outputState, arg2, arg3);
 
     auto &os = log<WARN>();
-    os << "\n---------- Analyzing output state ----------\n";
+    os << "---------- Analyzing output state ----------\n";
     for (const auto &entry : leakInfo) {
         os << '(' << IOStates::s_leakTypes[entry.leakType]
             << ", " << klee::hexval(entry.bufIndex)
             << ", " << klee::hexval(entry.offset) << ")\n";
+
+        if (entry.leakType == IOStates::LeakType::CANARY) {
+            log<WARN>() << "[** WARN **] canary leaked!\n";
+        }
     }
 }
 
@@ -124,8 +148,12 @@ void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
 void IOStates::maybeDisableForking(S2EExecutionState *state,
                                    const Instruction &i) {
     if (i.address == m_ctx.getExploit().getElf().symbols()["__stack_chk_fail"]) {
-        log<WARN>() << "disabled forking at __stack_chk_fail@plt\n";
-        state->disableForking();
+        //log<WARN>() << "disabled forking at __stack_chk_fail@plt\n";
+        //state->disableForking();
+
+        // XXX: If we disable forking instead of terminating the state here,
+        // the forked output state will run endlessly. Why is that ?__?
+        g_s2e->getExecutor()->terminateState(*state, "reached __stack_chk_fail@plt");
     }
 }
 
@@ -161,7 +189,8 @@ IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len)
 
     for (uint64_t i = 0; i < len; i += 8) {
         uint64_t value = u64(m_ctx.mem().readConcrete(buf + i, 8, /*concretize=*/false));
-        if (m_ctx.getExploit().getElf().getChecksec().hasCanary && value == canary) {
+        // log<WARN>() << "addr = " << klee::hexval(buf + i) << " value = " << klee::hexval(value) << '\n';
+        if (m_ctx.getExploit().getElf().getChecksec().hasCanary && (value & ~0xff) == canary) {
             leakInfo.push_back({i, 0, LeakType::CANARY});
         } else {
             for (const auto &region : mapInfo) {

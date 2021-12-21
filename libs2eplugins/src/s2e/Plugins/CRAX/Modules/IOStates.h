@@ -55,25 +55,44 @@ public:
 
     explicit IOStates(CRAX &ctx);
 
-    void maybeAnalyzeState(S2EExecutionState *inputState,
-                           uint64_t nr_syscall,
-                           uint64_t arg1,
-                           uint64_t arg2,
-                           uint64_t arg3,
-                           uint64_t arg4,
-                           uint64_t arg5,
-                           uint64_t arg6);
+    void inputStateHook(S2EExecutionState *inputState,
+                        uint64_t nr_syscall,
+                        uint64_t arg1,
+                        uint64_t arg2,
+                        uint64_t arg3,
+                        uint64_t arg4,
+                        uint64_t arg5,
+                        uint64_t arg6);
+
+    void outputStateHook(S2EExecutionState *outputState,
+                         uint64_t nr_syscall,
+                         uint64_t arg1,
+                         uint64_t arg2,
+                         uint64_t arg3,
+                         uint64_t arg4,
+                         uint64_t arg5,
+                         uint64_t arg6);
+
 
     void maybeInterceptStackCanary(S2EExecutionState *state,
                                    const Instruction &i);
 
+    void maybeDisableForking(S2EExecutionState *state,
+                             const Instruction &i);
+
+
     // Called at input states.
+    [[nodiscard]]
     std::array<std::vector<uint64_t>, IOStates::LeakType::LAST>
     analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len);
 
     // Called at output states.
+    [[nodiscard]]
     std::vector<IOStates::LeakInfo>
     detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len);
+
+
+    static const std::array<std::string, LeakType::LAST> s_leakTypes;
 
 private:
     LeakType getLeakType(const std::string &image) const;

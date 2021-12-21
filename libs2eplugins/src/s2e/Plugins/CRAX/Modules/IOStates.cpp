@@ -27,50 +27,108 @@
 
 namespace s2e::plugins::crax {
 
+const std::array<std::string, IOStates::LeakType::LAST> IOStates::s_leakTypes = {{
+    "unknown", "code", "libc", "heap", "stack", "canary"
+}};
+
 IOStates::IOStates(CRAX &ctx)
     : m_ctx(ctx),
       m_canaryHookConnection() {
-    // Install IOStates hook.
+    // Install input state syscall hook.
     ctx.beforeSyscallHooks.connect(
-            sigc::mem_fun(*this, &IOStates::maybeAnalyzeState));
+            sigc::mem_fun(*this, &IOStates::inputStateHook));
 
-    // If stack canary is enabled, install a hook
-    // to intercept canary values.
+    // Install output state syscall hook.
+    ctx.afterSyscallHooks.connect(
+            sigc::mem_fun(*this, &IOStates::outputStateHook));
+
+    // If stack canary is enabled, install a hook to intercept canary values.
     if (m_ctx.getExploit().getElf().getChecksec().hasCanary) {
         m_canaryHookConnection = ctx.afterInstructionHooks.connect(
                 sigc::mem_fun(*this, &IOStates::maybeInterceptStackCanary));
+
+        ctx.beforeInstructionHooks.connect(
+                sigc::mem_fun(*this, &IOStates::maybeDisableForking));
     }
 }
 
 
-void IOStates::maybeAnalyzeState(S2EExecutionState *state,
-                                 uint64_t nr_syscall,
-                                 uint64_t arg1,
-                                 uint64_t arg2,
-                                 uint64_t arg3,
-                                 uint64_t arg4,
-                                 uint64_t arg5,
-                                 uint64_t arg6) {
-    // XXX: don't hardcode the syscall numbers.
-    if (nr_syscall == 0 && arg1 == STDIN_FILENO) {
-        log<WARN>() << "input state here :)\n";
-        analyzeLeak(state, arg2, arg3);
+void IOStates::inputStateHook(S2EExecutionState *inputState,
+                              uint64_t nr_syscall,
+                              uint64_t arg1,
+                              uint64_t arg2,
+                              uint64_t arg3,
+                              uint64_t arg4,
+                              uint64_t arg5,
+                              uint64_t arg6) {
+    if (nr_syscall != 0 || arg1 != STDIN_FILENO) {
+        return;
+    }
 
-    } else if (nr_syscall == 1 && arg1 == STDOUT_FILENO) {
-        log<WARN>() << "output state here :)\n";
-        detectLeak(state, arg2, arg3);
+    m_ctx.setCurrentState(inputState);
+    auto bufInfo = analyzeLeak(inputState, arg2, arg3);
+
+    auto &os = log<WARN>();
+    os << "\n ---------- Analyzing input state ----------\n";
+    for (size_t i = 0; i < bufInfo.size(); i++) {
+        os << "[" << IOStates::s_leakTypes[i] << "]: ";
+        for (const auto &offset : bufInfo[i]) {
+            os << klee::hexval(offset) << ' ';
+        }
+        os << '\n';
     }
 }
+
+void IOStates::outputStateHook(S2EExecutionState *outputState,
+                               uint64_t nr_syscall,
+                               uint64_t arg1,
+                               uint64_t arg2,
+                               uint64_t arg3,
+                               uint64_t arg4,
+                               uint64_t arg5,
+                               uint64_t arg6) {
+    if (nr_syscall != 1 || arg1 != STDOUT_FILENO) {
+        return;
+    }
+
+    m_ctx.setCurrentState(outputState);
+    auto leakInfo = detectLeak(outputState, arg2, arg3);
+
+    auto &os = log<WARN>();
+    os << "\n---------- Analyzing output state ----------\n";
+    for (const auto &entry : leakInfo) {
+        os << '(' << IOStates::s_leakTypes[entry.leakType]
+            << ", " << klee::hexval(entry.bufIndex)
+            << ", " << klee::hexval(entry.offset) << ")\n";
+    }
+}
+
 
 void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
                                          const Instruction &i) {
-    if (i.mnemonic == "mov" && i.opStr == "rax, qword ptr fs:[0x28]") {
-        // XXX: we should only intercept canary after main().
+    static bool hasReachedMain = false;
+
+    if (i.address == m_ctx.getExploit().getElf().symbols()["main"]) {
+        hasReachedMain = true;
+    }
+
+    if (hasReachedMain &&
+        i.mnemonic == "mov" && i.opStr == "rax, qword ptr fs:[0x28]") {
         uint64_t canary = m_ctx.reg().readConcrete(Register::X64::RAX);
-        log<WARN>() << "Intercepted canary: " << klee::hexval(canary) << '\n';
         m_ctx.getExploit().getElf().setCanary(canary);
+        m_canaryHookConnection.disconnect();
+        log<WARN>() << "Intercepted canary: " << klee::hexval(canary) << '\n';
     }
 }
+
+void IOStates::maybeDisableForking(S2EExecutionState *state,
+                                   const Instruction &i) {
+    if (i.address == m_ctx.getExploit().getElf().symbols()["__stack_chk_fail"]) {
+        log<WARN>() << "disabled forking at __stack_chk_fail@plt\n";
+        state->disableForking();
+    }
+}
+
 
 std::array<std::vector<uint64_t>, IOStates::LeakType::LAST>
 IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len) {
@@ -79,10 +137,9 @@ IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len)
     std::array<std::vector<uint64_t>, IOStates::LeakType::LAST> bufInfo;
 
     for (uint64_t i = 0; i < len; i += 8) {
-        uint64_t value = u64(m_ctx.mem().readConcrete(buf + i, 8));
+        uint64_t value = u64(m_ctx.mem().readConcrete(buf + i, 8, /*concretize=*/false));
         //log<WARN>() << "addr = " << klee::hexval(buf + i) << " value = " << klee::hexval(value) << '\n';
-        if (value == canary) {
-            log<WARN>() << "found canary on stack at buf + " << klee::hexval(i) << "\n";
+        if (m_ctx.getExploit().getElf().getChecksec().hasCanary && value == canary) {
             bufInfo[LeakType::CANARY].push_back(i);
         } else {
             for (const auto &region : mapInfo) {
@@ -103,8 +160,8 @@ IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len)
     std::vector<IOStates::LeakInfo> leakInfo;
 
     for (uint64_t i = 0; i < len; i += 8) {
-        uint64_t value = u64(m_ctx.mem().readConcrete(buf + i, 8));
-        if (value == canary) {
+        uint64_t value = u64(m_ctx.mem().readConcrete(buf + i, 8, /*concretize=*/false));
+        if (m_ctx.getExploit().getElf().getChecksec().hasCanary && value == canary) {
             leakInfo.push_back({i, 0, LeakType::CANARY});
         } else {
             for (const auto &region : mapInfo) {

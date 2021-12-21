@@ -156,7 +156,7 @@ function execute_target {
     # provide symbolic arguments to the target if required. You can do so by
     # using the ``S2E_SYM_ARGS`` environment variable as required
     #S2E_SYM_ARGS="" LD_PRELOAD="${S2E_SO}" "${TARGET}" "$@" > /dev/null 2> /dev/null
-    ./symio ./target < ./poc
+    ./symio ./target < ./poc >/dev/null 2>&1
 }
 
 # Nothing more to initialize on Linux

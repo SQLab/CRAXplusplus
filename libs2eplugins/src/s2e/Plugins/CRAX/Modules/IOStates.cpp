@@ -123,6 +123,7 @@ void IOStates::outputStateHook(S2EExecutionState *outputState,
 
         if (entry.leakType == IOStates::LeakType::CANARY) {
             log<WARN>() << "[** WARN **] canary leaked!\n";
+            m_ctx.getExploit().setCanaryLeakOffset(entry.bufIndex + 1);
         }
     }
 }

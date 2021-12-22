@@ -30,12 +30,11 @@ std::vector<uint8_t> p64(uint64_t value) {
 
     ret.reserve(8);
     for (int i = 0; i < 8; i++) {
-        ret.push_back(value & bitmask);
+        ret.push_back((value & bitmask) >> i * 8);
         if (i != 7) {
             bitmask <<= 8;
         }
     }
-
     return ret;
 }
 

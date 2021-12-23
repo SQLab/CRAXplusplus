@@ -77,7 +77,7 @@ public:
     void maybeInterceptStackCanary(S2EExecutionState *state,
                                    const Instruction &i);
 
-    void maybeDisableForking(S2EExecutionState *state,
+    void maybeTerminateState(S2EExecutionState *state,
                              const Instruction &i);
 
 

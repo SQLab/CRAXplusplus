@@ -48,7 +48,7 @@ IOStates::IOStates(CRAX &ctx)
                 sigc::mem_fun(*this, &IOStates::maybeInterceptStackCanary));
 
         ctx.beforeInstructionHooks.connect(
-                sigc::mem_fun(*this, &IOStates::maybeDisableForking));
+                sigc::mem_fun(*this, &IOStates::maybeTerminateState));
     }
 }
 
@@ -146,12 +146,9 @@ void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
     }
 }
 
-void IOStates::maybeDisableForking(S2EExecutionState *state,
+void IOStates::maybeTerminateState(S2EExecutionState *state,
                                    const Instruction &i) {
     if (i.address == m_ctx.getExploit().getElf().symbols()["__stack_chk_fail"]) {
-        //log<WARN>() << "disabled forking at __stack_chk_fail@plt\n";
-        //state->disableForking();
-
         // XXX: If we disable forking instead of terminating the state here,
         // the forked output state will run endlessly. Why is that ?__?
         g_s2e->getExecutor()->terminateState(*state, "reached __stack_chk_fail@plt");

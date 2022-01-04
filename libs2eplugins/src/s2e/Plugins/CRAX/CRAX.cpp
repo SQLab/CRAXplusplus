@@ -22,6 +22,7 @@
 #include <s2e/ConfigFile.h>
 #include <s2e/Plugins/OSMonitors/Support/ProcessExecutionDetector.h>
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
+#include <s2e/Plugins/CRAX/Modules/RopChainBuilder.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
 #include <fstream>
@@ -47,16 +48,16 @@ CRAX::CRAX(S2E *s2e)
       afterInstructionHooks(),
       beforeSyscallHooks(),
       afterSyscallHooks(),
+      exploitGenerationHooks(),
+      m_currentState(),
       m_linuxMonitor(),
       m_register(*this),
       m_memory(*this),
       m_disassembler(*this),
       m_exploit(g_s2e->getConfig()->getString(getConfigKey() + ".elfFilename"),
                 g_s2e->getConfig()->getString(getConfigKey() + ".libcFilename")),
-      m_ropChainBuilder(*this),
       m_targetProcessPid(),
       m_modules(),
-      m_techniques(),
       m_readPrimitives(),
       m_writePrimitives() {}
 
@@ -112,9 +113,8 @@ void CRAX::onSymbolicRip(S2EExecutionState *exploitableState,
     // Dump virtual memory mappings.
     mem().showMapInfo(m_targetProcessPid);
 
-    if (!generateExploit()) {
-        log<WARN>() << "Failed to generate exploit.\n";
-    }
+    // Execute exploit generation hooks installed by the user.
+    exploitGenerationHooks.emit();
 
     s2e()->getExecutor()->terminateState(*exploitableState, "End of exploit generation");
 }
@@ -255,73 +255,6 @@ void CRAX::onExecuteSyscallEnd(S2EExecutionState *state) {
 
     // Execute syscall hooks installed by the user.
     afterSyscallHooks.emit(state, rax, rdi, rsi, rdx, r10, r8, r9);
-}
-
-bool CRAX::generateExploit() {
-    // Write exploit shebang.
-    m_exploit.writeline(Exploit::s_shebang);
-
-    // Pwntools stuff.
-    m_exploit.writelines({
-        "from pwn import *",
-        "context.update(arch = 'amd64', os = 'linux', log_level = 'info')",
-        "",
-        format("elf = ELF('%s', checksec=False)", m_exploit.getElfFilename().c_str()),
-    });
-
-    // Initialize techniques.
-    ConfigFile *cfg = s2e()->getConfig();
-    ConfigFile::string_list techniques = cfg->getStringList(getConfigKey() + ".techniques");
-
-    m_techniques.clear();
-    foreach2 (it, techniques.begin(), techniques.end()) {
-        log<WARN>() << "initializing: " << *it << '\n';
-        m_techniques.push_back(Technique::create(*this, *it));
-    }
-
-    // Check requirements.
-    for (const auto &t : m_techniques) {
-        if (!t->checkRequirements()) {
-            log<WARN>() << "Requirements unsatisfied: " << t->toString() << '\n';
-            return false;
-        }
-    }
-
-    m_exploit.registerSymbol("elf_base", 0);
-
-    // Declare symbols and values.
-    for (const auto &entry : m_exploit.getSymtab()) {
-        const auto &name = entry.first;
-        const auto &value = entry.second;
-        m_exploit.writeline(format("%s = 0x%llx", name.c_str(), value));
-    }
-
-    m_exploit.writeline();
-
-    // Write exploit body.
-    m_exploit.writelines({
-        "if __name__ == '__main__':",
-        "    proc = elf.process()",
-    });
-
-    // Build ROP chain based on the strategy list chosen by the user.
-    if (!m_ropChainBuilder.build(m_exploit, m_techniques)) {
-        return false;
-    }
-
-    // Write exploit trailer.
-    m_exploit.writeline("    proc.interactive()");
-
-    // Write the buffered content to the file.
-    std::string filename = m_exploit.getFilename(m_currentState->getID());
-    std::ofstream ofs(filename);
-    ofs << m_exploit.getContent();
-
-    m_exploit.clearContent();
-    m_ropChainBuilder.reset();
-
-    log<WARN>() << "Generated exploit script: " << filename << "\n";
-    return true;
 }
 
 }  // namespace s2e::plugins::crax

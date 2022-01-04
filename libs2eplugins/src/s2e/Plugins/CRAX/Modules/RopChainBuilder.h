@@ -22,8 +22,12 @@
 #define S2E_PLUGINS_CRAX_ROP_CHAIN_BUILDER_H
 
 #include <klee/Expr.h>
+#include <s2e/Plugins/CRAX/API/Register.h>
+#include <s2e/Plugins/CRAX/API/Memory.h>
+#include <s2e/Plugins/CRAX/Modules/Module.h>
 
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace s2e::plugins::crax {
@@ -37,17 +41,23 @@ class CRAX;
 class Exploit;
 class Technique;
 
-class RopChainBuilder {
+class RopChainBuilder : public Module {
 public:
     explicit RopChainBuilder(CRAX &ctx)
-        : m_ctx(ctx),
+        : Module(ctx),
           m_symbolicMode(true),
           m_symbolicModeRspOffset() {}
+
+    virtual ~RopChainBuilder() = default;
+
+    virtual std::string toString() const override {
+        return "RopChainBuilder";
+    }
 
 
     [[nodiscard]]
     bool build(Exploit &exploit,
-               const std::vector<std::shared_ptr<Technique>> &techniques);
+               const std::vector<std::unique_ptr<Technique>> &techniques);
 
     void reset() {
         m_symbolicMode = true;
@@ -68,7 +78,6 @@ private:
     bool addMemoryConstraint(uint64_t addr, const klee::ref<klee::Expr> &e);
     
 
-    CRAX &m_ctx;
     bool m_symbolicMode;  // true: symbolic, false: direct
     uint32_t m_symbolicModeRspOffset;
 };

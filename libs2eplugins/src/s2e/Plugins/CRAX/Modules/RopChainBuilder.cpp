@@ -18,16 +18,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <klee/Expr.h>
 #include <s2e/Plugins/CRAX/CRAX.h>
 #include <s2e/Plugins/CRAX/Expr/BinaryExprEvaluator.h>
 #include <s2e/Plugins/CRAX/Techniques/Technique.h>
 #include <s2e/Plugins/CRAX/Techniques/StackPivot.h>
 #include <s2e/Plugins/CRAX/Pwnlib/Util.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
-
-#include <klee/Expr.h>
-
-#include <string>
 
 #include "RopChainBuilder.h"
 
@@ -42,7 +39,7 @@ using ConcreteRopPayload = Technique::ConcreteRopPayload;
 
 
 bool RopChainBuilder::build(Exploit &exploit,
-                            const std::vector<std::shared_ptr<Technique>> &techniques) {
+                            const std::vector<std::unique_ptr<Technique>> &techniques) {
     // [Optional] generate code to leak canary.
     if (exploit.getElf().getChecksec().hasCanary) {
         exploit.appendRopPayload(format("b'A' * %d", exploit.getCanaryLeakOffset()));
@@ -62,7 +59,7 @@ bool RopChainBuilder::build(Exploit &exploit,
     }
 
     // [Required] generate ROP chain.
-    for (auto t : techniques) {
+    for (const auto &t : techniques) {
         std::vector<SymbolicRopPayload> symbolicRopPayloadList = t->getSymbolicRopPayloadList();
 
         if (symbolicRopPayloadList.empty()) {

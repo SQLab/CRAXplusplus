@@ -26,12 +26,13 @@ add_library(
     # Exploit generation
     s2e/Plugins/CRAX/CRAX.cpp
     s2e/Plugins/CRAX/Exploit.cpp
-    s2e/Plugins/CRAX/RopChainBuilder.cpp
     s2e/Plugins/CRAX/API/Register.cpp
     s2e/Plugins/CRAX/API/Memory.cpp
     s2e/Plugins/CRAX/API/Disassembler.cpp
     s2e/Plugins/CRAX/API/Logging.cpp
     s2e/Plugins/CRAX/Modules/Module.cpp
+    s2e/Plugins/CRAX/Modules/ExploitGenerator.cpp
+    s2e/Plugins/CRAX/Modules/RopChainBuilder.cpp
     s2e/Plugins/CRAX/Modules/IOStates.cpp
     s2e/Plugins/CRAX/Techniques/Technique.cpp
     s2e/Plugins/CRAX/Techniques/Ret2csu.cpp

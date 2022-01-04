@@ -22,6 +22,7 @@
 #define S2E_PLUGINS_CRAX_MODULE_H
 
 #include <memory>
+#include <map>
 #include <string>
 
 namespace s2e::plugins::crax {
@@ -37,11 +38,10 @@ public:
 
     virtual std::string toString() const = 0;
 
-    static std::shared_ptr<Module> create(CRAX &ctx, const std::string &name);
+    static std::unique_ptr<Module> create(CRAX &ctx, const std::string &name);
     static std::map<std::string, Module*> s_mapper;
 
 protected:
-    // CRAX's attributes.
     CRAX &m_ctx;
 };
 

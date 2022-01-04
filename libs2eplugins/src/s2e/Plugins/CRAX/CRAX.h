@@ -31,9 +31,7 @@
 #include <s2e/Plugins/CRAX/API/Disassembler.h>
 #include <s2e/Plugins/CRAX/API/Logging.h>
 #include <s2e/Plugins/CRAX/Modules/Module.h>
-#include <s2e/Plugins/CRAX/Techniques/Technique.h>
 #include <s2e/Plugins/CRAX/Exploit.h>
-#include <s2e/Plugins/CRAX/RopChainBuilder.h>
 
 #include <pybind11/embed.h>
 
@@ -49,6 +47,12 @@ public:
     CRAX(S2E *s2e);
     void initialize();
 
+
+    [[nodiscard]]
+    Module *getModule(const std::string &name) {
+        auto it = Module::s_mapper.find(name);
+        return (it != Module::s_mapper.end()) ? it->second : nullptr;
+    }
 
     [[nodiscard]]
     S2EExecutionState *getCurrentState() { return m_currentState; }
@@ -109,6 +113,9 @@ public:
                  uint64_t /* r8 */,
                  uint64_t /* r9 */>
         afterSyscallHooks;
+
+    sigc::signal<void>
+        exploitGenerationHooks;
     // clang-format on
 
     // Embedded Python interpreter from pybind11 library.
@@ -155,9 +162,6 @@ private:
 
     void onExecuteSyscallEnd(S2EExecutionState *state);
 
-    [[nodiscard]]
-    bool generateExploit();
-
 
     // S2E
     S2EExecutionState *m_currentState;
@@ -168,13 +172,10 @@ private:
     Memory m_memory;
     Disassembler m_disassembler;
     Exploit m_exploit;
-    RopChainBuilder m_ropChainBuilder;
     uint64_t m_targetProcessPid;
 
     // Exploitation-specific attributes.
-    std::vector<std::shared_ptr<Module>> m_modules;
-    std::vector<std::shared_ptr<Technique>> m_techniques;
-
+    std::vector<std::unique_ptr<Module>> m_modules;
     std::vector<uint64_t> m_readPrimitives;
     std::vector<uint64_t> m_writePrimitives;
 };

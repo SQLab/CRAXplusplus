@@ -58,7 +58,9 @@ public:
     explicit IOStates(CRAX &ctx);
     virtual ~IOStates() = default;
 
-    virtual std::string toString() const { return "IOState"; }
+    virtual std::string toString() const override {
+        return "IOState";
+    }
 
 
     void inputStateHook(S2EExecutionState *inputState,

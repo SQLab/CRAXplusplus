@@ -391,6 +391,12 @@ pluginsConfig.CRAX = {
 
     showInstructions = false,
     showSyscalls = true,
+    
+    modules = {
+        "ExploitGenerator",
+        "RopChainBuilder",
+        "IOStates",
+    },
 
     techniques = {
         "Ret2csu",

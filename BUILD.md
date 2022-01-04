@@ -69,22 +69,22 @@ Download pre-built VM images (~30 mins)
 s2e image_build linux -d
 ```
 
-Create an S2E project with our concolic execution wrapper
+Create an S2E project with our concolic execution proxy
 ```
-cd ~/s2e/source/s2e/wrappers/symio
+cd ~/s2e/source/s2e/proxies/sym_stdin
 make
 cd ~/s2e
-s2e new_project --image debian-9.2.1-x86_64 source/s2e/wrappers/symio/symio
+s2e new_project --image debian-9.2.1-x86_64 source/s2e/proxies/sym_stdin/sym_stdin
 ```
 
 Install CRAX++ configuration.
 ```
-cp source/s2e/wrappers/examples/* projects/symio/.
+cp source/s2e/proxies/examples/* projects/sym_stdin/.
 ```
 
 Setup target executable and poc.
 ```
-cd projects/symio
+cd projects/sym_stdin
 ln -s ~/s2e/examples/rop/rop target
 ln -s ~/s2e/examples/rop/poc poc
 ```

@@ -152,11 +152,11 @@ function execute_target {
 
 
 
-    # symio is dynamically linked, so s2e.so has been preloaded to
+    # sym_stdin is dynamically linked, so s2e.so has been preloaded to
     # provide symbolic arguments to the target if required. You can do so by
     # using the ``S2E_SYM_ARGS`` environment variable as required
     #S2E_SYM_ARGS="" LD_PRELOAD="${S2E_SO}" "${TARGET}" "$@" > /dev/null 2> /dev/null
-    ./symio ./target < ./poc >/dev/null 2>&1
+    ./sym_stdin ./target < ./poc >/dev/null 2>&1
 }
 
 # Nothing more to initialize on Linux
@@ -208,7 +208,7 @@ sudo swapoff -a
 target_init
 
 # Download the target file to analyze
-${S2EGET} "symio"
+${S2EGET} "sym_stdin"
 ${S2EGET} "target"
 ${S2EGET} "poc"
 
@@ -219,10 +219,7 @@ download_symbolic_files
 
 
 # Run the analysis
-
-
-
-    TARGET_PATH='./symio'
+TARGET_PATH='./sym_stdin'
 
 
 

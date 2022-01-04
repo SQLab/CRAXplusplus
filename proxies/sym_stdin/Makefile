@@ -1,7 +1,7 @@
-CXX=g++
+CXX=gcc
 CXXFLAGS=-Wall -I../../guest/common/include
-SRC=$(wildcard *.cc)
-BIN=symio
+SRC=$(wildcard *.c)
+BIN=sym_stdin
 
 all:
 	$(CXX) -o $(BIN) $(SRC) $(CXXFLAGS)

@@ -50,7 +50,7 @@ pluginsConfig.BaseInstructions = {
 add_plugin("HostFiles")
 pluginsConfig.HostFiles = {
     baseDirs = {
-        "/home/aesophor/s2e/projects/symio",
+        "/home/aesophor/s2e/projects/sym_stdin",
 
     },
     allowWrite = true,
@@ -65,7 +65,7 @@ pluginsConfig.HostFiles = {
 add_plugin("Vmi")
 pluginsConfig.Vmi = {
     baseDirs = {
-        "/home/aesophor/s2e/projects/symio",
+        "/home/aesophor/s2e/projects/sym_stdin",
 
 
             "/home/aesophor/s2e/images/debian-9.2.1-x86_64/guestfs",
@@ -85,7 +85,7 @@ add_plugin("MemUtils")
 -- server that listens on an address:port configured by the S2E_QMP_SERVER
 -- environment variable.
 --
--- The "s2e run symio" command sets up such a server in order to display
+-- The "s2e run sym_stdin" command sets up such a server in order to display
 -- stats on the dashboard.
 --
 -- You may also want to use this plugin to integrate S2E into a larger
@@ -390,7 +390,7 @@ pluginsConfig.CRAX = {
     libcFilename = "/lib/x86_64-linux-gnu/libc.so.6",
 
     showInstructions = false,
-    showSyscalls = false,
+    showSyscalls = true,
 
     modules = {
         "Ret2csu",

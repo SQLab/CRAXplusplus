@@ -20,27 +20,18 @@
 
 #include <s2e/s2e.h>
 
-extern "C" {
+#include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-}
-#include <iostream>
-#include <cstdlib>
-
-#define DIE(msg)          \
-    do {                  \
-        std::perror(msg); \
-        std::exit(1);     \
-    } while (0)
-
 
 int main(int argc, char *argv[]) {
     int n;
     char buf[1024];
 
     if (argc < 2) {
-        puts("usage: ./symio program_path [args]");
+        printf("usage: %s program_path [args]\n", argv[0]);
         return EXIT_SUCCESS;
     }
 
@@ -54,7 +45,8 @@ int main(int argc, char *argv[]) {
    
     int pipe_fd[2];
     if (pipe(pipe_fd) < 0) {
-        DIE("pipe error");
+        perror("pipe error");
+        return EXIT_FAILURE;
     }
     write(pipe_fd[1], buf, n);
 
@@ -63,23 +55,23 @@ int main(int argc, char *argv[]) {
     for (i = 0; i < argc - 1; i++) {
         args[i] = argv[i + 1];
     }
-    args[i] = nullptr;
+    args[i] = NULL;
 
     pid_t pid;
     switch (pid = fork()) {
         case -1:
-            DIE("failed to fork child process");
-            break;
+            perror("failed to fork child process");
+            return EXIT_FAILURE;
         case 0:  // child
             dup2(pipe_fd[0], 0);
             close(pipe_fd[0]);
             close(pipe_fd[1]);
-            execve(args[0], args, nullptr);
+            execve(args[0], args, NULL);
             break;
         default:  // parent
             close(pipe_fd[0]);
             close(pipe_fd[1]);
-            wait(nullptr);
+            wait(NULL);
             s2e_kill_state(0, "program terminated");
             break;
     }

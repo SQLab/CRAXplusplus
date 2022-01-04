@@ -59,7 +59,7 @@ Clone CRAX++, replace s2e with CRAX++, and build. (~60 mins)
 ```
 cd ~/s2e/source
 rm -rf s2e
-git clone https://github.com/aesophor/CRAXplusplus s2e
+git clone https://github.com/SQLab/CRAXplusplus s2e
 
 s2e build
 ```

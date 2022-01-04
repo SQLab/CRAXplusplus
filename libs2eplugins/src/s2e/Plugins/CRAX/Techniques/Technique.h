@@ -57,7 +57,7 @@ public:
     virtual std::string toString() const = 0;
 
     static std::shared_ptr<Technique> create(CRAX &ctx, const std::string &name);
-    static std::map<std::string, Technique*> mapper;
+    static std::map<std::string, Technique*> s_mapper;
 
 protected:
     // CRAX's attributes.

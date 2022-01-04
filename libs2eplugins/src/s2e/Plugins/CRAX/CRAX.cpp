@@ -54,10 +54,9 @@ CRAX::CRAX(S2E *s2e)
       m_exploit(g_s2e->getConfig()->getString(getConfigKey() + ".elfFilename"),
                 g_s2e->getConfig()->getString(getConfigKey() + ".libcFilename")),
       m_ropChainBuilder(*this),
-      m_ioStates(*this),
       m_targetProcessPid(),
+      m_modules(),
       m_techniques(),
-      m_ioBehaviors(),
       m_readPrimitives(),
       m_writePrimitives() {}
 
@@ -76,6 +75,14 @@ void CRAX::initialize() {
     // Install symbolic RIP handler.
     s2e()->getCorePlugin()->onSymbolicAddress.connect(
             sigc::mem_fun(*this, &CRAX::onSymbolicRip));
+
+    // Initialize modules.
+    ConfigFile *cfg = s2e()->getConfig();
+    ConfigFile::string_list moduleNames = cfg->getStringList(getConfigKey() + ".modules");
+    foreach2 (it, moduleNames.begin(), moduleNames.end()) {
+        log<WARN>() << "initializing: " << *it << '\n';
+        m_modules.push_back(Module::create(*this, *it));
+    }
 }
 
 

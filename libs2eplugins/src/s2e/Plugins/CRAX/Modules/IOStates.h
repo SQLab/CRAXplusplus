@@ -22,6 +22,8 @@
 #define S2E_PLUGINS_CRAX_IO_STATES_H
 
 #include <s2e/S2EExecutionState.h>
+#include <s2e/Plugins/CRAX/API/Disassembler.h>
+#include <s2e/Plugins/CRAX/Modules/Module.h>
 
 #include <array>
 #include <string>
@@ -34,7 +36,7 @@ class CRAX;
 
 
 // This is an implementation of "IOState" from balsn's LAEG.
-class IOStates {
+class IOStates : public Module {
 public:
     enum LeakType {
         UNKNOWN,
@@ -54,6 +56,10 @@ public:
 
 
     explicit IOStates(CRAX &ctx);
+    virtual ~IOStates() = default;
+
+    virtual std::string toString() const { return "IOState"; }
+
 
     void inputStateHook(S2EExecutionState *inputState,
                         uint64_t nr_syscall,
@@ -97,7 +103,6 @@ public:
 private:
     LeakType getLeakType(const std::string &image) const;
 
-    CRAX &m_ctx;
     sigc::connection m_canaryHookConnection;
 };
 

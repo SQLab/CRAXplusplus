@@ -30,8 +30,7 @@
 #include <s2e/Plugins/CRAX/API/Memory.h>
 #include <s2e/Plugins/CRAX/API/Disassembler.h>
 #include <s2e/Plugins/CRAX/API/Logging.h>
-#include <s2e/Plugins/CRAX/Modules/Behaviors.h>
-#include <s2e/Plugins/CRAX/Modules/IOStates.h>
+#include <s2e/Plugins/CRAX/Modules/Module.h>
 #include <s2e/Plugins/CRAX/Techniques/Technique.h>
 #include <s2e/Plugins/CRAX/Exploit.h>
 #include <s2e/Plugins/CRAX/RopChainBuilder.h>
@@ -170,12 +169,12 @@ private:
     Disassembler m_disassembler;
     Exploit m_exploit;
     RopChainBuilder m_ropChainBuilder;
-    IOStates m_ioStates;
     uint64_t m_targetProcessPid;
 
     // Exploitation-specific attributes.
+    std::vector<std::shared_ptr<Module>> m_modules;
     std::vector<std::shared_ptr<Technique>> m_techniques;
-    std::vector<std::unique_ptr<Behavior>> m_ioBehaviors;
+
     std::vector<uint64_t> m_readPrimitives;
     std::vector<uint64_t> m_writePrimitives;
 };

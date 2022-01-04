@@ -32,7 +32,7 @@ const std::array<std::string, IOStates::LeakType::LAST> IOStates::s_leakTypes = 
 }};
 
 IOStates::IOStates(CRAX &ctx)
-    : m_ctx(ctx),
+    : Module(ctx),
       m_canaryHookConnection() {
     // Install input state syscall hook.
     ctx.beforeSyscallHooks.connect(

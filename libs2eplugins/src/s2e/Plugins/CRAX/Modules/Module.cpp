@@ -18,33 +18,27 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <s2e/Plugins/CRAX/Techniques/Ret2csu.h>
-#include <s2e/Plugins/CRAX/Techniques/StackPivot.h>
-#include <s2e/Plugins/CRAX/Techniques/GotPartialOverwrite.h>
+#include <s2e/Plugins/CRAX/Modules/IOStates.h>
 
 #include <cassert>
 
-#include "Technique.h"
+#include "Module.h"
 
 namespace s2e::plugins::crax {
 
-std::map<std::string, Technique*> Technique::s_mapper;
+std::map<std::string, Module*> Module::s_mapper;
 
 
-std::shared_ptr<Technique> Technique::create(CRAX &ctx, const std::string &name) {
-    std::shared_ptr<Technique> ret;
+std::shared_ptr<Module> Module::create(CRAX &ctx, const std::string &name) {
+    std::shared_ptr<Module> ret;
 
-    if (name == "Ret2csu") {
-        ret = std::make_shared<Ret2csu>(ctx);
-    } else if (name == "BasicStackPivot") {
-        ret = std::make_shared<BasicStackPivot>(ctx);
-    } else if (name == "GotPartialOverwrite") {
-        ret = std::make_shared<GotPartialOverwrite>(ctx);
+    if (name == "IOStates") {
+        ret = std::make_shared<IOStates>(ctx);
     }
 
-    assert(ret && "Technique::create() failed, possibly due to incorrect technique name!");
+    assert(ret && "Module::create() failed, possibly due to incorrect module name!");
 
-    Technique::s_mapper[name] = ret.get();
+    Module::s_mapper[name] = ret.get();
     return ret;
 }
 

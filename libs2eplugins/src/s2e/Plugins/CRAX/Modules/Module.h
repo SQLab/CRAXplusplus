@@ -18,34 +18,33 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <s2e/Plugins/CRAX/Techniques/Ret2csu.h>
-#include <s2e/Plugins/CRAX/Techniques/StackPivot.h>
-#include <s2e/Plugins/CRAX/Techniques/GotPartialOverwrite.h>
+#ifndef S2E_PLUGINS_CRAX_MODULE_H
+#define S2E_PLUGINS_CRAX_MODULE_H
 
-#include <cassert>
-
-#include "Technique.h"
+#include <memory>
+#include <string>
 
 namespace s2e::plugins::crax {
 
-std::map<std::string, Technique*> Technique::s_mapper;
+// Forward declaration
+class CRAX;
 
+// The abstract base class of all modules.
+class Module {
+public:
+    explicit Module(CRAX &ctx) : m_ctx(ctx) {}
+    virtual ~Module() = default;
 
-std::shared_ptr<Technique> Technique::create(CRAX &ctx, const std::string &name) {
-    std::shared_ptr<Technique> ret;
+    virtual std::string toString() const = 0;
 
-    if (name == "Ret2csu") {
-        ret = std::make_shared<Ret2csu>(ctx);
-    } else if (name == "BasicStackPivot") {
-        ret = std::make_shared<BasicStackPivot>(ctx);
-    } else if (name == "GotPartialOverwrite") {
-        ret = std::make_shared<GotPartialOverwrite>(ctx);
-    }
+    static std::shared_ptr<Module> create(CRAX &ctx, const std::string &name);
+    static std::map<std::string, Module*> s_mapper;
 
-    assert(ret && "Technique::create() failed, possibly due to incorrect technique name!");
-
-    Technique::s_mapper[name] = ret.get();
-    return ret;
-}
+protected:
+    // CRAX's attributes.
+    CRAX &m_ctx;
+};
 
 }  // namespace s2e::plugins::crax
+
+#endif  // S2E_PLUGINS_CRAX_MODULE_H

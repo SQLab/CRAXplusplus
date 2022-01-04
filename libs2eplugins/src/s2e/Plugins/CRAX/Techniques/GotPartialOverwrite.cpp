@@ -50,7 +50,7 @@ std::string GotPartialOverwrite::getAuxiliaryFunctions() const {
 }
 
 std::vector<SymbolicRopPayload> GotPartialOverwrite::getSymbolicRopPayloadList() const {
-    Ret2csu *ret2csu = dynamic_cast<Ret2csu *>(Technique::mapper["Ret2csu"]);
+    Ret2csu *ret2csu = dynamic_cast<Ret2csu *>(Technique::s_mapper["Ret2csu"]);
     assert(ret2csu);
 
     auto symbolMap = m_ctx.getExploit().getElf().symbols();

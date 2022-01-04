@@ -18,27 +18,39 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef S2E_PLUGINS_CRAX_DEFAULT_STRATEGY_H
-#define S2E_PLUGINS_CRAX_DEFAULT_STRATEGY_H
+#ifndef S2E_PLUGINS_CRAX_IO_STATES_SEARCHER_H
+#define S2E_PLUGINS_CRAX_IO_STATES_SEARCHER_H
 
-#include <s2e/Plugins/CRAX/Modules/Strategies/Strategy.h>
+#include <s2e/S2EExecutionState.h>
+
+#include <klee/Searcher.h>
+
+#include <queue>
 
 namespace s2e::plugins::crax {
 
-// Forward declaration
-class CRAX;
-
-// Default exploitation strategy:
-//
-// 1. migrate the stack to .bss
-// 2. use ret2csu to partially overwrite read@GOT to point to `syscall` gadget.
-// 3. use ret2csu to call sys_execve("/bin/sh", 0, 0)
-class DefaultStrategy : public Strategy {
+// IOStates scheduler
+class IOStatesSearcher : public klee::Searcher {
 public:
-    explicit DefaultStrategy(CRAX &ctx);
-    virtual ~DefaultStrategy() = default;
+    IOStatesSearcher();
+    virtual ~IOStatesSearcher() = default;
+
+    virtual klee::ExecutionState &selectState() override;
+
+    virtual void update(klee::ExecutionState *current,
+                        const klee::StateSet &addedStates,
+                        const klee::StateSet &removedStates) override;
+
+    virtual bool empty() override { return m_outputStates.empty(); }
+
+    virtual void printName(llvm::raw_ostream &os) override {
+        os << "IOStates searcher\n";
+    }
+
+private:
+    std::queue<S2EExecutionState *> m_stateQueue;
 };
 
 }  // namespace s2e::plugins::crax
 
-#endif  // S2E_PLUGINS_CRAX_STRATEGY_H
+#endif  // S2E_PLUGINS_CRAX_IO_STATES_SEARCHER_H

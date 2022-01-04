@@ -18,10 +18,37 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "Technique.h"
+#ifndef S2E_PLUGINS_CRAX_GOT_PARTIAL_OVERWRITE_H
+#define S2E_PLUGINS_CRAX_GOT_PARTIAL_OVERWRITE_H
+
+#include <s2e/Plugins/CRAX/Techniques/Technique.h>
+
+#include <string>
+#include <vector>
 
 namespace s2e::plugins::crax {
 
-std::map<std::string, Technique*> Technique::mapper;
+// Forward declaration
+class CRAX;
+
+class GotPartialOverwrite : public Technique {
+public:
+    explicit GotPartialOverwrite(CRAX &ctx);
+    virtual ~GotPartialOverwrite() = default;
+
+    virtual bool checkRequirements() const override;
+    virtual void resolveRequiredGadgets() override;
+    virtual std::string getAuxiliaryFunctions() const override;
+
+    virtual std::vector<SymbolicRopPayload> getSymbolicRopPayloadList() const override;
+    virtual ConcreteRopPayload getExtraPayload() const override;
+
+    virtual std::string toString() const override;
+
+private:
+    uint8_t getLsbOfReadSyscall() const;
+};
 
 }  // namespace s2e::plugins::crax
+
+#endif  // S2E_PLUGINS_CRAX_GOT_PARTIAL_OVERWRITE_H

@@ -30,9 +30,9 @@
 #include <s2e/Plugins/CRAX/API/Memory.h>
 #include <s2e/Plugins/CRAX/API/Disassembler.h>
 #include <s2e/Plugins/CRAX/API/Logging.h>
-#include <s2e/Plugins/CRAX/Modules/Strategies/Strategy.h>
 #include <s2e/Plugins/CRAX/Modules/Behaviors.h>
 #include <s2e/Plugins/CRAX/Modules/IOStates.h>
+#include <s2e/Plugins/CRAX/Techniques/Technique.h>
 #include <s2e/Plugins/CRAX/Exploit.h>
 #include <s2e/Plugins/CRAX/RopChainBuilder.h>
 
@@ -160,7 +160,6 @@ private:
     bool generateExploit();
 
 
-
     // S2E
     S2EExecutionState *m_currentState;
     LinuxMonitor *m_linuxMonitor;
@@ -175,7 +174,7 @@ private:
     uint64_t m_targetProcessPid;
 
     // Exploitation-specific attributes.
-    std::unique_ptr<Strategy> m_strategy;
+    std::vector<std::shared_ptr<Technique>> m_techniques;
     std::vector<std::unique_ptr<Behavior>> m_ioBehaviors;
     std::vector<uint64_t> m_readPrimitives;
     std::vector<uint64_t> m_writePrimitives;

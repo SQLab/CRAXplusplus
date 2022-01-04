@@ -22,7 +22,6 @@
 #include <s2e/ConfigFile.h>
 #include <s2e/Plugins/OSMonitors/Support/ProcessExecutionDetector.h>
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
-#include <s2e/Plugins/CRAX/Modules/Strategies/DefaultStrategy.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
 #include <fstream>
@@ -36,7 +35,7 @@ using namespace klee;
 
 namespace s2e::plugins::crax {
 
-S2E_DEFINE_PLUGIN(CRAX, "Automatic Exploit Generation Engine", "", );
+S2E_DEFINE_PLUGIN(CRAX, "Modular Exploit Generation System", "", );
 
 pybind11::scoped_interpreter CRAX::s_pybind11;
 pybind11::module CRAX::s_pwnlib(pybind11::module::import("pwnlib.elf"));
@@ -57,7 +56,7 @@ CRAX::CRAX(S2E *s2e)
       m_ropChainBuilder(*this),
       m_ioStates(*this),
       m_targetProcessPid(),
-      m_strategy(),
+      m_techniques(),
       m_ioBehaviors(),
       m_readPrimitives(),
       m_writePrimitives() {}
@@ -66,7 +65,6 @@ CRAX::CRAX(S2E *s2e)
 void CRAX::initialize() {
     // Initialize CRAX++'s logging module.
     initCRAXLogging(this);
-
     m_register.initialize();
     m_memory.initialize();
 
@@ -75,6 +73,7 @@ void CRAX::initialize() {
     m_linuxMonitor->onProcessLoad.connect(
             sigc::mem_fun(*this, &CRAX::onProcessLoad));
 
+    // Install symbolic RIP handler.
     s2e()->getCorePlugin()->onSymbolicAddress.connect(
             sigc::mem_fun(*this, &CRAX::onSymbolicRip));
 }
@@ -263,15 +262,18 @@ bool CRAX::generateExploit() {
         format("elf = ELF('%s', checksec=False)", m_exploit.getElfFilename().c_str()),
     });
 
-    // Determine exploit strategy.
-    if (!m_strategy) {
-        m_strategy = std::make_unique<DefaultStrategy>(*this);
+    // Initialize techniques.
+    ConfigFile *cfg = s2e()->getConfig();
+    ConfigFile::string_list techniques = cfg->getStringList(getConfigKey() + ".techniques");
+
+    m_techniques.clear();
+    foreach2 (it, techniques.begin(), techniques.end()) {
+        log<WARN>() << "initializing: " << *it << '\n';
+        m_techniques.push_back(Technique::create(*this, *it));
     }
 
     // Check requirements.
-    std::vector<Technique *> primaryTechniques = m_strategy->getPrimaryTechniques();
-
-    for (auto t : primaryTechniques) {
+    for (const auto &t : m_techniques) {
         if (!t->checkRequirements()) {
             log<WARN>() << "Requirements unsatisfied: " << t->toString() << '\n';
             return false;
@@ -296,7 +298,7 @@ bool CRAX::generateExploit() {
     });
 
     // Build ROP chain based on the strategy list chosen by the user.
-    if (!m_ropChainBuilder.build(m_exploit, primaryTechniques)) {
+    if (!m_ropChainBuilder.build(m_exploit, m_techniques)) {
         return false;
     }
 
@@ -304,10 +306,14 @@ bool CRAX::generateExploit() {
     m_exploit.writeline("    proc.interactive()");
 
     // Write the buffered content to the file.
-    std::ofstream ofs(m_exploit.getFilename());
+    std::string filename = m_exploit.getFilename(m_currentState->getID());
+    std::ofstream ofs(filename);
     ofs << m_exploit.getContent();
 
-    log<WARN>() << "Generated exploit script: " << m_exploit.getFilename() << "\n";
+    m_exploit.clearContent();
+    m_ropChainBuilder.reset();
+
+    log<WARN>() << "Generated exploit script: " << filename << "\n";
     return true;
 }
 

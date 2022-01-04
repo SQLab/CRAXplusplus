@@ -392,7 +392,7 @@ pluginsConfig.CRAX = {
     showInstructions = false,
     showSyscalls = true,
 
-    modules = {
+    techniques = {
         "Ret2csu",
         "BasicStackPivot",
         "GotPartialOverwrite",

@@ -18,50 +18,23 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef S2E_PLUGINS_CRAX_TECHNIQUE_H
-#define S2E_PLUGINS_CRAX_TECHNIQUE_H
+#include "IOStatesSearcher.h"
 
-#include <s2e/Plugins/CRAX/Expr/Expr.h>
-#include <s2e/Plugins/CRAX/Exploit.h>
-
-#include <klee/Expr.h>
-
-#include <map>
-#include <string>
-#include <vector>
+using namespace klee;
 
 namespace s2e::plugins::crax {
 
-// Forward declaration
-class CRAX;
-
-// The abstract base class of all concrete exploitation techniques,
-// e.g., stack pivoting, ret2csu, orw, etc.
-class Technique {
-public:
-    using SymbolicRopPayload = std::vector<klee::ref<klee::Expr>>;
-    using ConcreteRopPayload = std::vector<uint64_t>;
+IOStatesSearcher::IOStatesSearcher() : m_stateQueue() {}
 
 
-    explicit Technique(CRAX &ctx) : m_ctx(ctx) {}
-    virtual ~Technique() = default;
+ExecutionState &IOStatesSearcher::selectState() {
+    pabort("No more output states to schedule!");
+}
 
-    virtual bool checkRequirements() const = 0;
-    virtual void resolveRequiredGadgets() = 0;
-    virtual std::string getAuxiliaryFunctions() const = 0;
+void IOStatesSearcher::update(ExecutionState *current,
+                              const StateSet &addedStates,
+                              const StateSet &removedStates) {
 
-    virtual std::vector<SymbolicRopPayload> getSymbolicRopPayloadList() const = 0;
-    virtual ConcreteRopPayload getExtraPayload() const = 0;
-
-    virtual std::string toString() const = 0;
-
-    static std::map<std::string, Technique*> mapper;
-
-protected:
-    // CRAX's attributes.
-    CRAX &m_ctx;
-};
+}
 
 }  // namespace s2e::plugins::crax
-
-#endif  // S2E_PLUGINS_CRAX_TECHNIQUE_H

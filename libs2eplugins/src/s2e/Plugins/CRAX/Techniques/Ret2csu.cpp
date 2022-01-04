@@ -87,6 +87,10 @@ std::string Ret2csu::getAuxiliaryFunctions() const {
 }
 
 std::vector<SymbolicRopPayload> Ret2csu::getSymbolicRopPayloadList() const {
+    if (!m_addr) {
+        return {};
+    }
+
     auto ret = getSymbolicRopPayloadList(m_addr, m_arg1, m_arg2, m_arg3);
     ret[0].insert(ret[0].begin(), ConstantExpr::create(0x4141414141414141, Expr::Int64));
     return ret;

@@ -20,8 +20,8 @@
 
 #include <s2e/Plugins/CRAX/CRAX.h>
 #include <s2e/Plugins/CRAX/Expr/BinaryExprEvaluator.h>
-#include <s2e/Plugins/CRAX/Modules/Techniques/Technique.h>
-#include <s2e/Plugins/CRAX/Modules/Techniques/StackPivot.h>
+#include <s2e/Plugins/CRAX/Techniques/Technique.h>
+#include <s2e/Plugins/CRAX/Techniques/StackPivot.h>
 #include <s2e/Plugins/CRAX/Pwnlib/Util.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
@@ -42,7 +42,7 @@ using ConcreteRopPayload = Technique::ConcreteRopPayload;
 
 
 bool RopChainBuilder::build(Exploit &exploit,
-                            const std::vector<Technique *> &techniques) {
+                            const std::vector<std::shared_ptr<Technique>> &techniques) {
     // [Optional] generate code to leak canary.
     if (exploit.getElf().getChecksec().hasCanary) {
         exploit.appendRopPayload(format("b'A' * %d", exploit.getCanaryLeakOffset()));
@@ -64,6 +64,10 @@ bool RopChainBuilder::build(Exploit &exploit,
     // [Required] generate ROP chain.
     for (auto t : techniques) {
         std::vector<SymbolicRopPayload> symbolicRopPayloadList = t->getSymbolicRopPayloadList();
+
+        if (symbolicRopPayloadList.empty()) {
+            continue;
+        }
 
         // Direct payload generation mode
         if (!m_symbolicMode) {
@@ -97,7 +101,7 @@ bool RopChainBuilder::build(Exploit &exploit,
             }
         }
 
-        if (shouldSwitchToDirectMode(t)) {
+        if (shouldSwitchToDirectMode(t.get())) {
             log<WARN>() << "Switching from symbolic mode to direct mode...\n";
             m_symbolicMode = false;
 

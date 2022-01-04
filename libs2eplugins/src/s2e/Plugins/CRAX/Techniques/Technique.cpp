@@ -18,37 +18,34 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef S2E_PLUGINS_CRAX_GOT_PARTIAL_OVERWRITE_H
-#define S2E_PLUGINS_CRAX_GOT_PARTIAL_OVERWRITE_H
+#include <s2e/Plugins/CRAX/Techniques/Ret2csu.h>
+#include <s2e/Plugins/CRAX/Techniques/StackPivot.h>
+#include <s2e/Plugins/CRAX/Techniques/GotPartialOverwrite.h>
 
-#include <s2e/Plugins/CRAX/Modules/Techniques/Technique.h>
+#include <cassert>
 
-#include <string>
-#include <vector>
+#include "Technique.h"
 
 namespace s2e::plugins::crax {
 
-// Forward declaration
-class CRAX;
+std::map<std::string, Technique*> Technique::mapper;
 
-class GotPartialOverwrite : public Technique {
-public:
-    explicit GotPartialOverwrite(CRAX &ctx);
-    virtual ~GotPartialOverwrite() = default;
 
-    virtual bool checkRequirements() const override;
-    virtual void resolveRequiredGadgets() override;
-    virtual std::string getAuxiliaryFunctions() const override;
+std::shared_ptr<Technique> Technique::create(CRAX &ctx, const std::string &name) {
+    std::shared_ptr<Technique> ret;
 
-    virtual std::vector<SymbolicRopPayload> getSymbolicRopPayloadList() const override;
-    virtual ConcreteRopPayload getExtraPayload() const override;
+    if (name == "Ret2csu") {
+        ret = std::make_shared<Ret2csu>(ctx);
+    } else if (name == "BasicStackPivot") {
+        ret = std::make_shared<BasicStackPivot>(ctx);
+    } else if (name == "GotPartialOverwrite") {
+        ret = std::make_shared<GotPartialOverwrite>(ctx);
+    }
 
-    virtual std::string toString() const override;
+    assert(ret && "Technique::create() failed, possibly due to incorrect technique name!");
 
-private:
-    uint8_t getLsbOfReadSyscall() const;
-};
+    Technique::mapper[name] = ret.get();
+    return ret;
+}
 
 }  // namespace s2e::plugins::crax
-
-#endif  // S2E_PLUGINS_CRAX_GOT_PARTIAL_OVERWRITE_H

@@ -31,12 +31,11 @@ add_library(
     s2e/Plugins/CRAX/API/Memory.cpp
     s2e/Plugins/CRAX/API/Disassembler.cpp
     s2e/Plugins/CRAX/API/Logging.cpp
-    s2e/Plugins/CRAX/Modules/Strategies/DefaultStrategy.cpp
-    s2e/Plugins/CRAX/Modules/Techniques/Technique.cpp
-    s2e/Plugins/CRAX/Modules/Techniques/Ret2csu.cpp
-    s2e/Plugins/CRAX/Modules/Techniques/StackPivot.cpp
-    s2e/Plugins/CRAX/Modules/Techniques/GotPartialOverwrite.cpp
     s2e/Plugins/CRAX/Modules/IOStates.cpp
+    s2e/Plugins/CRAX/Techniques/Technique.cpp
+    s2e/Plugins/CRAX/Techniques/Ret2csu.cpp
+    s2e/Plugins/CRAX/Techniques/StackPivot.cpp
+    s2e/Plugins/CRAX/Techniques/GotPartialOverwrite.cpp
     s2e/Plugins/CRAX/Pwnlib/ELF.cpp
     s2e/Plugins/CRAX/Pwnlib/Util.cpp
     s2e/Plugins/CRAX/Utils/Algorithm.cpp

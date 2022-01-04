@@ -18,61 +18,52 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef S2E_PLUGINS_CRAX_ROP_CHAIN_BUILDER_H
-#define S2E_PLUGINS_CRAX_ROP_CHAIN_BUILDER_H
+#ifndef S2E_PLUGINS_CRAX_TECHNIQUE_H
+#define S2E_PLUGINS_CRAX_TECHNIQUE_H
+
+#include <s2e/Plugins/CRAX/Expr/Expr.h>
+#include <s2e/Plugins/CRAX/Exploit.h>
 
 #include <klee/Expr.h>
 
 #include <memory>
+#include <map>
+#include <string>
 #include <vector>
 
 namespace s2e::plugins::crax {
 
-// CRAX supports two modes of ROP chain generation:
-// 1. Symbolic mode (usually used before stack pivoting)
-// 2. Direct mode (usually used after stack pivoting)
-
 // Forward declaration
 class CRAX;
-class Exploit;
-class Technique;
 
-class RopChainBuilder {
+// The abstract base class of all concrete exploitation techniques,
+// e.g., stack pivoting, ret2csu, orw, etc.
+class Technique {
 public:
-    explicit RopChainBuilder(CRAX &ctx)
-        : m_ctx(ctx),
-          m_symbolicMode(true),
-          m_symbolicModeRspOffset() {}
+    using SymbolicRopPayload = std::vector<klee::ref<klee::Expr>>;
+    using ConcreteRopPayload = std::vector<uint64_t>;
 
 
-    [[nodiscard]]
-    bool build(Exploit &exploit,
-               const std::vector<std::shared_ptr<Technique>> &techniques);
+    explicit Technique(CRAX &ctx) : m_ctx(ctx) {}
+    virtual ~Technique() = default;
 
-    void reset() {
-        m_symbolicMode = true;
-        m_symbolicModeRspOffset = 0;
-    }
+    virtual bool checkRequirements() const = 0;
+    virtual void resolveRequiredGadgets() = 0;
+    virtual std::string getAuxiliaryFunctions() const = 0;
 
-private:
-    [[nodiscard]]
-    bool shouldSwitchToDirectMode(const Technique *t) const;
+    virtual std::vector<SymbolicRopPayload> getSymbolicRopPayloadList() const = 0;
+    virtual ConcreteRopPayload getExtraPayload() const = 0;
 
-    // When building ROP chain using symbolic mode,
-    // exploit constraints are added to the input constraints
-    // in order to generate ROP payload.
-    [[nodiscard]]
-    bool addRegisterConstraint(Register::X64 reg, const klee::ref<klee::Expr> &e);
+    virtual std::string toString() const = 0;
 
-    [[nodiscard]]
-    bool addMemoryConstraint(uint64_t addr, const klee::ref<klee::Expr> &e);
-    
+    static std::shared_ptr<Technique> create(CRAX &ctx, const std::string &name);
+    static std::map<std::string, Technique*> mapper;
 
+protected:
+    // CRAX's attributes.
     CRAX &m_ctx;
-    bool m_symbolicMode;  // true: symbolic, false: direct
-    uint32_t m_symbolicModeRspOffset;
 };
 
 }  // namespace s2e::plugins::crax
 
-#endif  // S2E_PLUGINS_CRAX_ROP_CHAIN_BUILDER_H
+#endif  // S2E_PLUGINS_CRAX_TECHNIQUE_H

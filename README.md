@@ -1,4 +1,4 @@
-## CRAX++: software CRash analysis for Automatic eXploit generation
+# CRAXplusplus (CRAX++)
 
 version: early alpha
 

@@ -70,8 +70,7 @@ uint64_t Register::readConcrete(Register::X64 reg, bool verbose) {
 
     if (verbose &&
         !m_ctx.getCurrentState()->regs()->read(getOffset(reg), &ret, sizeof(ret), /*concretize=*/false)) {
-        log<WARN>()
-            << "Cannot read concrete data from register: " << getName(reg) << "\n";
+        log<WARN>() << "Cannot read concrete data from register: " << getName(reg) << "\n";
     }
     return ret;
 }
@@ -79,8 +78,7 @@ uint64_t Register::readConcrete(Register::X64 reg, bool verbose) {
 bool Register::writeSymbolic(Register::X64 reg, const klee::ref<klee::Expr> &value, bool verbose) {
     bool success = m_ctx.getCurrentState()->regs()->write(getOffset(reg), value);
     if (verbose && !success) {
-        log<WARN>()
-            << "Cannot write symbolic data to register: " << getName(reg) << "\n";
+        log<WARN>() << "Cannot write symbolic data to register: " << getName(reg) << "\n";
     }
     return success;
 }
@@ -88,8 +86,7 @@ bool Register::writeSymbolic(Register::X64 reg, const klee::ref<klee::Expr> &val
 bool Register::writeConcrete(Register::X64 reg, uint64_t value, bool verbose) {
     bool success = m_ctx.getCurrentState()->regs()->write(getOffset(reg), &value, sizeof(value));
     if (verbose && !success) {
-        log<WARN>()
-            << "Cannot write concrete data to register: " << getName(reg) << "\n";
+        log<WARN>() << "Cannot write concrete data to register: " << getName(reg) << "\n";
     }
     return success;
 }

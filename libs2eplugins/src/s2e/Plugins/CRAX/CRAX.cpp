@@ -188,6 +188,12 @@ void CRAX::onExecuteInstructionStart(S2EExecutionState *state,
         return;
     }
 
+    if (s2e()->getConfig()->getBool(getConfigKey() + ".showInstructions", false) &&
+        !m_linuxMonitor->isKernelAddress(pc)) {
+        log<INFO>()
+            << hexval(i->address) << ": " << i->mnemonic << ' ' << i->opStr << '\n';
+    }
+
     if (i->mnemonic == "syscall") {
         onExecuteSyscallStart(state);
     }
@@ -204,12 +210,6 @@ void CRAX::onExecuteInstructionEnd(S2EExecutionState *state,
 
     if (!i) {
         return;
-    }
-
-    if (s2e()->getConfig()->getBool(getConfigKey() + ".showInstructions", false) &&
-        !m_linuxMonitor->isKernelAddress(pc)) {
-        log<INFO>()
-            << hexval(i->address) << ": " << i->mnemonic << ' ' << i->opStr << '\n';
     }
 
     if (i->mnemonic == "syscall") {
@@ -229,6 +229,17 @@ void CRAX::onExecuteSyscallStart(S2EExecutionState *state) {
     uint64_t r8  = reg().readConcrete(Register::X64::R8);
     uint64_t r9  = reg().readConcrete(Register::X64::R9);
 
+    if (s2e()->getConfig()->getBool(getConfigKey() + ".showSyscalls", true)) {
+        log<INFO>()
+            << "syscall: " << hexval(rax) << " ("
+            << hexval(rdi) << ", "
+            << hexval(rsi) << ", "
+            << hexval(rdx) << ", "
+            << hexval(r10) << ", "
+            << hexval(r8) << ", "
+            << hexval(r9) << '\n';
+    }
+
     // Execute syscall hooks installed by the user.
     beforeSyscallHooks.emit(state, rax, rdi, rsi, rdx, r10, r8, r9);
 }
@@ -241,17 +252,6 @@ void CRAX::onExecuteSyscallEnd(S2EExecutionState *state) {
     uint64_t r10 = reg().readConcrete(Register::X64::R10);
     uint64_t r8  = reg().readConcrete(Register::X64::R8);
     uint64_t r9  = reg().readConcrete(Register::X64::R9);
-
-    if (s2e()->getConfig()->getBool(getConfigKey() + ".showSyscalls", true)) {
-        log<INFO>()
-            << "syscall: " << hexval(rax) << " ("
-            << hexval(rdi) << ", "
-            << hexval(rsi) << ", "
-            << hexval(rdx) << ", "
-            << hexval(r10) << ", "
-            << hexval(r8) << ", "
-            << hexval(r9) << '\n';
-    }
 
     // Execute syscall hooks installed by the user.
     afterSyscallHooks.emit(state, rax, rdi, rsi, rdx, r10, r8, r9);

@@ -30,11 +30,16 @@ using namespace klee;
 
 namespace s2e::plugins::crax {
 
+#define CRAX_CONFIG_GET_BOOL(key, defaultValue) \
+    (g_s2e->getConfig()->getBool(getConfigKey() + key, defaultValue))
+
+#define CRAX_CONFIG_GET_STRING(key) \
+    (g_s2e->getConfig()->getString(getConfigKey() + key))
+
 S2E_DEFINE_PLUGIN(CRAX, "Modular Exploit Generation System", "", );
 
 pybind11::scoped_interpreter CRAX::s_pybind11;
 pybind11::module CRAX::s_pwnlib(pybind11::module::import("pwnlib.elf"));
-
 
 CRAX::CRAX(S2E *s2e)
     : Plugin(s2e),
@@ -45,11 +50,13 @@ CRAX::CRAX(S2E *s2e)
       exploitGenerationHooks(),
       m_currentState(),
       m_linuxMonitor(),
+      m_showInstructions(CRAX_CONFIG_GET_BOOL(".showInstructions", false)),
+      m_showSyscalls(CRAX_CONFIG_GET_BOOL(".showSyscalls", true)),
       m_register(*this),
       m_memory(*this),
       m_disassembler(*this),
-      m_exploit(g_s2e->getConfig()->getString(getConfigKey() + ".elfFilename"),
-                g_s2e->getConfig()->getString(getConfigKey() + ".libcFilename")),
+      m_exploit(CRAX_CONFIG_GET_STRING(".elfFilename"),
+                CRAX_CONFIG_GET_STRING(".libcFilename")),
       m_targetProcessPid(),
       m_afterSyscallHooks(),
       m_modules(),
@@ -187,10 +194,8 @@ void CRAX::onExecuteInstructionStart(S2EExecutionState *state,
         return;
     }
 
-    if (s2e()->getConfig()->getBool(getConfigKey() + ".showInstructions", false) &&
-        !m_linuxMonitor->isKernelAddress(pc)) {
-        log<INFO>()
-            << hexval(i->address) << ": " << i->mnemonic << ' ' << i->opStr << '\n';
+    if (m_showInstructions && !m_linuxMonitor->isKernelAddress(pc)) {
+        log<INFO>() << hexval(i->address) << ": " << i->mnemonic << ' ' << i->opStr << '\n';
     }
 
     if (i->mnemonic == "syscall") {
@@ -235,7 +240,7 @@ void CRAX::onExecuteSyscallStart(S2EExecutionState *state) {
     uint64_t r8  = reg().readConcrete(Register::X64::R8);
     uint64_t r9  = reg().readConcrete(Register::X64::R9);
 
-    if (s2e()->getConfig()->getBool(getConfigKey() + ".showSyscalls", true)) {
+    if (m_showSyscalls) {
         log<INFO>()
             << "syscall: " << hexval(rax) << " ("
             << hexval(rdi) << ", "

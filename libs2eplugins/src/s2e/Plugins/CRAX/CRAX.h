@@ -169,6 +169,8 @@ private:
     LinuxMonitor *m_linuxMonitor;
 
     // CRAX's attributes.
+    bool m_showInstructions;
+    bool m_showSyscalls;
     Register m_register;
     Memory m_memory;
     Disassembler m_disassembler;

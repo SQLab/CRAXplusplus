@@ -230,7 +230,7 @@ void CRAX::onExecuteInstructionEnd(S2EExecutionState *state,
 
 void CRAX::onExecuteSyscallStart(S2EExecutionState *state,
                                  uint64_t pc) {
-    SyscallArgs syscall;
+    SyscallCtx syscall;
     syscall.nr = reg().readConcrete(Register::X64::RAX);
     syscall.ret = 0;
     syscall.arg1 = reg().readConcrete(Register::X64::RDI);
@@ -263,7 +263,7 @@ void CRAX::onExecuteSyscallStart(S2EExecutionState *state,
 void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,
                                uint64_t pc,
                                uint64_t nr) {
-    SyscallArgs syscall;
+    SyscallCtx syscall;
     syscall.nr = nr;
     syscall.ret = reg().readConcrete(Register::X64::RAX);
     syscall.arg1 = reg().readConcrete(Register::X64::RDI);

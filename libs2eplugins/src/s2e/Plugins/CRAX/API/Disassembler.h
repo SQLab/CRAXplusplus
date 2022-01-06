@@ -36,7 +36,7 @@ struct Instruction {
     std::string opStr;
 };
 
-struct SyscallArgs {
+struct SyscallCtx {
     uint64_t nr;
     uint64_t ret;
     uint64_t arg1;

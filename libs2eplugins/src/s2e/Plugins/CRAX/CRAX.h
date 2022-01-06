@@ -95,12 +95,12 @@ public:
 
     sigc::signal<void,
                  S2EExecutionState*,
-                 const SyscallArgs&>
+                 const SyscallCtx&>
         beforeSyscallHooks;
 
     sigc::signal<void,
                  S2EExecutionState*,
-                 const SyscallArgs&>
+                 const SyscallCtx&>
         afterSyscallHooks;
 
     sigc::signal<void>

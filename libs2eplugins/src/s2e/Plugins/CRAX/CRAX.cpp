@@ -22,13 +22,7 @@
 #include <s2e/ConfigFile.h>
 #include <s2e/Plugins/OSMonitors/Support/ProcessExecutionDetector.h>
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
-#include <s2e/Plugins/CRAX/Modules/RopChainBuilder.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
-
-#include <fstream>
-#include <string>
-#include <vector>
-#include <memory>
 
 #include "CRAX.h"
 
@@ -57,6 +51,7 @@ CRAX::CRAX(S2E *s2e)
       m_exploit(g_s2e->getConfig()->getString(getConfigKey() + ".elfFilename"),
                 g_s2e->getConfig()->getString(getConfigKey() + ".libcFilename")),
       m_targetProcessPid(),
+      m_afterSyscallHooks(),
       m_modules(),
       m_readPrimitives(),
       m_writePrimitives() {}
@@ -158,24 +153,28 @@ void CRAX::onTranslateInstructionStart(ExecutionSignal *onInstructionExecute,
                                        S2EExecutionState *state,
                                        TranslationBlock *tb,
                                        uint64_t pc) {
-    if (!m_linuxMonitor->isKernelAddress(pc)) {
-        // Register the instruction hook which
-        // will be called before the instruction is executed.
-        onInstructionExecute->connect(
-                sigc::mem_fun(*this, &CRAX::onExecuteInstructionStart));
+    if (m_linuxMonitor->isKernelAddress(pc)) {
+        return;
     }
+
+    // Register the instruction hook which will be called
+    // before the instruction is executed.
+    onInstructionExecute->connect(
+            sigc::mem_fun(*this, &CRAX::onExecuteInstructionStart));
 }
 
 void CRAX::onTranslateInstructionEnd(ExecutionSignal *onInstructionExecute,
                                      S2EExecutionState *state,
                                      TranslationBlock *tb,
                                      uint64_t pc) {
-    if (!m_linuxMonitor->isKernelAddress(pc)) {
-        // Register the instruction hook which
-        // will be called after the instruction is executed.
-        onInstructionExecute->connect(
-                sigc::mem_fun(*this, &CRAX::onExecuteInstructionEnd));
+    if (m_linuxMonitor->isKernelAddress(pc)) {
+        return;
     }
+
+    // Register the instruction hook which will be called
+    // after the instruction is executed.
+    onInstructionExecute->connect(
+            sigc::mem_fun(*this, &CRAX::onExecuteInstructionEnd));
 }
 
 void CRAX::onExecuteInstructionStart(S2EExecutionState *state,
@@ -196,6 +195,17 @@ void CRAX::onExecuteInstructionStart(S2EExecutionState *state,
 
     if (i->mnemonic == "syscall") {
         onExecuteSyscallStart(state);
+
+        // Schedule the syscall hook to be called
+        // after the instruction at `pc + 2` is executed,
+        // where pc == state->regs()->getPc().
+        m_afterSyscallHooks.insert(pc + 2);
+    }
+
+    if (m_afterSyscallHooks.size() &&
+        m_afterSyscallHooks.find(pc) != m_afterSyscallHooks.end()) {
+        m_afterSyscallHooks.erase(pc);
+        onExecuteSyscallEnd(state);
     }
 
     // Execute instruction hooks installed by the user.
@@ -210,10 +220,6 @@ void CRAX::onExecuteInstructionEnd(S2EExecutionState *state,
 
     if (!i) {
         return;
-    }
-
-    if (i->mnemonic == "syscall") {
-        onExecuteSyscallEnd(state);
     }
 
     // Execute instruction hooks installed by the user.

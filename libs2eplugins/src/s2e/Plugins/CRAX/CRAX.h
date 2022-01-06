@@ -37,6 +37,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_set>
 
 namespace s2e::plugins::crax {
 
@@ -173,6 +174,7 @@ private:
     Disassembler m_disassembler;
     Exploit m_exploit;
     uint64_t m_targetProcessPid;
+    std::unordered_set<uint64_t> m_afterSyscallHooks;
 
     // Exploitation-specific attributes.
     std::vector<std::unique_ptr<Module>> m_modules;

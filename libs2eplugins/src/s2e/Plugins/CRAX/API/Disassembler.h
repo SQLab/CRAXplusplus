@@ -24,6 +24,7 @@
 #include <s2e/S2E.h>
 #include <s2e/S2EExecutionState.h>
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -37,14 +38,15 @@ struct Instruction {
 };
 
 struct SyscallCtx {
-    uint64_t nr;
     uint64_t ret;
+    uint64_t nr;
     uint64_t arg1;
     uint64_t arg2;
     uint64_t arg3;
     uint64_t arg4;
     uint64_t arg5;
     uint64_t arg6;
+    std::shared_ptr<void> userData;
 };
 
 

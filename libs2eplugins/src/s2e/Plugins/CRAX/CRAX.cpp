@@ -231,14 +231,15 @@ void CRAX::onExecuteInstructionEnd(S2EExecutionState *state,
 void CRAX::onExecuteSyscallStart(S2EExecutionState *state,
                                  uint64_t pc) {
     SyscallCtx syscall;
-    syscall.nr = reg().readConcrete(Register::X64::RAX);
     syscall.ret = 0;
+    syscall.nr = reg().readConcrete(Register::X64::RAX);
     syscall.arg1 = reg().readConcrete(Register::X64::RDI);
     syscall.arg2 = reg().readConcrete(Register::X64::RSI);
     syscall.arg3 = reg().readConcrete(Register::X64::RDX);
     syscall.arg4 = reg().readConcrete(Register::X64::R10);
     syscall.arg5 = reg().readConcrete(Register::X64::R8);
     syscall.arg6 = reg().readConcrete(Register::X64::R9);
+    syscall.userData = nullptr;
 
     if (m_showSyscalls) {
         log<INFO>()
@@ -254,7 +255,7 @@ void CRAX::onExecuteSyscallStart(S2EExecutionState *state,
     // Schedule the syscall hook to be called
     // after the instruction at `pc + 2` is executed.
     // Note: pc == state->regs()->getPc().
-    m_scheduledAfterSyscallHooks.insert({pc + 2, syscall.nr});
+    m_scheduledAfterSyscallHooks.insert({pc + 2, syscall});
 
     // Execute syscall hooks installed by the user.
     beforeSyscallHooks.emit(state, syscall);
@@ -262,16 +263,8 @@ void CRAX::onExecuteSyscallStart(S2EExecutionState *state,
 
 void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,
                                uint64_t pc,
-                               uint64_t nr) {
-    SyscallCtx syscall;
-    syscall.nr = nr;
+                               SyscallCtx &syscall) {
     syscall.ret = reg().readConcrete(Register::X64::RAX);
-    syscall.arg1 = reg().readConcrete(Register::X64::RDI);
-    syscall.arg2 = reg().readConcrete(Register::X64::RSI);
-    syscall.arg3 = reg().readConcrete(Register::X64::RDX);
-    syscall.arg4 = reg().readConcrete(Register::X64::R10);
-    syscall.arg5 = reg().readConcrete(Register::X64::R8);
-    syscall.arg6 = reg().readConcrete(Register::X64::R9);
 
     // Execute syscall hooks installed by the user.
     afterSyscallHooks.emit(state, syscall);

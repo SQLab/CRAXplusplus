@@ -95,7 +95,7 @@ public:
 
     sigc::signal<void,
                  S2EExecutionState*,
-                 const SyscallCtx&>
+                 SyscallCtx&>
         beforeSyscallHooks;
 
     sigc::signal<void,
@@ -152,7 +152,7 @@ private:
 
     void onExecuteSyscallEnd(S2EExecutionState *state,
                              uint64_t pc,
-                             uint64_t nr);
+                             SyscallCtx &syscall);
 
 
     // S2E
@@ -167,12 +167,7 @@ private:
     Disassembler m_disassembler;
     Exploit m_exploit;
     uint64_t m_targetProcessPid;
-
-    // clang-format off
-    std::map<uint64_t /* pc */,
-             uint64_t /* syscall.nr */>
-        m_scheduledAfterSyscallHooks;
-    // clang-format on
+    std::map<uint64_t /* pc */, SyscallCtx> m_scheduledAfterSyscallHooks;
 
     // Exploitation-specific attributes.
     std::vector<std::unique_ptr<Module>> m_modules;

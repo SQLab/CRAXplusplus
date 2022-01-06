@@ -166,8 +166,9 @@ private:
     Memory m_memory;
     Disassembler m_disassembler;
     Exploit m_exploit;
+
     uint64_t m_targetProcessPid;
-    std::map<uint64_t /* pc */, SyscallCtx> m_scheduledAfterSyscallHooks;
+    std::map<uint64_t, SyscallCtx> m_scheduledAfterSyscallHooks;  // <pc, SyscallCtx>
 
     // Exploitation-specific attributes.
     std::vector<std::unique_ptr<Module>> m_modules;

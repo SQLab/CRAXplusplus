@@ -36,6 +36,17 @@ struct Instruction {
     std::string opStr;
 };
 
+struct SyscallArgs {
+    uint64_t nr;
+    uint64_t ret;
+    uint64_t arg1;
+    uint64_t arg2;
+    uint64_t arg3;
+    uint64_t arg4;
+    uint64_t arg5;
+    uint64_t arg6;
+};
+
 
 // Forward declaration
 class CRAX;

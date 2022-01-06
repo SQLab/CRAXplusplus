@@ -35,9 +35,9 @@
 
 #include <pybind11/embed.h>
 
+#include <map>
 #include <memory>
 #include <string>
-#include <unordered_set>
 
 namespace s2e::plugins::crax {
 
@@ -95,24 +95,12 @@ public:
 
     sigc::signal<void,
                  S2EExecutionState*,
-                 uint64_t /* rax */,
-                 uint64_t /* rdi */,
-                 uint64_t /* rsi */,
-                 uint64_t /* rdx */,
-                 uint64_t /* r10 */,
-                 uint64_t /* r8 */,
-                 uint64_t /* r9 */>
+                 const SyscallArgs&>
         beforeSyscallHooks;
 
     sigc::signal<void,
                  S2EExecutionState*,
-                 uint64_t /* rax */,
-                 uint64_t /* rdi */,
-                 uint64_t /* rsi */,
-                 uint64_t /* rdx */,
-                 uint64_t /* r10 */,
-                 uint64_t /* r8 */,
-                 uint64_t /* r9 */>
+                 const SyscallArgs&>
         afterSyscallHooks;
 
     sigc::signal<void>
@@ -159,9 +147,12 @@ private:
     void onExecuteInstructionEnd(S2EExecutionState *state,
                                  uint64_t pc);
 
-    void onExecuteSyscallStart(S2EExecutionState *state);
+    void onExecuteSyscallStart(S2EExecutionState *state,
+                               uint64_t pc);
 
-    void onExecuteSyscallEnd(S2EExecutionState *state);
+    void onExecuteSyscallEnd(S2EExecutionState *state,
+                             uint64_t pc,
+                             uint64_t nr);
 
 
     // S2E
@@ -176,7 +167,12 @@ private:
     Disassembler m_disassembler;
     Exploit m_exploit;
     uint64_t m_targetProcessPid;
-    std::unordered_set<uint64_t> m_afterSyscallHooks;
+
+    // clang-format off
+    std::map<uint64_t /* pc */,
+             uint64_t /* syscall.nr */>
+        m_scheduledAfterSyscallHooks;
+    // clang-format on
 
     // Exploitation-specific attributes.
     std::vector<std::unique_ptr<Module>> m_modules;

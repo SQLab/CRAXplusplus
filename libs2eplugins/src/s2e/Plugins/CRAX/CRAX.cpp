@@ -58,7 +58,7 @@ CRAX::CRAX(S2E *s2e)
       m_exploit(CRAX_CONFIG_GET_STRING(".elfFilename"),
                 CRAX_CONFIG_GET_STRING(".libcFilename")),
       m_targetProcessPid(),
-      m_afterSyscallHooks(),
+      m_scheduledAfterSyscallHooks(),
       m_modules(),
       m_readPrimitives(),
       m_writePrimitives() {}
@@ -199,18 +199,15 @@ void CRAX::onExecuteInstructionStart(S2EExecutionState *state,
     }
 
     if (i->mnemonic == "syscall") {
-        onExecuteSyscallStart(state);
-
-        // Schedule the syscall hook to be called
-        // after the instruction at `pc + 2` is executed,
-        // where pc == state->regs()->getPc().
-        m_afterSyscallHooks.insert(pc + 2);
+        onExecuteSyscallStart(state, pc);
     }
 
-    if (m_afterSyscallHooks.size() &&
-        m_afterSyscallHooks.find(pc) != m_afterSyscallHooks.end()) {
-        m_afterSyscallHooks.erase(pc);
-        onExecuteSyscallEnd(state);
+    if (m_scheduledAfterSyscallHooks.size()) {
+        auto it = m_scheduledAfterSyscallHooks.find(pc);
+        if (it != m_scheduledAfterSyscallHooks.end()) {
+            onExecuteSyscallEnd(state, pc, it->second);
+            m_scheduledAfterSyscallHooks.erase(pc);
+        }
     }
 
     // Execute instruction hooks installed by the user.
@@ -231,41 +228,53 @@ void CRAX::onExecuteInstructionEnd(S2EExecutionState *state,
     afterInstructionHooks.emit(state, *i);
 }
 
-void CRAX::onExecuteSyscallStart(S2EExecutionState *state) {
-    uint64_t rax = reg().readConcrete(Register::X64::RAX);
-    uint64_t rdi = reg().readConcrete(Register::X64::RDI);
-    uint64_t rsi = reg().readConcrete(Register::X64::RSI);
-    uint64_t rdx = reg().readConcrete(Register::X64::RDX);
-    uint64_t r10 = reg().readConcrete(Register::X64::R10);
-    uint64_t r8  = reg().readConcrete(Register::X64::R8);
-    uint64_t r9  = reg().readConcrete(Register::X64::R9);
+void CRAX::onExecuteSyscallStart(S2EExecutionState *state,
+                                 uint64_t pc) {
+    SyscallArgs syscall;
+    syscall.nr = reg().readConcrete(Register::X64::RAX);
+    syscall.ret = 0;
+    syscall.arg1 = reg().readConcrete(Register::X64::RDI);
+    syscall.arg2 = reg().readConcrete(Register::X64::RSI);
+    syscall.arg3 = reg().readConcrete(Register::X64::RDX);
+    syscall.arg4 = reg().readConcrete(Register::X64::R10);
+    syscall.arg5 = reg().readConcrete(Register::X64::R8);
+    syscall.arg6 = reg().readConcrete(Register::X64::R9);
 
     if (m_showSyscalls) {
         log<INFO>()
-            << "syscall: " << hexval(rax) << " ("
-            << hexval(rdi) << ", "
-            << hexval(rsi) << ", "
-            << hexval(rdx) << ", "
-            << hexval(r10) << ", "
-            << hexval(r8) << ", "
-            << hexval(r9) << '\n';
+            << "syscall: " << hexval(syscall.nr) << " ("
+            << hexval(syscall.arg1) << ", "
+            << hexval(syscall.arg2) << ", "
+            << hexval(syscall.arg3) << ", "
+            << hexval(syscall.arg4) << ", "
+            << hexval(syscall.arg5) << ", "
+            << hexval(syscall.arg6) << '\n';
     }
 
+    // Schedule the syscall hook to be called
+    // after the instruction at `pc + 2` is executed.
+    // Note: pc == state->regs()->getPc().
+    m_scheduledAfterSyscallHooks.insert({pc + 2, syscall.nr});
+
     // Execute syscall hooks installed by the user.
-    beforeSyscallHooks.emit(state, rax, rdi, rsi, rdx, r10, r8, r9);
+    beforeSyscallHooks.emit(state, syscall);
 }
 
-void CRAX::onExecuteSyscallEnd(S2EExecutionState *state) {
-    uint64_t rax = reg().readConcrete(Register::X64::RAX);
-    uint64_t rdi = reg().readConcrete(Register::X64::RDI);
-    uint64_t rsi = reg().readConcrete(Register::X64::RSI);
-    uint64_t rdx = reg().readConcrete(Register::X64::RDX);
-    uint64_t r10 = reg().readConcrete(Register::X64::R10);
-    uint64_t r8  = reg().readConcrete(Register::X64::R8);
-    uint64_t r9  = reg().readConcrete(Register::X64::R9);
+void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,
+                               uint64_t pc,
+                               uint64_t nr) {
+    SyscallArgs syscall;
+    syscall.nr = nr;
+    syscall.ret = reg().readConcrete(Register::X64::RAX);
+    syscall.arg1 = reg().readConcrete(Register::X64::RDI);
+    syscall.arg2 = reg().readConcrete(Register::X64::RSI);
+    syscall.arg3 = reg().readConcrete(Register::X64::RDX);
+    syscall.arg4 = reg().readConcrete(Register::X64::R10);
+    syscall.arg5 = reg().readConcrete(Register::X64::R8);
+    syscall.arg6 = reg().readConcrete(Register::X64::R9);
 
     // Execute syscall hooks installed by the user.
-    afterSyscallHooks.emit(state, rax, rdi, rsi, rdx, r10, r8, r9);
+    afterSyscallHooks.emit(state, syscall);
 }
 
 }  // namespace s2e::plugins::crax

@@ -255,10 +255,11 @@ void CRAX::onExecuteSyscallStart(S2EExecutionState *state,
     // Schedule the syscall hook to be called
     // after the instruction at `pc + 2` is executed.
     // Note: pc == state->regs()->getPc().
-    m_scheduledAfterSyscallHooks.insert({pc + 2, syscall});
+    auto ret = m_scheduledAfterSyscallHooks.insert({pc + 2, syscall});
+    auto it = ret.first;
 
     // Execute syscall hooks installed by the user.
-    beforeSyscallHooks.emit(state, syscall);
+    beforeSyscallHooks.emit(state, it->second);
 }
 
 void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,

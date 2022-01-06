@@ -26,8 +26,12 @@
 #include <s2e/Plugins/CRAX/Modules/Module.h>
 
 #include <array>
+#include <memory>
+#include <map>
+#include <queue>
 #include <string>
 #include <vector>
+#include <utility>
 
 namespace s2e::plugins::crax {
 
@@ -48,7 +52,27 @@ public:
         LAST
     };
 
-    struct LeakInfo {
+
+    struct StateInfo {
+        virtual ~StateInfo() = default;
+        uint64_t stateID;
+    };
+
+    struct InputStateInfo : public StateInfo {
+        InputStateInfo(std::vector<uint8_t> buf, uint8_t offset)
+            : buf(std::move(buf)),
+              offset(offset) {}
+
+        std::vector<uint8_t> buf;
+        uint8_t offset;
+    };
+
+    struct LeakInfo : public StateInfo {
+        //LeakInfo(uint64_t bufIndex, uint64_t offset, LeakType leakType)
+        //    : bufIndex(bufIndex),
+        //      offset(offset),
+        //      leakType(leakType) {}
+
         uint64_t bufIndex;
         uint64_t offset;
         LeakType leakType;
@@ -64,22 +88,13 @@ public:
 
 
     void inputStateHook(S2EExecutionState *inputState,
-                        uint64_t nr_syscall,
-                        uint64_t arg1,
-                        uint64_t arg2,
-                        uint64_t arg3,
-                        uint64_t arg4,
-                        uint64_t arg5,
-                        uint64_t arg6);
+                        SyscallCtx &syscall);
+
+    void inputStateHook2(S2EExecutionState *inputState,
+                         const SyscallCtx &syscall);
 
     void outputStateHook(S2EExecutionState *outputState,
-                         uint64_t nr_syscall,
-                         uint64_t arg1,
-                         uint64_t arg2,
-                         uint64_t arg3,
-                         uint64_t arg4,
-                         uint64_t arg5,
-                         uint64_t arg6);
+                         const SyscallCtx &syscall);
 
 
     void maybeInterceptStackCanary(S2EExecutionState *state,
@@ -99,13 +114,16 @@ public:
     std::vector<IOStates::LeakInfo>
     detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len);
 
+    const std::vector<std::unique_ptr<StateInfo>> &getStateInfoList() const { return m_stateInfoList; }
+
 
     static const std::array<std::string, LeakType::LAST> s_leakTypes;
 
 private:
     LeakType getLeakType(const std::string &image) const;
 
-    sigc::connection m_canaryHookConnection;
+    std::queue<LeakType> m_leakQueue;
+    std::vector<std::unique_ptr<StateInfo>> m_stateInfoList;
 };
 
 }  // namespace s2e::plugins::crax

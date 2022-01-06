@@ -206,7 +206,8 @@ void CRAX::onExecuteInstructionStart(S2EExecutionState *state,
         auto it = m_scheduledAfterSyscallHooks.find(pc);
         if (it != m_scheduledAfterSyscallHooks.end()) {
             onExecuteSyscallEnd(state, pc, it->second);
-            m_scheduledAfterSyscallHooks.erase(pc);
+            log<WARN>() << "Removing SyscallCtx for " << hexval(pc) << '\n';
+            //m_scheduledAfterSyscallHooks.erase(pc);
         }
     }
 

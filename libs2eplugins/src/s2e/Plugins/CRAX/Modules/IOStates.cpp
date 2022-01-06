@@ -33,18 +33,33 @@ const std::array<std::string, IOStates::LeakType::LAST> IOStates::s_leakTypes = 
 
 IOStates::IOStates(CRAX &ctx)
     : Module(ctx),
-      m_canaryHookConnection() {
+      m_leakQueue(),
+      m_stateInfoList() {
     // Install input state syscall hook.
     ctx.beforeSyscallHooks.connect(
             sigc::mem_fun(*this, &IOStates::inputStateHook));
+
+    ctx.afterSyscallHooks.connect(
+            sigc::mem_fun(*this, &IOStates::inputStateHook2));
 
     // Install output state syscall hook.
     ctx.afterSyscallHooks.connect(
             sigc::mem_fun(*this, &IOStates::outputStateHook));
 
+    // Determine which base address(es) must be leaked
+    // according to checksec of the target binary.
+    const auto &checksec = m_ctx.getExploit().getElf().getChecksec();
+    if (checksec.hasCanary) {
+        m_leakQueue.push(IOStates::LeakType::CANARY);
+    }
+    if (checksec.hasPIE) {
+        m_leakQueue.push(IOStates::LeakType::CODE);
+    }
+    // XXX: ASLR -> libc
+
     // If stack canary is enabled, install a hook to intercept canary values.
-    if (m_ctx.getExploit().getElf().getChecksec().hasCanary) {
-        m_canaryHookConnection = ctx.afterInstructionHooks.connect(
+    if (checksec.hasCanary) {
+        ctx.afterInstructionHooks.connect(
                 sigc::mem_fun(*this, &IOStates::maybeInterceptStackCanary));
 
         ctx.beforeInstructionHooks.connect(
@@ -54,19 +69,13 @@ IOStates::IOStates(CRAX &ctx)
 
 
 void IOStates::inputStateHook(S2EExecutionState *inputState,
-                              uint64_t nr_syscall,
-                              uint64_t arg1,
-                              uint64_t arg2,
-                              uint64_t arg3,
-                              uint64_t arg4,
-                              uint64_t arg5,
-                              uint64_t arg6) {
-    if (nr_syscall != 0 || arg1 != STDIN_FILENO) {
+                              SyscallCtx &syscall) {
+    if (syscall.nr != 0 || syscall.arg1 != STDIN_FILENO) {
         return;
     }
 
     m_ctx.setCurrentState(inputState);
-    auto bufInfo = analyzeLeak(inputState, arg2, arg3);
+    auto bufInfo = analyzeLeak(inputState, syscall.arg2, syscall.arg3);
 
     auto &os = log<WARN>();
     os << " ---------- Analyzing input state ----------\n";
@@ -78,54 +87,93 @@ void IOStates::inputStateHook(S2EExecutionState *inputState,
         os << '\n';
     }
 
-    for (uint64_t offset : bufInfo[IOStates::LeakType::CANARY]) {
-        // Create input state snapshot.
-        if (inputState->needToJumpToSymbolic()) {
-            inputState->jumpToSymbolic();
-        }
 
-        S2EExecutor::StatePair sp = m_ctx.s2e()->getExecutor()->fork(*inputState);
-        auto forkedState = dynamic_cast<S2EExecutionState *>(sp.second);
+    // Now we assume that the first offset can help us
+    // successfully leak the address we want.
+    IOStates::LeakType currentLeakType = m_leakQueue.front();
 
-        log<WARN>()
-            << "forked output state for leak detection (id="
-            << forkedState->getID() << ")\n";
-
-        // Hijack sys_read(0, buf, len), setting len to `value`.
-        // Since the forked state is currently in symbolic mode,
-        // we have to write a klee::ConstantExpr instead of uint64_t.
-        ref<Expr> value = ConstantExpr::create(offset + 1, Expr::Int64);
-        forkedState->regs()->write(CPU_OFFSET(regs[Register::X64::RDX]), value);
+    if (bufInfo[currentLeakType].empty()) {
+        log<WARN>() << "No leak targets\n";
+        return;
     }
+
+    // Create input state snapshot.
+    if (inputState->needToJumpToSymbolic()) {
+        inputState->jumpToSymbolic();
+    }
+
+    S2EExecutor::StatePair sp = m_ctx.s2e()->getExecutor()->fork(*inputState);
+    auto forkedState = dynamic_cast<S2EExecutionState *>(sp.second);
+
+    log<WARN>()
+        << "forked output state for leak detection (id="
+        << forkedState->getID() << ")\n";
+
+    // Hijack sys_read(0, buf, len), setting len to `value`.
+    // Since the forked state is currently in symbolic mode,
+    // we have to write a klee::ConstantExpr instead of uint64_t.
+    uint64_t offset = bufInfo[currentLeakType].front();
+    if (currentLeakType == IOStates::LeakType::CANARY) {
+        offset++;
+    }
+    ref<Expr> value = ConstantExpr::create(offset, Expr::Int64);
+    forkedState->regs()->write(CPU_OFFSET(regs[Register::X64::RDX]), value);
+
+    syscall.userData = std::make_shared<uint64_t>(offset);
+}
+
+void IOStates::inputStateHook2(S2EExecutionState *inputState,
+                               const SyscallCtx &syscall) {
+    if (syscall.nr != 0 || syscall.arg1 != STDIN_FILENO) {
+        return;
+    }
+
+    m_ctx.setCurrentState(inputState);
+
+    //log<WARN>() << "sys_read() read " << syscall.ret << " bytes.\n";
+
+    std::vector<uint8_t> buf
+        = m_ctx.mem().readConcrete(syscall.arg2, 0x30, /*concretize=*/false);
+
+    /*
+    auto &os = log<WARN>();
+    for (auto __byte : buf) {
+        os << klee::hexval(__byte) << ' ';
+    }
+    os << '\n';
+    */
+
+    assert(syscall.userData && "syscall.userData == nullptr");
+    uint64_t offset = *std::static_pointer_cast<uint64_t>(syscall.userData);
+    auto stateInfo = std::make_unique<InputStateInfo>(buf, offset);
+    stateInfo->stateID = inputState->getID();
+    m_stateInfoList.push_back(std::move(stateInfo));
 }
 
 void IOStates::outputStateHook(S2EExecutionState *outputState,
-                               uint64_t nr_syscall,
-                               uint64_t arg1,
-                               uint64_t arg2,
-                               uint64_t arg3,
-                               uint64_t arg4,
-                               uint64_t arg5,
-                               uint64_t arg6) {
-    if (nr_syscall != 1 || arg1 != STDOUT_FILENO) {
+                               const SyscallCtx &syscall) {
+    if (syscall.nr != 1 || syscall.arg1 != STDOUT_FILENO) {
         return;
     }
 
     m_ctx.setCurrentState(outputState);
-    auto leakInfo = detectLeak(outputState, arg2, arg3);
+    auto leakInfoList = detectLeak(outputState, syscall.arg2, syscall.arg3);
+    auto leakInfo = std::make_unique<LeakInfo>();
+    leakInfo->stateID = outputState->getID();
 
-    auto &os = log<WARN>();
-    os << "---------- Analyzing output state ----------\n";
-    for (const auto &entry : leakInfo) {
-        os << '(' << IOStates::s_leakTypes[entry.leakType]
-            << ", " << klee::hexval(entry.bufIndex)
-            << ", " << klee::hexval(entry.offset) << ")\n";
+    if (leakInfoList.size()) {
+        leakInfo->bufIndex = leakInfoList.back().bufIndex;
+        leakInfo->offset = leakInfoList.back().offset;
+        leakInfo->leakType = leakInfoList.back().leakType;
 
-        if (entry.leakType == IOStates::LeakType::CANARY) {
-            log<WARN>() << "[** WARN **] canary leaked!\n";
-            m_ctx.getExploit().setCanaryLeakOffset(entry.bufIndex + 1);
-        }
+        log<WARN>()
+            << "*** WARN *** detected leak: ("
+            << IOStates::s_leakTypes[leakInfo->leakType] << ", "
+            << klee::hexval(leakInfo->bufIndex) << ", "
+            << klee::hexval(leakInfo->offset) << ")\n";
     }
+
+    m_stateInfoList.push_back(std::move(leakInfo));
 }
 
 
@@ -141,7 +189,6 @@ void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
         i.mnemonic == "mov" && i.opStr == "rax, qword ptr fs:[0x28]") {
         uint64_t canary = m_ctx.reg().readConcrete(Register::X64::RAX);
         m_ctx.getExploit().getElf().setCanary(canary);
-        m_canaryHookConnection.disconnect();
         log<WARN>() << "Intercepted canary: " << klee::hexval(canary) << '\n';
     }
 }
@@ -188,12 +235,20 @@ IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len)
     for (uint64_t i = 0; i < len; i += 8) {
         uint64_t value = u64(m_ctx.mem().readConcrete(buf + i, 8, /*concretize=*/false));
         // log<WARN>() << "addr = " << klee::hexval(buf + i) << " value = " << klee::hexval(value) << '\n';
+        IOStates::LeakInfo info;
+
         if (m_ctx.getExploit().getElf().getChecksec().hasCanary && (value & ~0xff) == canary) {
-            leakInfo.push_back({i, 0, LeakType::CANARY});
+            info.bufIndex = i;
+            info.offset = 0;
+            info.leakType = LeakType::CANARY;
+            leakInfo.push_back(info);
         } else {
             for (const auto &region : mapInfo) {
                 if (value >= region.start && value <= region.end) {
-                    leakInfo.push_back({i, value - region.start, getLeakType(region.image)});
+                    info.bufIndex = i;
+                    info.offset = value - region.start;
+                    info.leakType = getLeakType(region.image);
+                    leakInfo.push_back(info);
                 }
             }
         }

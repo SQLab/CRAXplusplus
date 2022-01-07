@@ -33,14 +33,13 @@ const std::array<std::string, IOStates::LeakType::LAST> IOStates::s_leakTypes = 
 
 IOStates::IOStates(CRAX &ctx)
     : Module(ctx),
-      m_leakQueue(),
-      m_stateInfoList() {
+      m_leakQueue() {
     // Install input state syscall hook.
     ctx.beforeSyscallHooks.connect(
-            sigc::mem_fun(*this, &IOStates::inputStateHook));
+            sigc::mem_fun(*this, &IOStates::inputStateHookTopHalf));
 
     ctx.afterSyscallHooks.connect(
-            sigc::mem_fun(*this, &IOStates::inputStateHook2));
+            sigc::mem_fun(*this, &IOStates::inputStateHookBottomHalf));
 
     // Install output state syscall hook.
     ctx.afterSyscallHooks.connect(
@@ -68,8 +67,8 @@ IOStates::IOStates(CRAX &ctx)
 }
 
 
-void IOStates::inputStateHook(S2EExecutionState *inputState,
-                              SyscallCtx &syscall) {
+void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
+                                     SyscallCtx &syscall) {
     if (syscall.nr != 0 || syscall.arg1 != STDIN_FILENO) {
         return;
     }
@@ -122,8 +121,8 @@ void IOStates::inputStateHook(S2EExecutionState *inputState,
     syscall.userData = std::make_shared<uint64_t>(offset);
 }
 
-void IOStates::inputStateHook2(S2EExecutionState *inputState,
-                               const SyscallCtx &syscall) {
+void IOStates::inputStateHookBottomHalf(S2EExecutionState *inputState,
+                                        const SyscallCtx &syscall) {
     if (syscall.nr != 0 || syscall.arg1 != STDIN_FILENO) {
         return;
     }
@@ -144,10 +143,14 @@ void IOStates::inputStateHook2(S2EExecutionState *inputState,
     */
 
     assert(syscall.userData && "syscall.userData == nullptr");
-    uint64_t offset = *std::static_pointer_cast<uint64_t>(syscall.userData);
-    auto stateInfo = std::make_unique<InputStateInfo>(buf, offset);
-    stateInfo->stateID = inputState->getID();
-    m_stateInfoList.push_back(std::move(stateInfo));
+
+    InputStateInfo stateInfo;
+    stateInfo.buf = std::move(buf);
+    stateInfo.offset = *std::static_pointer_cast<uint64_t>(syscall.userData);
+
+    DECLARE_PLUGINSTATE_P((&m_ctx), CRAXState, inputState);
+    DECLARE_MODULESTATE(IOStatesState, plgState);
+    modState->stateInfoList.push_back(std::move(stateInfo));
 }
 
 void IOStates::outputStateHook(S2EExecutionState *outputState,
@@ -157,23 +160,24 @@ void IOStates::outputStateHook(S2EExecutionState *outputState,
     }
 
     m_ctx.setCurrentState(outputState);
-    auto leakInfoList = detectLeak(outputState, syscall.arg2, syscall.arg3);
-    auto leakInfo = std::make_unique<LeakInfo>();
-    leakInfo->stateID = outputState->getID();
+    auto outputStateInfoList = detectLeak(outputState, syscall.arg2, syscall.arg3);
+    OutputStateInfo stateInfo;
 
-    if (leakInfoList.size()) {
-        leakInfo->bufIndex = leakInfoList.back().bufIndex;
-        leakInfo->offset = leakInfoList.back().offset;
-        leakInfo->leakType = leakInfoList.back().leakType;
+    if (outputStateInfoList.size()) {
+        stateInfo.bufIndex = outputStateInfoList.back().bufIndex;
+        stateInfo.offset = outputStateInfoList.back().offset;
+        stateInfo.leakType = outputStateInfoList.back().leakType;
 
         log<WARN>()
             << "*** WARN *** detected leak: ("
-            << IOStates::s_leakTypes[leakInfo->leakType] << ", "
-            << klee::hexval(leakInfo->bufIndex) << ", "
-            << klee::hexval(leakInfo->offset) << ")\n";
+            << IOStates::s_leakTypes[stateInfo.leakType] << ", "
+            << klee::hexval(stateInfo.bufIndex) << ", "
+            << klee::hexval(stateInfo.offset) << ")\n";
     }
 
-    m_stateInfoList.push_back(std::move(leakInfo));
+    DECLARE_PLUGINSTATE_P((&m_ctx), CRAXState, outputState);
+    DECLARE_MODULESTATE(IOStatesState, plgState);
+    modState->stateInfoList.push_back(std::move(stateInfo));
 }
 
 
@@ -226,16 +230,16 @@ IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len)
     return bufInfo;
 }
 
-std::vector<IOStates::LeakInfo>
+std::vector<IOStates::OutputStateInfo>
 IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len) {
     auto mapInfo = m_ctx.mem().getMapInfo(m_ctx.getTargetProcessPid());
     uint64_t canary = m_ctx.getExploit().getElf().getCanary();
-    std::vector<IOStates::LeakInfo> leakInfo;
+    std::vector<IOStates::OutputStateInfo> leakInfo;
 
     for (uint64_t i = 0; i < len; i += 8) {
         uint64_t value = u64(m_ctx.mem().readConcrete(buf + i, 8, /*concretize=*/false));
-        // log<WARN>() << "addr = " << klee::hexval(buf + i) << " value = " << klee::hexval(value) << '\n';
-        IOStates::LeakInfo info;
+        //log<WARN>() << "addr = " << klee::hexval(buf + i) << " value = " << klee::hexval(value) << '\n';
+        IOStates::OutputStateInfo info;
 
         if (m_ctx.getExploit().getElf().getChecksec().hasCanary && (value & ~0xff) == canary) {
             info.bufIndex = i;

@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <s2e/Plugins/CRAX/CRAX.h>
 #include <s2e/Plugins/CRAX/Modules/ExploitGenerator.h>
 #include <s2e/Plugins/CRAX/Modules/RopChainBuilder.h>
 #include <s2e/Plugins/CRAX/Modules/IOStates.h>
@@ -30,6 +31,10 @@ namespace s2e::plugins::crax {
 
 std::map<std::string, Module *> Module::s_mapper;
 
+
+ModuleState *Module::getModuleState(CRAXState *s, ModuleStateFactory f) const {
+    return s->getModuleState(const_cast<Module *>(this), f);
+}
 
 std::unique_ptr<Module> Module::create(CRAX &ctx, const std::string &name) {
     std::unique_ptr<Module> ret;

@@ -38,6 +38,8 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
+#include <utility>
 
 namespace s2e::plugins::crax {
 
@@ -48,12 +50,6 @@ public:
     CRAX(S2E *s2e);
     void initialize();
 
-
-    [[nodiscard]]
-    Module *getModule(const std::string &name) {
-        auto it = Module::s_mapper.find(name);
-        return (it != Module::s_mapper.end()) ? it->second : nullptr;
-    }
 
     [[nodiscard]]
     S2EExecutionState *getCurrentState() { return m_currentState; }
@@ -80,6 +76,12 @@ public:
 
     [[nodiscard]]
     const std::vector<uint64_t> &getWritePrimitives() const { return m_writePrimitives; }
+
+    [[nodiscard]]
+    static Module *getModule(const std::string &name) {
+        auto it = Module::s_mapper.find(name);
+        return (it != Module::s_mapper.end()) ? it->second : nullptr;
+    }
 
 
     // clang-format off
@@ -174,6 +176,44 @@ private:
     std::vector<std::unique_ptr<Module>> m_modules;
     std::vector<uint64_t> m_readPrimitives;
     std::vector<uint64_t> m_writePrimitives;
+};
+
+
+class CRAXState : public PluginState {
+    using ModuleStateMap = std::map<const Module *, std::unique_ptr<ModuleState>>;
+
+public:
+    CRAXState() : m_moduleState() {}
+    virtual ~CRAXState() = default;
+
+    static PluginState *factory(Plugin *, S2EExecutionState *) {
+        return new CRAXState();
+    }
+
+    virtual CRAXState *clone() const override {
+        CRAXState *newState = new CRAXState();
+        for (const auto &entry : m_moduleState) {
+            const Module *module = entry.first;
+            std::unique_ptr<ModuleState> newModuleState(entry.second->clone());
+            newState->m_moduleState.insert(std::make_pair(module, std::move(newModuleState)));
+        }
+        return newState;
+    }
+
+    ModuleState *getModuleState(Module *module, ModuleStateFactory factory) {
+        auto it = m_moduleState.find(module);
+        if (it == m_moduleState.end()) {
+            std::unique_ptr<ModuleState> newModuleState(factory(module, this));
+            assert(newModuleState);
+            ModuleState *ret = newModuleState.get();
+            m_moduleState.insert(std::make_pair(module, std::move(newModuleState)));
+            return ret;
+        }
+        return it->second.get();
+    }
+
+private:
+    ModuleStateMap m_moduleState;
 };
 
 }  // namespace s2e::plugins::crax

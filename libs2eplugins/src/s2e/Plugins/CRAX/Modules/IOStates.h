@@ -31,6 +31,7 @@
 #include <queue>
 #include <string>
 #include <vector>
+#include <variant>
 #include <utility>
 
 namespace s2e::plugins::crax {
@@ -52,27 +53,14 @@ public:
         LAST
     };
 
-
-    struct StateInfo {
-        virtual ~StateInfo() = default;
-        uint64_t stateID;
-    };
-
-    struct InputStateInfo : public StateInfo {
-        InputStateInfo(std::vector<uint8_t> buf, uint8_t offset)
-            : buf(std::move(buf)),
-              offset(offset) {}
-
+    struct InputStateInfo {
+        //~InputStateInfo() { log<WARN>() << "input state info dtor()\n"; }
         std::vector<uint8_t> buf;
         uint8_t offset;
     };
 
-    struct LeakInfo : public StateInfo {
-        //LeakInfo(uint64_t bufIndex, uint64_t offset, LeakType leakType)
-        //    : bufIndex(bufIndex),
-        //      offset(offset),
-        //      leakType(leakType) {}
-
+    struct OutputStateInfo {
+        //~OutputStateInfo() { log<WARN>() << "output state info dtor()\n"; }
         uint64_t bufIndex;
         uint64_t offset;
         LeakType leakType;
@@ -87,11 +75,11 @@ public:
     }
 
 
-    void inputStateHook(S2EExecutionState *inputState,
-                        SyscallCtx &syscall);
+    void inputStateHookTopHalf(S2EExecutionState *inputState,
+                               SyscallCtx &syscall);
 
-    void inputStateHook2(S2EExecutionState *inputState,
-                         const SyscallCtx &syscall);
+    void inputStateHookBottomHalf(S2EExecutionState *inputState,
+                                  const SyscallCtx &syscall);
 
     void outputStateHook(S2EExecutionState *outputState,
                          const SyscallCtx &syscall);
@@ -111,11 +99,8 @@ public:
 
     // Called at output states.
     [[nodiscard]]
-    std::vector<IOStates::LeakInfo>
+    std::vector<IOStates::OutputStateInfo>
     detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len);
-
-    const std::vector<std::unique_ptr<StateInfo>> &getStateInfoList() const { return m_stateInfoList; }
-
 
     static const std::array<std::string, LeakType::LAST> s_leakTypes;
 
@@ -123,7 +108,27 @@ private:
     LeakType getLeakType(const std::string &image) const;
 
     std::queue<LeakType> m_leakQueue;
-    std::vector<std::unique_ptr<StateInfo>> m_stateInfoList;
+};
+
+
+class IOStatesState : public ModuleState {
+    using InputStateInfo = IOStates::InputStateInfo;
+    using OutputStateInfo = IOStates::OutputStateInfo;
+
+public:
+    IOStatesState() : stateInfoList() {}
+    virtual ~IOStatesState() = default;
+
+    static ModuleState *factory(Module *, CRAXState *) {
+        return new IOStatesState();
+    }
+
+    virtual ModuleState *clone() const override {
+        return new IOStatesState(*this);
+    }
+
+    // XXX: maybe make this member private?
+    std::vector<std::variant<InputStateInfo, OutputStateInfo>> stateInfoList;
 };
 
 }  // namespace s2e::plugins::crax

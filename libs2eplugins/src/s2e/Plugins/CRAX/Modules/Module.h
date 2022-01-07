@@ -29,6 +29,11 @@ namespace s2e::plugins::crax {
 
 // Forward declaration
 class CRAX;
+class CRAXState;
+class Module;
+class ModuleState;
+
+using ModuleStateFactory = ModuleState *(*)(Module *, CRAXState *);
 
 // The abstract base class of all modules.
 class Module {
@@ -38,7 +43,10 @@ public:
 
     virtual std::string toString() const = 0;
 
+    ModuleState *getModuleState(CRAXState *state, ModuleStateFactory f) const;
+
     static std::unique_ptr<Module> create(CRAX &ctx, const std::string &name);
+
     static std::map<std::string, Module *> s_mapper;
 
 protected:
@@ -50,8 +58,18 @@ protected:
 class ModuleState {
 public:
     virtual ~ModuleState() = default;
-}
+    virtual ModuleState *clone() const = 0;
+
+    static ModuleState *factory(Module *, CRAXState *);
+};
 
 }  // namespace s2e::plugins::crax
+
+
+#define DECLARE_MODULESTATE_M(mod, c, craxstate) \
+    c *modState = static_cast<c *>(mod->getModuleState(craxstate, &c::factory))
+
+#define DECLARE_MODULESTATE(c, craxstate) \
+    c *modState = static_cast<c *>(getModuleState(craxstate, &c::factory))
 
 #endif  // S2E_PLUGINS_CRAX_MODULE_H

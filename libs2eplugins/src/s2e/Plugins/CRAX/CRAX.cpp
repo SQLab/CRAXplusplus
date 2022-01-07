@@ -206,7 +206,6 @@ void CRAX::onExecuteInstructionStart(S2EExecutionState *state,
         auto it = m_scheduledAfterSyscallHooks.find(pc);
         if (it != m_scheduledAfterSyscallHooks.end()) {
             onExecuteSyscallEnd(state, pc, it->second);
-            log<WARN>() << "Removing SyscallCtx for " << hexval(pc) << '\n';
             //m_scheduledAfterSyscallHooks.erase(pc);
         }
     }
@@ -256,11 +255,10 @@ void CRAX::onExecuteSyscallStart(S2EExecutionState *state,
     // Schedule the syscall hook to be called
     // after the instruction at `pc + 2` is executed.
     // Note: pc == state->regs()->getPc().
-    auto ret = m_scheduledAfterSyscallHooks.insert({pc + 2, syscall});
-    auto it = ret.first;
+    m_scheduledAfterSyscallHooks[pc + 2] = syscall;
 
     // Execute syscall hooks installed by the user.
-    beforeSyscallHooks.emit(state, it->second);
+    beforeSyscallHooks.emit(state, m_scheduledAfterSyscallHooks[pc + 2]);
 }
 
 void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,

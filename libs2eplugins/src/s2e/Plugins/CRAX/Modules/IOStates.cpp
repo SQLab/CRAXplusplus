@@ -142,11 +142,14 @@ void IOStates::inputStateHookBottomHalf(S2EExecutionState *inputState,
     os << '\n';
     */
 
-    assert(syscall.userData && "syscall.userData == nullptr");
-
     InputStateInfo stateInfo;
-    stateInfo.buf = std::move(buf);
-    stateInfo.offset = *std::static_pointer_cast<uint64_t>(syscall.userData);
+
+    if (syscall.userData) {
+        stateInfo.buf = std::move(buf);
+        stateInfo.offset = *std::static_pointer_cast<uint64_t>(syscall.userData);
+    } else {
+        stateInfo.offset = 0;
+    }
 
     DECLARE_PLUGINSTATE_P((&m_ctx), CRAXState, inputState);
     DECLARE_MODULESTATE(IOStatesState, plgState);
@@ -164,9 +167,9 @@ void IOStates::outputStateHook(S2EExecutionState *outputState,
     OutputStateInfo stateInfo;
 
     if (outputStateInfoList.size()) {
-        stateInfo.bufIndex = outputStateInfoList.back().bufIndex;
-        stateInfo.offset = outputStateInfoList.back().offset;
-        stateInfo.leakType = outputStateInfoList.back().leakType;
+        stateInfo.bufIndex = outputStateInfoList.front().bufIndex;
+        stateInfo.offset = outputStateInfoList.front().offset;
+        stateInfo.leakType = outputStateInfoList.front().leakType;
 
         log<WARN>()
             << "*** WARN *** detected leak: ("
@@ -259,6 +262,26 @@ IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len)
     }
 
     return leakInfo;
+}
+
+void IOStates::print() const {
+    DECLARE_PLUGINSTATE_P((&m_ctx), CRAXState, (m_ctx.getCurrentState()));
+    DECLARE_MODULESTATE(IOStatesState, plgState);
+
+    auto &os = log<WARN>();
+    os << "Dumping IOStates: [";
+
+    for (size_t i = 0; i < modState->stateInfoList.size(); i++) {
+        if (const auto &inputStateInfo = std::get_if<InputStateInfo>(&modState->stateInfoList[i])) {
+            os << "input";
+        } else {
+            os << "output";
+        }
+        if (i != modState->stateInfoList.size() - 1) {
+            os << ", ";
+        }
+    }
+    os << "]\n";
 }
 
 

@@ -102,6 +102,8 @@ public:
     std::vector<IOStates::OutputStateInfo>
     detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len);
 
+    void print() const;
+
     static const std::array<std::string, LeakType::LAST> s_leakTypes;
 
 private:

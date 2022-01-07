@@ -39,11 +39,18 @@ public:
     virtual std::string toString() const = 0;
 
     static std::unique_ptr<Module> create(CRAX &ctx, const std::string &name);
-    static std::map<std::string, Module*> s_mapper;
+    static std::map<std::string, Module *> s_mapper;
 
 protected:
     CRAX &m_ctx;
 };
+
+
+// The per-state information of a CRAX's module.
+class ModuleState {
+public:
+    virtual ~ModuleState() = default;
+}
 
 }  // namespace s2e::plugins::crax
 

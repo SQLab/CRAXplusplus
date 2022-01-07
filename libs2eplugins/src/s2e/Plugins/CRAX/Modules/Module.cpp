@@ -28,7 +28,7 @@
 
 namespace s2e::plugins::crax {
 
-std::map<std::string, Module*> Module::s_mapper;
+std::map<std::string, Module *> Module::s_mapper;
 
 
 std::unique_ptr<Module> Module::create(CRAX &ctx, const std::string &name) {

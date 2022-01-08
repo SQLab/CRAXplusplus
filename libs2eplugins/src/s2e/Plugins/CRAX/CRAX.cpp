@@ -264,6 +264,8 @@ void CRAX::onExecuteSyscallStart(S2EExecutionState *state,
 void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,
                                uint64_t pc,
                                SyscallCtx &syscall) {
+    // The kernel has finished serving the system call,
+    // and the return value is now placed in RAX.
     syscall.ret = reg().readConcrete(Register::X64::RAX);
 
     // Execute syscall hooks installed by the user.

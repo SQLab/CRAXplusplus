@@ -45,6 +45,19 @@ std::string format(const std::string &fmt, Args &&...args) {
           std::forward<Args>(args)...) > 0) ? std::string(buf.get()) : "";
 }
 
+// A byte string is a sequence of bytes, such as b'\xef\xbe\xad\xde'
+// which represents 0xdeadbeef.
+// input:  {0xef, 0xbe, 0xad, 0xde}
+// output: "b'\xef\xbe\xad\xde'"
+template <typename InputIt>
+std::string toByteString(InputIt first, InputIt last) {
+    std::string ret("b'");
+    for (auto it = first; it != last; it++) {
+        ret += format("\\x%02x", *it);
+    }
+    return ret + '\'';
+}
+
 std::string toString(const std::istream &is);
 std::string toString(const std::ostream &os);
 std::vector<std::string> split(const std::string &s, const char delim);

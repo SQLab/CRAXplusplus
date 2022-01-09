@@ -108,12 +108,8 @@ bool RopChainBuilder::build(Exploit &exploit,
                 return false;
             }
 
-            std::string symbolicPayload = "b'";
-            const VarValuePair &vp = newInput[0];
-            for (const auto __byte : vp.second) {
-                symbolicPayload += format("\\x%02x", __byte);
-            }
-            symbolicPayload += "'";
+            std::string symbolicPayload = toByteString(newInput[0].second.begin(),
+                                                       newInput[0].second.end());
 
             // XXX: You mad bro?
             if (exploit.getElf().getChecksec().hasCanary) {

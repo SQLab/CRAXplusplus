@@ -118,7 +118,19 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
     ref<Expr> value = ConstantExpr::create(offset, Expr::Int64);
     forkedState->regs()->write(CPU_OFFSET(regs[Register::X64::RDX]), value);
 
-    syscall.userData = std::make_shared<uint64_t>(offset);
+    log<WARN>() << "inputStateHookTopHalf(): set leakableOffset to: " << offset << '\n';
+
+    {
+        DECLARE_PLUGINSTATE_P((&m_ctx), CRAXState, inputState);
+        DECLARE_MODULESTATE(IOStatesState, plgState);
+        modState->leakableOffset = offset;
+    }
+
+    {
+        DECLARE_PLUGINSTATE_P((&m_ctx), CRAXState, forkedState);
+        DECLARE_MODULESTATE(IOStatesState, plgState);
+        modState->leakableOffset = offset;
+    }
 }
 
 void IOStates::inputStateHookBottomHalf(S2EExecutionState *inputState,
@@ -129,30 +141,26 @@ void IOStates::inputStateHookBottomHalf(S2EExecutionState *inputState,
 
     m_ctx.setCurrentState(inputState);
 
-    //log<WARN>() << "sys_read() read " << syscall.ret << " bytes.\n";
-
     std::vector<uint8_t> buf
-        = m_ctx.mem().readConcrete(syscall.arg2, 0x30, /*concretize=*/false);
-
-    /*
-    auto &os = log<WARN>();
-    for (auto __byte : buf) {
-        os << klee::hexval(__byte) << ' ';
-    }
-    os << '\n';
-    */
-
-    InputStateInfo stateInfo;
-
-    if (syscall.userData) {
-        stateInfo.buf = std::move(buf);
-        stateInfo.offset = *std::static_pointer_cast<uint64_t>(syscall.userData);
-    } else {
-        stateInfo.offset = 0;
-    }
+        = m_ctx.mem().readConcrete(syscall.arg2, syscall.arg3, /*concretize=*/false);
 
     DECLARE_PLUGINSTATE_P((&m_ctx), CRAXState, inputState);
     DECLARE_MODULESTATE(IOStatesState, plgState);
+
+    InputStateInfo stateInfo;
+    stateInfo.buf = std::move(buf);
+
+    if (modState->leakableOffset) {
+        // `inputStateHookBottomHalf()` -> `analyzeLeak()` has found
+        // something that can be leaked and stored it in `modState->leakableOffset`.
+        stateInfo.offset = modState->leakableOffset;
+        log<WARN>() << "inputStateHookBottomHalf(): get offset: " << stateInfo.offset << '\n';
+    } else {
+        // Nothing to leak, set the offset as the original length of sys_read().
+        stateInfo.offset = syscall.arg3;
+    }
+
+    modState->leakableOffset = 0;
     modState->stateInfoList.push_back(std::move(stateInfo));
 }
 
@@ -163,19 +171,24 @@ void IOStates::outputStateHook(S2EExecutionState *outputState,
     }
 
     m_ctx.setCurrentState(outputState);
+
+    log<WARN>() << "outputStateHook()\n";
     auto outputStateInfoList = detectLeak(outputState, syscall.arg2, syscall.arg3);
+
     OutputStateInfo stateInfo;
+    stateInfo.valid = false;
 
     if (outputStateInfoList.size()) {
+        stateInfo.valid = true;
         stateInfo.bufIndex = outputStateInfoList.front().bufIndex;
-        stateInfo.offset = outputStateInfoList.front().offset;
+        stateInfo.baseOffset = outputStateInfoList.front().baseOffset;
         stateInfo.leakType = outputStateInfoList.front().leakType;
 
         log<WARN>()
             << "*** WARN *** detected leak: ("
             << IOStates::s_leakTypes[stateInfo.leakType] << ", "
             << klee::hexval(stateInfo.bufIndex) << ", "
-            << klee::hexval(stateInfo.offset) << ")\n";
+            << klee::hexval(stateInfo.baseOffset) << ")\n";
     }
 
     DECLARE_PLUGINSTATE_P((&m_ctx), CRAXState, outputState);
@@ -188,6 +201,10 @@ void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
                                          const Instruction &i) {
     static bool hasReachedMain = false;
 
+    if (m_ctx.getExploit().getElf().getCanary()) {
+        return;
+    }
+
     if (i.address == m_ctx.getExploit().getElf().symbols()["main"]) {
         hasReachedMain = true;
     }
@@ -196,7 +213,9 @@ void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
         i.mnemonic == "mov" && i.opStr == "rax, qword ptr fs:[0x28]") {
         uint64_t canary = m_ctx.reg().readConcrete(Register::X64::RAX);
         m_ctx.getExploit().getElf().setCanary(canary);
-        log<WARN>() << "Intercepted canary: " << klee::hexval(canary) << '\n';
+        log<WARN>()
+            << '[' << klee::hexval(i.address) << "] "
+            << "Intercepted canary: " << klee::hexval(canary) << '\n';
     }
 }
 
@@ -243,17 +262,18 @@ IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len)
         uint64_t value = u64(m_ctx.mem().readConcrete(buf + i, 8, /*concretize=*/false));
         //log<WARN>() << "addr = " << klee::hexval(buf + i) << " value = " << klee::hexval(value) << '\n';
         IOStates::OutputStateInfo info;
+        info.valid = true;
 
         if (m_ctx.getExploit().getElf().getChecksec().hasCanary && (value & ~0xff) == canary) {
-            info.bufIndex = i;
-            info.offset = 0;
+            info.bufIndex = i + 1;
+            info.baseOffset = 0;
             info.leakType = LeakType::CANARY;
             leakInfo.push_back(info);
         } else {
             for (const auto &region : mapInfo) {
                 if (value >= region.start && value <= region.end) {
                     info.bufIndex = i;
-                    info.offset = value - region.start;
+                    info.baseOffset = value - region.start;
                     info.leakType = getLeakType(region.image);
                     leakInfo.push_back(info);
                 }

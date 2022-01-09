@@ -26,7 +26,6 @@
 #include <s2e/Plugins/CRAX/Modules/Module.h>
 
 #include <array>
-#include <memory>
 #include <map>
 #include <queue>
 #include <string>
@@ -54,15 +53,14 @@ public:
     };
 
     struct InputStateInfo {
-        //~InputStateInfo() { log<WARN>() << "input state info dtor()\n"; }
         std::vector<uint8_t> buf;
-        uint8_t offset;
+        uint64_t offset;
     };
 
     struct OutputStateInfo {
-        //~OutputStateInfo() { log<WARN>() << "output state info dtor()\n"; }
+        bool valid;
         uint64_t bufIndex;
-        uint64_t offset;
+        uint64_t baseOffset;
         LeakType leakType;
     };
 
@@ -118,7 +116,7 @@ class IOStatesState : public ModuleState {
     using OutputStateInfo = IOStates::OutputStateInfo;
 
 public:
-    IOStatesState() : stateInfoList() {}
+    IOStatesState() : leakableOffset(), stateInfoList() {}
     virtual ~IOStatesState() = default;
 
     static ModuleState *factory(Module *, CRAXState *) {
@@ -130,6 +128,7 @@ public:
     }
 
     // XXX: maybe make this member private?
+    uint64_t leakableOffset;
     std::vector<std::variant<InputStateInfo, OutputStateInfo>> stateInfoList;
 };
 

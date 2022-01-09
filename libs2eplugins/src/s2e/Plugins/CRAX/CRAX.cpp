@@ -22,6 +22,8 @@
 #include <s2e/ConfigFile.h>
 #include <s2e/Plugins/OSMonitors/Support/ProcessExecutionDetector.h>
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
+#include <s2e/Plugins/CRAX/Modules/ExploitGenerator.h>
+#include <s2e/Plugins/CRAX/Modules/IOStates.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
 #include "CRAX.h"
@@ -78,6 +80,9 @@ void CRAX::initialize() {
     // Install symbolic RIP handler.
     s2e()->getCorePlugin()->onSymbolicAddress.connect(
             sigc::mem_fun(*this, &CRAX::onSymbolicRip));
+
+    s2e()->getCorePlugin()->onStateKill.connect(
+            sigc::mem_fun(*this, &CRAX::onStateKill));
 
     // Initialize modules.
     ConfigFile *cfg = s2e()->getConfig();
@@ -239,7 +244,6 @@ void CRAX::onExecuteSyscallStart(S2EExecutionState *state,
     syscall.arg4 = reg().readConcrete(Register::X64::R10);
     syscall.arg5 = reg().readConcrete(Register::X64::R8);
     syscall.arg6 = reg().readConcrete(Register::X64::R9);
-    syscall.userData = nullptr;
 
     if (m_showSyscalls) {
         log<INFO>()
@@ -270,6 +274,14 @@ void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,
 
     // Execute syscall hooks installed by the user.
     afterSyscallHooks.emit(state, syscall);
+}
+
+void CRAX::onStateKill(S2EExecutionState *state) {
+    auto iostates = dynamic_cast<IOStates *>(CRAX::getModule("IOStates"));
+    iostates->print();
+
+    auto exploitGen = dynamic_cast<ExploitGenerator *>(CRAX::getModule("ExploitGenerator"));
+    static_cast<void>(exploitGen->generateExploit());
 }
 
 }  // namespace s2e::plugins::crax

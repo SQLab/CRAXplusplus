@@ -156,6 +156,8 @@ private:
                              uint64_t pc,
                              SyscallCtx &syscall);
 
+    void onStateKill(S2EExecutionState *state);
+
 
     // S2E
     S2EExecutionState *m_currentState;

@@ -119,6 +119,12 @@ private:
                                         uint64_t guestDataPtr,
                                         uint64_t guestDataSize) {}
 
+    void onSymbolicRip(S2EExecutionState *state,
+                       klee::ref<klee::Expr> symbolicRip,
+                       uint64_t concreteRip,
+                       bool &concretize,
+                       CorePlugin::symbolicAddressReason reason);
+
     void onProcessLoad(S2EExecutionState *state,
                        uint64_t cr3,
                        uint64_t pid,
@@ -126,12 +132,6 @@ private:
 
     void onModuleLoad(S2EExecutionState *state,
                       const ModuleDescriptor &md);
-
-    void onSymbolicRip(S2EExecutionState *state,
-                       klee::ref<klee::Expr> symbolicRip,
-                       uint64_t concreteRip,
-                       bool &concretize,
-                       CorePlugin::symbolicAddressReason reason);
 
     void onTranslateInstructionStart(ExecutionSignal *onInstructionExecute,
                                      S2EExecutionState *state,
@@ -156,6 +156,9 @@ private:
                              uint64_t pc,
                              SyscallCtx &syscall);
 
+    void onStateForkDecide(S2EExecutionState *state,
+                           bool *allowForking);
+
     void onStateKill(S2EExecutionState *state);
 
 
@@ -163,14 +166,16 @@ private:
     S2EExecutionState *m_currentState;
     LinuxMonitor *m_linuxMonitor;
 
-    // CRAX's attributes.
+    // CRAX's config options.
     bool m_showInstructions;
     bool m_showSyscalls;
+    bool m_disableNativeForking;
+
+    // CRAX's attributes.
     Register m_register;
     Memory m_memory;
     Disassembler m_disassembler;
     Exploit m_exploit;
-
     uint64_t m_targetProcessPid;
     std::map<uint64_t, SyscallCtx> m_scheduledAfterSyscallHooks;  // <pc, SyscallCtx>
 

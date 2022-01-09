@@ -22,7 +22,6 @@
 #include <s2e/ConfigFile.h>
 #include <s2e/Plugins/OSMonitors/Support/ProcessExecutionDetector.h>
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
-#include <s2e/Plugins/CRAX/Modules/ExploitGenerator.h>
 #include <s2e/Plugins/CRAX/Modules/IOStates.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
@@ -54,6 +53,7 @@ CRAX::CRAX(S2E *s2e)
       m_linuxMonitor(),
       m_showInstructions(CRAX_CONFIG_GET_BOOL(".showInstructions", false)),
       m_showSyscalls(CRAX_CONFIG_GET_BOOL(".showSyscalls", true)),
+      m_disableNativeForking(CRAX_CONFIG_GET_BOOL(".disableNativeForking", false)),
       m_register(*this),
       m_memory(*this),
       m_disassembler(*this),
@@ -80,6 +80,9 @@ void CRAX::initialize() {
     // Install symbolic RIP handler.
     s2e()->getCorePlugin()->onSymbolicAddress.connect(
             sigc::mem_fun(*this, &CRAX::onSymbolicRip));
+
+    s2e()->getCorePlugin()->onStateForkDecide.connect(
+            sigc::mem_fun(*this, &CRAX::onStateForkDecide));
 
     s2e()->getCorePlugin()->onStateKill.connect(
             sigc::mem_fun(*this, &CRAX::onStateKill));
@@ -276,12 +279,21 @@ void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,
     afterSyscallHooks.emit(state, syscall);
 }
 
+void CRAX::onStateForkDecide(S2EExecutionState *state,
+                             bool *allowForking) {
+    // If this option is enabled, then only CRAXplusplus is allowed
+    // to fork states.
+    if (m_disableNativeForking) {
+        *allowForking = false;
+    }
+}
+
 void CRAX::onStateKill(S2EExecutionState *state) {
     auto iostates = dynamic_cast<IOStates *>(CRAX::getModule("IOStates"));
     iostates->print();
 
-    auto exploitGen = dynamic_cast<ExploitGenerator *>(CRAX::getModule("ExploitGenerator"));
-    static_cast<void>(exploitGen->generateExploit());
+    //auto exploitGen = dynamic_cast<ExploitGenerator *>(CRAX::getModule("ExploitGenerator"));
+    //static_cast<void>(exploitGen->generateExploit());
 }
 
 }  // namespace s2e::plugins::crax

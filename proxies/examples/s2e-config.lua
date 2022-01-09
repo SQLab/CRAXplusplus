@@ -379,6 +379,9 @@ pluginsConfig.CRAX = {
     showInstructions = false,
     showSyscalls = true,
 
+    -- Disable forking except those performed by CRAXplusplus.
+    disableNativeForking = true,
+
     -- Modules of CRAX++ that you wish to load.
     modules = {
         "ExploitGenerator",

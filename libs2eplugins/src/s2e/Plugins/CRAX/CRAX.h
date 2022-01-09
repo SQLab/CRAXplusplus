@@ -35,10 +35,12 @@
 
 #include <pybind11/embed.h>
 
+#include <cassert>
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_set>
 #include <utility>
 
 namespace s2e::plugins::crax {
@@ -50,6 +52,21 @@ public:
     CRAX(S2E *s2e);
     void initialize();
 
+
+    [[nodiscard, gnu::always_inline]]
+    inline S2EExecutionState *fork(S2EExecutionState &state) {
+        if (m_disableNativeForking) {
+            m_allowedForkingStates.insert(&state);
+        }
+
+        if (state.needToJumpToSymbolic()) {
+            state.jumpToSymbolic();
+        }
+
+        S2EExecutor::StatePair sp = s2e()->getExecutor()->fork(state);
+        assert(sp.second && "CRAX: failed to fork state!");
+        return static_cast<S2EExecutionState *>(sp.second);
+    }
 
     [[nodiscard]]
     S2EExecutionState *getCurrentState() { return m_currentState; }
@@ -178,6 +195,7 @@ private:
     Exploit m_exploit;
     uint64_t m_targetProcessPid;
     std::map<uint64_t, SyscallCtx> m_scheduledAfterSyscallHooks;  // <pc, SyscallCtx>
+    std::unordered_set<S2EExecutionState *> m_allowedForkingStates;
 
     // Exploitation-specific attributes.
     std::vector<std::unique_ptr<Module>> m_modules;

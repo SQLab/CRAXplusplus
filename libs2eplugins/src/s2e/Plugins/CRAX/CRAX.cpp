@@ -61,6 +61,7 @@ CRAX::CRAX(S2E *s2e)
                 CRAX_CONFIG_GET_STRING(".libcFilename")),
       m_targetProcessPid(),
       m_scheduledAfterSyscallHooks(),
+      m_allowedForkingStates(),
       m_modules(),
       m_readPrimitives(),
       m_writePrimitives() {}
@@ -281,14 +282,25 @@ void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,
 
 void CRAX::onStateForkDecide(S2EExecutionState *state,
                              bool *allowForking) {
-    // If this option is enabled, then only CRAXplusplus is allowed
-    // to fork states.
-    if (m_disableNativeForking) {
-        *allowForking = false;
+    // If `disableNativeForking` is true,
+    // then only CRAX plugin is allowed to fork states.
+    if (!m_disableNativeForking) {
+        *allowForking = true;
+        return;
+    }
+
+    *allowForking = m_allowedForkingStates.find(state) != m_allowedForkingStates.end();
+
+    if (*allowForking) {
+        m_allowedForkingStates.erase(state);
     }
 }
 
 void CRAX::onStateKill(S2EExecutionState *state) {
+    if (m_disableNativeForking) {
+        m_allowedForkingStates.erase(state);
+    }
+
     auto iostates = dynamic_cast<IOStates *>(CRAX::getModule("IOStates"));
     iostates->print();
 

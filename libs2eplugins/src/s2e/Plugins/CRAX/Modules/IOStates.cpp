@@ -97,13 +97,7 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
     }
 
     // Create input state snapshot.
-    if (inputState->needToJumpToSymbolic()) {
-        inputState->jumpToSymbolic();
-    }
-
-    S2EExecutor::StatePair sp = m_ctx.s2e()->getExecutor()->fork(*inputState);
-    assert(sp.second && "Failed to fork state for leak detection");
-    auto forkedState = dynamic_cast<S2EExecutionState *>(sp.second);
+    S2EExecutionState *forkedState = m_ctx.fork(*inputState);
 
     log<WARN>()
         << "forked output state for leak detection (id="

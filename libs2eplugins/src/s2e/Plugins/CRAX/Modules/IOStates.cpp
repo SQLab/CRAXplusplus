@@ -115,17 +115,11 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
 
     log<WARN>() << "inputStateHookTopHalf(): set leakableOffset to: " << offset << '\n';
 
-    {
-        DECLARE_PLUGINSTATE_P((&m_ctx), CRAXState, inputState);
-        DECLARE_MODULESTATE(IOStatesState, plgState);
-        modState->leakableOffset = offset;
-    }
+    auto modState = m_ctx.getPluginModuleState<IOStatesState>(inputState, this);
+    modState->leakableOffset = offset;
 
-    {
-        DECLARE_PLUGINSTATE_P((&m_ctx), CRAXState, forkedState);
-        DECLARE_MODULESTATE(IOStatesState, plgState);
-        modState->leakableOffset = offset;
-    }
+    auto *forkedModState = m_ctx.getPluginModuleState<IOStatesState>(forkedState, this);
+    forkedModState->leakableOffset = offset;
 }
 
 void IOStates::inputStateHookBottomHalf(S2EExecutionState *inputState,
@@ -139,9 +133,7 @@ void IOStates::inputStateHookBottomHalf(S2EExecutionState *inputState,
     std::vector<uint8_t> buf
         = m_ctx.mem().readConcrete(syscall.arg2, syscall.arg3, /*concretize=*/false);
 
-    DECLARE_PLUGINSTATE_P((&m_ctx), CRAXState, inputState);
-    DECLARE_MODULESTATE(IOStatesState, plgState);
-
+    auto modState = m_ctx.getPluginModuleState<IOStatesState>(inputState, this);
     InputStateInfo stateInfo;
     stateInfo.buf = std::move(buf);
 
@@ -186,8 +178,7 @@ void IOStates::outputStateHook(S2EExecutionState *outputState,
             << klee::hexval(stateInfo.baseOffset) << ")\n";
     }
 
-    DECLARE_PLUGINSTATE_P((&m_ctx), CRAXState, outputState);
-    DECLARE_MODULESTATE(IOStatesState, plgState);
+    auto modState = m_ctx.getPluginModuleState<IOStatesState>(outputState, this);
     modState->stateInfoList.push_back(std::move(stateInfo));
 }
 
@@ -280,8 +271,7 @@ IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len)
 }
 
 void IOStates::print() const {
-    DECLARE_PLUGINSTATE_P((&m_ctx), CRAXState, (m_ctx.getCurrentState()));
-    DECLARE_MODULESTATE(IOStatesState, plgState);
+    auto modState = m_ctx.getPluginModuleState<IOStatesState>(m_ctx.getCurrentState(), this);
 
     auto &os = log<WARN>();
     os << "Dumping IOStates: [";

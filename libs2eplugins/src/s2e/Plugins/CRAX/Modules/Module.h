@@ -36,6 +36,9 @@ class ModuleState;
 using ModuleStateFactory = ModuleState *(*)(Module *, CRAXState *);
 
 // The abstract base class of all modules.
+//
+// The concept of "modules" in CRAX is similar to that of "plugins" in S2E.
+// Essentially, a module is an S2E-plugin's plugin.
 class Module {
 public:
     explicit Module(CRAX &ctx) : m_ctx(ctx) {}
@@ -64,12 +67,5 @@ public:
 };
 
 }  // namespace s2e::plugins::crax
-
-
-#define DECLARE_MODULESTATE_M(mod, c, craxstate) \
-    c *modState = static_cast<c *>(mod->getModuleState(craxstate, &c::factory))
-
-#define DECLARE_MODULESTATE(c, craxstate) \
-    c *modState = static_cast<c *>(getModuleState(craxstate, &c::factory))
 
 #endif  // S2E_PLUGINS_CRAX_MODULE_H

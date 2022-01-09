@@ -39,11 +39,57 @@
 #include <map>
 #include <memory>
 #include <string>
-#include <vector>
+#include <type_traits>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 namespace s2e::plugins::crax {
+
+// A plugin state contains per-state information of a plugin,
+// so CRAXState holds information specific to a particular S2EExecutionState.
+//
+// In addition, CRAX supports "modules" (or you can think of them as plugin),
+// so a CRAXState further splits the per-state information at module level.
+class CRAXState : public PluginState {
+    using ModuleStateMap = std::map<const Module *, std::unique_ptr<ModuleState>>;
+
+public:
+    CRAXState() : m_moduleState() {}
+    virtual ~CRAXState() = default;
+
+    static PluginState *factory(Plugin *, S2EExecutionState *) {
+        return new CRAXState();
+    }
+
+    virtual CRAXState *clone() const override {
+        CRAXState *newState = new CRAXState();
+        for (const auto &entry : m_moduleState) {
+            const Module *module = entry.first;
+            std::unique_ptr<ModuleState> newModuleState(entry.second->clone());
+            newState->m_moduleState.insert(std::make_pair(module, std::move(newModuleState)));
+        }
+        return newState;
+    }
+
+
+    ModuleState *getModuleState(Module *module, ModuleStateFactory factory) {
+        auto it = m_moduleState.find(module);
+        if (it == m_moduleState.end()) {
+            std::unique_ptr<ModuleState> newModuleState(factory(module, this));
+            assert(newModuleState);
+            ModuleState *ret = newModuleState.get();
+            m_moduleState.insert(std::make_pair(module, std::move(newModuleState)));
+            return ret;
+        }
+        return it->second.get();
+    }
+
+private:
+    ModuleStateMap m_moduleState;
+};
+
+
 
 class CRAX : public Plugin, IPluginInvoker {
     S2E_PLUGIN
@@ -67,6 +113,37 @@ public:
         assert(sp.second && "CRAX: failed to fork state!");
         return static_cast<S2EExecutionState *>(sp.second);
     }
+
+    // Here we define it again in the derived class
+    // to unhide the overloaded version from Plugin::getPluginState(). 
+    PluginState *getPluginState(S2EExecutionState *state, PluginStateFactory f) const {
+        return Plugin::getPluginState(state, f);
+    }
+
+    // This version is intended to provide a user-friendly interface.
+    [[nodiscard, gnu::always_inline]]
+    inline CRAXState *getPluginState(S2EExecutionState *state) const {
+        // See: libs2ecore/include/s2e/Plugin.h
+        return static_cast<CRAXState *>(Plugin::getPluginState(state, &CRAXState::factory));
+    }
+
+    // This is a shortcut to perform `getPluginState()` + `getModuleState()`.
+    // The extra type manipulation at compile time is to make the API less fragile.
+    // XXX: not sure if it's necessary, since I'm not good at C++...
+    template <typename __T>
+    [[nodiscard, gnu::always_inline]]
+    inline typename std::remove_pointer_t<__T> *getPluginModuleState(S2EExecutionState *state,
+                                                                     const Module *module) const {
+        using T = std::remove_pointer_t<__T>;
+
+        CRAXState *craxState = getPluginState(state);
+        assert(craxState && "Unable to get plugin state for CRAX!?");
+
+        ModuleState *modState = module->getModuleState(craxState, &T::factory);
+        assert(modState && "Unable to get plugin module state!");
+        return static_cast<T *>(modState);
+    }
+
 
     [[nodiscard]]
     S2EExecutionState *getCurrentState() { return m_currentState; }
@@ -201,44 +278,6 @@ private:
     std::vector<std::unique_ptr<Module>> m_modules;
     std::vector<uint64_t> m_readPrimitives;
     std::vector<uint64_t> m_writePrimitives;
-};
-
-
-class CRAXState : public PluginState {
-    using ModuleStateMap = std::map<const Module *, std::unique_ptr<ModuleState>>;
-
-public:
-    CRAXState() : m_moduleState() {}
-    virtual ~CRAXState() = default;
-
-    static PluginState *factory(Plugin *, S2EExecutionState *) {
-        return new CRAXState();
-    }
-
-    virtual CRAXState *clone() const override {
-        CRAXState *newState = new CRAXState();
-        for (const auto &entry : m_moduleState) {
-            const Module *module = entry.first;
-            std::unique_ptr<ModuleState> newModuleState(entry.second->clone());
-            newState->m_moduleState.insert(std::make_pair(module, std::move(newModuleState)));
-        }
-        return newState;
-    }
-
-    ModuleState *getModuleState(Module *module, ModuleStateFactory factory) {
-        auto it = m_moduleState.find(module);
-        if (it == m_moduleState.end()) {
-            std::unique_ptr<ModuleState> newModuleState(factory(module, this));
-            assert(newModuleState);
-            ModuleState *ret = newModuleState.get();
-            m_moduleState.insert(std::make_pair(module, std::move(newModuleState)));
-            return ret;
-        }
-        return it->second.get();
-    }
-
-private:
-    ModuleStateMap m_moduleState;
 };
 
 }  // namespace s2e::plugins::crax

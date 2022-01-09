@@ -64,6 +64,26 @@ public:
         LeakType leakType;
     };
 
+    class State : public ModuleState {
+        using InputStateInfo = IOStates::InputStateInfo;
+        using OutputStateInfo = IOStates::OutputStateInfo;
+
+    public:
+        State() : leakableOffset(), stateInfoList() {}
+        virtual ~State() = default;
+
+        static ModuleState *factory(Module *, CRAXState *) {
+            return new State();
+        }
+
+        virtual ModuleState *clone() const override {
+            return new State(*this);
+        }
+
+        // XXX: maybe make this member private?
+        uint64_t leakableOffset;
+        std::vector<std::variant<InputStateInfo, OutputStateInfo>> stateInfoList;
+    };
 
     explicit IOStates(CRAX &ctx);
     virtual ~IOStates() = default;
@@ -108,28 +128,6 @@ private:
     LeakType getLeakType(const std::string &image) const;
 
     std::queue<LeakType> m_leakQueue;
-};
-
-
-class IOStatesState : public ModuleState {
-    using InputStateInfo = IOStates::InputStateInfo;
-    using OutputStateInfo = IOStates::OutputStateInfo;
-
-public:
-    IOStatesState() : leakableOffset(), stateInfoList() {}
-    virtual ~IOStatesState() = default;
-
-    static ModuleState *factory(Module *, CRAXState *) {
-        return new IOStatesState();
-    }
-
-    virtual ModuleState *clone() const override {
-        return new IOStatesState(*this);
-    }
-
-    // XXX: maybe make this member private?
-    uint64_t leakableOffset;
-    std::vector<std::variant<InputStateInfo, OutputStateInfo>> stateInfoList;
 };
 
 }  // namespace s2e::plugins::crax

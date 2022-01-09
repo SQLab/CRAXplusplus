@@ -115,10 +115,10 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
 
     log<WARN>() << "inputStateHookTopHalf(): set leakableOffset to: " << offset << '\n';
 
-    auto modState = m_ctx.getPluginModuleState<IOStatesState>(inputState, this);
+    auto modState = m_ctx.getPluginModuleState(inputState, this);
     modState->leakableOffset = offset;
 
-    auto *forkedModState = m_ctx.getPluginModuleState<IOStatesState>(forkedState, this);
+    auto *forkedModState = m_ctx.getPluginModuleState(forkedState, this);
     forkedModState->leakableOffset = offset;
 }
 
@@ -133,7 +133,7 @@ void IOStates::inputStateHookBottomHalf(S2EExecutionState *inputState,
     std::vector<uint8_t> buf
         = m_ctx.mem().readConcrete(syscall.arg2, syscall.arg3, /*concretize=*/false);
 
-    auto modState = m_ctx.getPluginModuleState<IOStatesState>(inputState, this);
+    auto modState = m_ctx.getPluginModuleState(inputState, this);
     InputStateInfo stateInfo;
     stateInfo.buf = std::move(buf);
 
@@ -178,7 +178,7 @@ void IOStates::outputStateHook(S2EExecutionState *outputState,
             << klee::hexval(stateInfo.baseOffset) << ")\n";
     }
 
-    auto modState = m_ctx.getPluginModuleState<IOStatesState>(outputState, this);
+    auto modState = m_ctx.getPluginModuleState(outputState, this);
     modState->stateInfoList.push_back(std::move(stateInfo));
 }
 
@@ -271,7 +271,7 @@ IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len)
 }
 
 void IOStates::print() const {
-    auto modState = m_ctx.getPluginModuleState<IOStatesState>(m_ctx.getCurrentState(), this);
+    auto modState = m_ctx.getPluginModuleState(m_ctx.getCurrentState(), this);
 
     auto &os = log<WARN>();
     os << "Dumping IOStates: [";

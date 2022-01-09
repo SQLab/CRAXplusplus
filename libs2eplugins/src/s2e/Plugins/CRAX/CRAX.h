@@ -39,7 +39,6 @@
 #include <map>
 #include <memory>
 #include <string>
-#include <type_traits>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -128,20 +127,17 @@ public:
     }
 
     // This is a shortcut to perform `getPluginState()` + `getModuleState()`.
-    // The extra type manipulation at compile time is to make the API less fragile.
-    // XXX: not sure if it's necessary, since I'm not good at C++...
-    template <typename __T>
-    [[nodiscard, gnu::always_inline]]
-    inline typename std::remove_pointer_t<__T> *getPluginModuleState(S2EExecutionState *state,
-                                                                     const Module *module) const {
-        using T = std::remove_pointer_t<__T>;
-
+    template <typename T>
+    [[nodiscard]]
+    typename T::State *getPluginModuleState(S2EExecutionState *state,
+                                            const T *mod) const {
         CRAXState *craxState = getPluginState(state);
         assert(craxState && "Unable to get plugin state for CRAX!?");
 
-        ModuleState *modState = module->getModuleState(craxState, &T::factory);
+        ModuleState *modState = mod->getModuleState(craxState, &T::State::factory);
         assert(modState && "Unable to get plugin module state!");
-        return static_cast<T *>(modState);
+
+        return static_cast<typename T::State *>(modState);
     }
 
 

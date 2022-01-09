@@ -20,8 +20,7 @@ s2e = {
     -- All the cl::opt options defined in the engine can be tweaked here.
     -- This can be left empty most of the time.
     -- Most of the options can be found in S2EExecutor.cpp and Executor.cpp.
-    kleeArgs = {
-    },
+    kleeArgs = {},
 }
 
 -- Declare empty plugin settings. They will be populated in the rest of
@@ -39,7 +38,7 @@ dofile('library.lua')
 
 add_plugin("BaseInstructions")
 pluginsConfig.BaseInstructions = {
-
+    logLevel="info",
 }
 
 -------------------------------------------------------------------------------
@@ -51,7 +50,6 @@ add_plugin("HostFiles")
 pluginsConfig.HostFiles = {
     baseDirs = {
         "/home/aesophor/s2e/projects/sym_stdin",
-
     },
     allowWrite = true,
 }
@@ -66,11 +64,7 @@ add_plugin("Vmi")
 pluginsConfig.Vmi = {
     baseDirs = {
         "/home/aesophor/s2e/projects/sym_stdin",
-
-
-            "/home/aesophor/s2e/images/debian-9.2.1-x86_64/guestfs",
-
-
+        "/home/aesophor/s2e/images/debian-9.2.1-x86_64/guestfs",
     },
 }
 
@@ -150,11 +144,9 @@ pluginsConfig.TranslationBlockCoverage = {
 
 add_plugin("ModuleExecutionDetector")
 pluginsConfig.ModuleExecutionDetector = {
-
     mod_0 = {
         moduleName = "target",
     },
-
     logLevel="info"
 }
 
@@ -189,9 +181,7 @@ pluginsConfig.ForkLimiter = {
 add_plugin("ProcessExecutionDetector")
 pluginsConfig.ProcessExecutionDetector = {
     moduleNames = {
-
         "target",
-
     },
 }
 
@@ -210,7 +200,6 @@ add_plugin("MemoryMap")
 pluginsConfig.MemoryMap = {
   logLevel = "info"
 }
-
 
 
 -------------------------------------------------------------------------------
@@ -234,13 +223,9 @@ pluginsConfig.CUPASearcher = {
     -- The order of classes is important, please refer to the plugin
     -- source code and documentation for details on how CUPA works.
     classes = {
-
-
         -- This ensures that states run for a certain amount of time.
         -- Otherwise too frequent state switching may decrease performance.
         "batch",
-
-
 
         -- A program under test may be composed of several binaries.
         -- We want to give equal chance to all binaries, even if some of them
@@ -250,6 +235,7 @@ pluginsConfig.CUPASearcher = {
         -- Finally, group states by program counter at fork.
         "pc",
     },
+
     logLevel="info",
     enabled = true,
 
@@ -260,9 +246,6 @@ pluginsConfig.CUPASearcher = {
 }
 
 
-
-
-
 -------------------------------------------------------------------------------
 -- Function models help drastically reduce path explosion. A model is an
 -- expression that efficiently encodes the behavior of a function. In imperative
@@ -271,15 +254,22 @@ pluginsConfig.CUPASearcher = {
 -- expression. Models are most suitable for side-effect-free functions that
 -- fork a lot. Please refer to models.lua and the documentation for more details.
 
-add_plugin("StaticFunctionModels")
+--add_plugin("StaticFunctionModels")
 
-pluginsConfig.StaticFunctionModels = {
-  modules = {}
+--pluginsConfig.StaticFunctionModels = {
+--  modules = {}
+--}
+
+--g_function_models = {}
+--safe_load('models.lua')
+--pluginsConfig.StaticFunctionModels.modules = g_function_models
+
+
+add_plugin("FunctionModels")
+
+pluginsConfig.FunctionModels = {
+
 }
-
-g_function_models = {}
-safe_load('models.lua')
-pluginsConfig.StaticFunctionModels.modules = g_function_models
 
 
 -------------------------------------------------------------------------------
@@ -295,19 +285,13 @@ pluginsConfig.StaticFunctionModels.modules = g_function_models
 --}
 
 
-
-
-
 -------------------------------------------------------------------------------
 -- The screenshot plugin records a screenshot of the guest into screenshotX.png,
 -- where XX is the path number. You can configure the interval here:
-add_plugin("Screenshot")
-pluginsConfig.Screenshot = {
-    period = 5
-}
-
-
-
+--add_plugin("Screenshot")
+--pluginsConfig.Screenshot = {
+--    period = 5
+--}
 
 
 -- ========================================================================= --
@@ -331,7 +315,6 @@ pluginsConfig.LinuxMonitor = {
     -- Kill the execution state when it encounters a trap
     terminateOnTrap = true,
 }
-
 
 
 -- ========================================================================= --
@@ -386,18 +369,24 @@ end
 add_plugin("CRAX")
 
 pluginsConfig.CRAX = {
+    -- The filenames to the ELF and libc.so.6.
+    -- The static analysis of binary programs is currently
+    -- carried out in the host (instead of in the guest).
     elfFilename = "target",
     libcFilename = "/lib/x86_64-linux-gnu/libc.so.6",
 
+    -- Verbosity.
     showInstructions = false,
     showSyscalls = true,
-    
+
+    -- Modules of CRAX++ that you wish to load.
     modules = {
         "ExploitGenerator",
         "RopChainBuilder",
         "IOStates",
     },
 
+    -- The exploitaion techniques that your exploit will use.
     techniques = {
         "Ret2csu",
         "BasicStackPivot",

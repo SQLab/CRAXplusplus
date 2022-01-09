@@ -1,6 +1,6 @@
 CXX=gcc
-CXXFLAGS=-Wall -I../../guest/common/include
-SRC=$(wildcard *.c)
+CXXFLAGS=-Wall -Wl,-z,relro,-z,now -I../../guest/common/include
+SRC=sym_stdin.c
 BIN=sym_stdin
 
 all:

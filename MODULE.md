@@ -14,12 +14,11 @@ For instance, suppose we're going to create a module called "MyModule":
 
    namespace s2e::plugins::crax {
 
-   class IOStates : public Module {
+   class MyModule : public Module {
    public:
-
        class State : public ModuleState {
        public:
-           State() : leakableOffset(), stateInfoList() {}
+           State() = default;
            virtual ~State() = default;
 
            static ModuleState *factory(Module *, CRAXState *) {
@@ -34,8 +33,8 @@ For instance, suppose we're going to create a module called "MyModule":
            // ...
        };
 
-       explicit IOStates(CRAX &ctx);
-       virtual ~IOStates() = default;
+       explicit MyModule(CRAX &ctx);
+       virtual ~MyModule() = default;
 
        virtual std::string toString() const override {
            return "MyModule";

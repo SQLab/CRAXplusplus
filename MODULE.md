@@ -82,3 +82,24 @@ For instance, suppose we're going to create a module called "MyModule":
        -- ...
    }
    ```
+
+4. To access per-state module data from MyModule::foo()
+
+   ```cpp
+   void MyModule::foo(S2EExecutionState *state) {
+       MyModule::State *modState = m_ctx.getPluginModuleState(state, this);
+       // ...
+   }
+   ```
+
+5. To access per-state module data from another module, e.g. ExploitGenerator::foo()
+
+   ```cpp
+   void ExploitGenerator::foo(S2EExecutionState *state) {
+       MyModule *mod = dynamic_cast<MyModule *>(CRAX::getModule("MyModule"));
+       assert(mod);
+
+       MyModule::State *modState = m_ctx.getPluginModuleState(state, mod);
+       // ...
+   }
+   ```

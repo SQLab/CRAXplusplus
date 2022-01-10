@@ -28,7 +28,13 @@ To build CRAX++, please refer to the following documentation:
 
 ## Extending CRAXplusplus
 
+### Modules
+
 In CRAXplusplus, even the default exploit generator is implemented as a module. See [Writing Your Own Module](MODULE.md).
+
+### Techniques
+
+WIP...
 
 ## License
 

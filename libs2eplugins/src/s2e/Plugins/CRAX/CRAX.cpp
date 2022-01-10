@@ -22,7 +22,6 @@
 #include <s2e/ConfigFile.h>
 #include <s2e/Plugins/OSMonitors/Support/ProcessExecutionDetector.h>
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
-#include <s2e/Plugins/CRAX/Modules/IOStates.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
 #include "CRAX.h"
@@ -85,9 +84,6 @@ void CRAX::initialize() {
 
     s2e()->getCorePlugin()->onStateForkDecide.connect(
             sigc::mem_fun(*this, &CRAX::onStateForkDecide));
-
-    s2e()->getCorePlugin()->onStateKill.connect(
-            sigc::mem_fun(*this, &CRAX::onStateKill));
 
     // Initialize modules.
     ConfigFile *cfg = s2e()->getConfig();
@@ -294,23 +290,7 @@ void CRAX::onStateForkDecide(S2EExecutionState *state,
 
     // We'll also check if current state forking was requested by CRAX.
     // If yes, then `state` should be in `m_allowedForkingStates`.
-    *allowForking |= m_allowedForkingStates.find(state) != m_allowedForkingStates.end();
-
-    if (*allowForking) {
-        m_allowedForkingStates.erase(state);
-    }
-}
-
-void CRAX::onStateKill(S2EExecutionState *state) {
-    if (m_disableNativeForking) {
-        m_allowedForkingStates.erase(state);
-    }
-
-    auto iostates = dynamic_cast<IOStates *>(CRAX::getModule("IOStates"));
-    iostates->print();
-
-    //auto exploitGen = dynamic_cast<ExploitGenerator *>(CRAX::getModule("ExploitGenerator"));
-    //static_cast<void>(exploitGen->generateExploit());
+    *allowForking |= m_allowedForkingStates.erase(state) == 1;
 }
 
 }  // namespace s2e::plugins::crax

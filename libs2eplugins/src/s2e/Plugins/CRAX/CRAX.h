@@ -257,8 +257,6 @@ private:
     void onStateForkDecide(S2EExecutionState *state,
                            bool *allowForking);
 
-    void onStateKill(S2EExecutionState *state);
-
 
     // S2E
     S2EExecutionState *m_currentState;

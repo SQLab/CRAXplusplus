@@ -32,6 +32,7 @@ namespace s2e::plugins::crax {
 
 struct Instruction {
     uint64_t address;
+    uint64_t size;
     std::string mnemonic;
     std::string opStr;
 };

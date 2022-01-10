@@ -77,6 +77,7 @@ std::vector<Instruction> Disassembler::disasm(const std::vector<uint8_t> &code,
         for (size_t i = 0; i < count; i++) {
             ret[i] = {
                 insn[i].address,
+                insn[i].size,
                 insn[i].mnemonic,
                 insn[i].op_str
             };

@@ -78,6 +78,7 @@ For instance, suppose we're going to create a module called "MyModule":
            "ExploitGenerator",
            "RopChainBuilder",
            "IOStates",
+           "MyModule",  -- <-- here
        },
        -- ...
    }

@@ -16,15 +16,19 @@ CRAX++ (2021) is the new version of the original CRAX.
 
 <img src="/docs/overview.png">
 
+## Features
+
+WIP...
+
 ## Build
 
 To build CRAX++, please refer to the following documentation:
 * [Official S2E documentation](https://s2e.systems/docs) for how to build and use S2E
 * [BUILD.md](BUILD.md) for build instructions written specifically for CRAX++
 
-## Features
+## Extending CRAXplusplus
 
-WIP...
+In CRAXplusplus, even the default exploit generator is implemented as a module. See [Writing Your Own Module](MODULE.md).
 
 ## License
 

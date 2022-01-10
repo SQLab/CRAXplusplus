@@ -106,8 +106,11 @@ public:
     void maybeInterceptStackCanary(S2EExecutionState *state,
                                    const Instruction &i);
 
-    void maybeTerminateState(S2EExecutionState *state,
-                             const Instruction &i);
+    void onStackChkFailed(S2EExecutionState *state,
+                          const Instruction &i);
+
+    void onStateForkModuleDecide(S2EExecutionState *state,
+                                 bool *allowForking);
 
 
     // Called at input states.
@@ -127,6 +130,7 @@ public:
 private:
     LeakType getLeakType(const std::string &image) const;
 
+    const uint64_t m_stackChkFailPlt;
     std::queue<LeakType> m_leakQueue;
 };
 

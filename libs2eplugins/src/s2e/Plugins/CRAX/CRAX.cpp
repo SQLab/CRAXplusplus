@@ -49,6 +49,7 @@ CRAX::CRAX(S2E *s2e)
       beforeSyscallHooks(),
       afterSyscallHooks(),
       exploitGenerationHooks(),
+      onStateForkModuleDecide(),
       m_currentState(),
       m_linuxMonitor(),
       m_showInstructions(CRAX_CONFIG_GET_BOOL(".showInstructions", false)),
@@ -282,14 +283,18 @@ void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,
 
 void CRAX::onStateForkDecide(S2EExecutionState *state,
                              bool *allowForking) {
-    // If `disableNativeForking` is true,
-    // then only CRAX plugin is allowed to fork states.
+    // At this point, `*allowForking` is true by default.
     if (!m_disableNativeForking) {
-        *allowForking = true;
         return;
     }
 
-    *allowForking = m_allowedForkingStates.find(state) != m_allowedForkingStates.end();
+    // If the user has explicitly disabled all state forks done by S2E,
+    // then we'll let CRAX's modules decide whether this fork should be done.
+    onStateForkModuleDecide.emit(state, allowForking);
+
+    // We'll also check if current state forking was requested by CRAX.
+    // If yes, then `state` should be in `m_allowedForkingStates`.
+    *allowForking |= m_allowedForkingStates.find(state) != m_allowedForkingStates.end();
 
     if (*allowForking) {
         m_allowedForkingStates.erase(state);

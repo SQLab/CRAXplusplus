@@ -147,6 +147,9 @@ public:
     void setCurrentState(S2EExecutionState *state) { m_currentState = state; }
 
     [[nodiscard]]
+    bool isNativeForkingDisabled() const { return m_disableNativeForking; }
+
+    [[nodiscard]]
     Register &reg() { return m_register; }
 
     [[nodiscard]]
@@ -197,6 +200,11 @@ public:
 
     sigc::signal<void>
         exploitGenerationHooks;
+
+    sigc::signal<void,
+                 S2EExecutionState*,
+                 bool*>
+        onStateForkModuleDecide;
     // clang-format on
 
     // Embedded Python interpreter from pybind11 library.

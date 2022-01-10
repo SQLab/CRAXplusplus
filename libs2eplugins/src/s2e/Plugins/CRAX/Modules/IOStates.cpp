@@ -33,6 +33,7 @@ const std::array<std::string, IOStates::LeakType::LAST> IOStates::s_leakTypes = 
 
 IOStates::IOStates(CRAX &ctx)
     : Module(ctx),
+      m_stackChkFailPlt(ctx.getExploit().getElf().symbols()["__stack_chk_fail"]),
       m_leakQueue() {
     // Install input state syscall hook.
     ctx.beforeSyscallHooks.connect(
@@ -62,7 +63,10 @@ IOStates::IOStates(CRAX &ctx)
                 sigc::mem_fun(*this, &IOStates::maybeInterceptStackCanary));
 
         ctx.beforeInstructionHooks.connect(
-                sigc::mem_fun(*this, &IOStates::maybeTerminateState));
+                sigc::mem_fun(*this, &IOStates::onStackChkFailed));
+
+        ctx.onStateForkModuleDecide.connect(
+                sigc::mem_fun(*this, &IOStates::onStateForkModuleDecide));
     }
 }
 
@@ -205,11 +209,43 @@ void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
     }
 }
 
-void IOStates::maybeTerminateState(S2EExecutionState *state,
-                                   const Instruction &i) {
-    if (i.address == m_ctx.getExploit().getElf().symbols()["__stack_chk_fail"]) {
-        // XXX: If we disable forking instead of terminating the state here,
-        // the forked output state will run endlessly. Why is that ?__?
+void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
+                                       bool *allowForking) {
+    // If S2E native forking is enabled, then it will automatically fork
+    // at canary check.
+    if (!m_ctx.isNativeForkingDisabled()) {
+        return;
+    }
+
+    // Look ahead the next instruction.
+    std::optional<Instruction> insn
+        = m_ctx.getDisassembler().disasm(state->regs()->getPc());  
+    assert(insn && "Disassemble failed? (insn)");
+
+    std::optional<Instruction> nextInsn
+        = m_ctx.getDisassembler().disasm(state->regs()->getPc() + insn->size);
+    assert(nextInsn && "Disassemble failed? (nextInsn)");
+
+    // If the current branch instruction is the one before `call __stack_chk_fail@plt`,
+    // then allow it to fork the current state.
+    //
+    // -> 401289:       74 05                   je     401290 <main+0xa2>
+    //    40128b:       e8 20 fe ff ff          call   4010b0 <__stack_chk_fail@plt>
+    //    401290:       c9                      leave
+    if (nextInsn->mnemonic == "call" &&
+        std::stoull(nextInsn->opStr, nullptr, 16) == m_stackChkFailPlt) {
+        // Make sure we don't overwrite the decision from other modules.
+        *allowForking &= true;
+    } else {
+        *allowForking = false;
+    }
+}
+
+void IOStates::onStackChkFailed(S2EExecutionState *state,
+                                const Instruction &i) {
+    if (i.address == m_stackChkFailPlt) {
+        // The program has reached __stack_chk_fail and
+        // there's no return, so kill it.
         g_s2e->getExecutor()->terminateState(*state, "reached __stack_chk_fail@plt");
     }
 }

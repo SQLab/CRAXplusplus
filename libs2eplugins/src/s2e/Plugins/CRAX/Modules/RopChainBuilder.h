@@ -45,7 +45,8 @@ class RopChainBuilder : public Module {
 public:
     explicit RopChainBuilder(CRAX &ctx)
         : Module(ctx),
-          m_symbolicMode(true),
+          m_useSolver(true),
+          m_symbolicMode(m_useSolver),
           m_symbolicModeRspOffset() {}
 
     virtual ~RopChainBuilder() = default;
@@ -57,10 +58,16 @@ public:
 
     [[nodiscard]]
     bool build(Exploit &exploit,
-               const std::vector<std::unique_ptr<Technique>> &techniques);
+               const std::vector<std::unique_ptr<Technique>> &techniques,
+               uint64_t nrSkippedBytes = 0);
+
+    void useSolver(bool useSolver) {
+        m_useSolver = useSolver;
+        reset();
+    }
 
     void reset() {
-        m_symbolicMode = true;
+        m_symbolicMode = m_useSolver;
         m_symbolicModeRspOffset = 0;
     }
 
@@ -78,6 +85,7 @@ private:
     bool addMemoryConstraint(uint64_t addr, const klee::ref<klee::Expr> &e);
     
 
+    bool m_useSolver;
     bool m_symbolicMode;  // true: symbolic, false: direct
     uint32_t m_symbolicModeRspOffset;
 };

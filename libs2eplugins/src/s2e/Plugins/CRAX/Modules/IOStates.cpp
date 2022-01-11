@@ -152,6 +152,7 @@ void IOStates::inputStateHookBottomHalf(S2EExecutionState *inputState,
     }
 
     modState->leakableOffset = 0;
+    modState->lastInputStateInfoIdx = modState->stateInfoList.size();
     modState->stateInfoList.push_back(std::move(stateInfo));
 }
 
@@ -234,6 +235,7 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
     //    401290:       c9                      leave
     if (nextInsn->mnemonic == "call" &&
         std::stoull(nextInsn->opStr, nullptr, 16) == m_stackChkFailPlt) {
+        log<WARN>() << "Allowing fork before __stack_chk_fail@plt\n";
         // Make sure we don't overwrite the decision from other modules.
         *allowForking &= true;
     } else {

@@ -29,36 +29,16 @@
 #include "RopChainBuilder.h"
 
 using namespace klee;
-using VarValuePair = std::pair<std::string, std::vector<uint8_t>>;
-using ConcreteInputs = std::vector<VarValuePair>;
 
 namespace s2e::plugins::crax {
 
-using SymbolicRopPayload = Technique::SymbolicRopPayload;
-using ConcreteRopPayload = Technique::ConcreteRopPayload;
-
-
 bool RopChainBuilder::build(Exploit &exploit,
-                            const std::vector<std::unique_ptr<Technique>> &techniques) {
-    // [Optional] generate code to leak canary.
-    if (exploit.getElf().getChecksec().hasCanary) {
-        exploit.appendRopPayload(format("b'A' * %d", exploit.getCanaryLeakOffset()));
-        exploit.flushRopPayload();
+                            const std::vector<std::unique_ptr<Technique>> &techniques,
+                            uint64_t nrSkippedBytes) {
+    using VarValuePair = std::pair<std::string, std::vector<uint8_t>>;
+    using ConcreteInputs = std::vector<VarValuePair>;
+    using SymbolicRopPayload = Technique::SymbolicRopPayload;
 
-        exploit.writelines({
-            format("    proc.recvuntil(b'A' * %d)", exploit.getCanaryLeakOffset()),
-            "    canary = b'\\x00' + proc.recv(7)",
-            "    log.info('leaked canary: {}'.format(hex(u64(canary))))",
-            ""
-        });
-    }
-
-    // [Optional] generate code to leak ELF base.
-    if (exploit.getElf().getChecksec().hasPIE) {
-
-    }
-
-    // [Required] generate ROP chain.
     for (const auto &t : techniques) {
         std::vector<SymbolicRopPayload> symbolicRopPayloadList = t->getSymbolicRopPayloadList();
 
@@ -102,16 +82,21 @@ bool RopChainBuilder::build(Exploit &exploit,
             log<WARN>() << "Switching from symbolic mode to direct mode...\n";
             m_symbolicMode = false;
 
-            ConcreteInputs newInput;
-            if (!m_ctx.getCurrentState()->getSymbolicSolution(newInput)) {
+            ConcreteInputs __newInput;
+            if (!m_ctx.getCurrentState()->getSymbolicSolution(__newInput)) {
                 log<WARN>() << "Could not get symbolic solutions\n";
                 return false;
             }
 
-            std::string symbolicPayload = toByteString(newInput[0].second.begin(),
-                                                       newInput[0].second.end());
+            // Optionally skip the first n bytes.
+            assert(nrSkippedBytes <= __newInput[0].second.size() && "nrSkippedBytes too large");
+            std::vector<uint8_t> newInput(__newInput[0].second.begin() + nrSkippedBytes,
+                                          __newInput[0].second.end());
 
-            // XXX: You mad bro?
+            std::string symbolicPayload = toByteString(newInput.begin(), newInput.end());
+
+            // Maybe replace canary.
+            // XXX: currently our canary cannot survive input transformation...
             if (exploit.getElf().getChecksec().hasCanary) {
                 assert(exploit.getElf().getCanary() != 0 && "Corrupted canary?");
 
@@ -135,7 +120,6 @@ bool RopChainBuilder::build(Exploit &exploit,
             }
         }
     }
-
     return true;
 }
 

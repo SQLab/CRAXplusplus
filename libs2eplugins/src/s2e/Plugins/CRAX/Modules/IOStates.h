@@ -69,7 +69,10 @@ public:
         using OutputStateInfo = IOStates::OutputStateInfo;
 
     public:
-        State() : leakableOffset(), stateInfoList() {}
+        State()
+            : leakableOffset(),
+              lastInputStateInfoIdx(),
+              stateInfoList() {}
         virtual ~State() = default;
 
         static ModuleState *factory(Module *, CRAXState *) {
@@ -82,6 +85,7 @@ public:
 
         // XXX: maybe make this member private?
         uint64_t leakableOffset;
+        uint64_t lastInputStateInfoIdx;
         std::vector<std::variant<InputStateInfo, OutputStateInfo>> stateInfoList;
     };
 

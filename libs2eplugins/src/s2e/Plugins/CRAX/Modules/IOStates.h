@@ -135,8 +135,6 @@ public:
 private:
     LeakType getLeakType(const std::string &image) const;
 
-    const uint64_t m_stackChkFailPlt;
-
     // The targets that must be leaked according to checksec.
     std::vector<LeakType> m_leakTargets;
 };

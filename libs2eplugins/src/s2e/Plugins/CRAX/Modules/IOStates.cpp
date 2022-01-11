@@ -25,6 +25,8 @@
 
 #include "IOStates.h"
 
+using namespace klee;
+
 namespace s2e::plugins::crax {
 
 const std::array<std::string, IOStates::LeakType::LAST> IOStates::s_leakTypes = {{
@@ -33,7 +35,6 @@ const std::array<std::string, IOStates::LeakType::LAST> IOStates::s_leakTypes = 
 
 IOStates::IOStates(CRAX &ctx)
     : Module(ctx),
-      m_stackChkFailPlt(ctx.getExploit().getElf().symbols()["__stack_chk_fail"]),
       m_leakTargets() {
     // Install input state syscall hook.
     ctx.beforeSyscallHooks.connect(
@@ -110,27 +111,31 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
         return;
     }
 
-    // Create input state snapshot.
-    S2EExecutionState *forkedState = m_ctx.fork(*inputState);
+    // For each offset, fork a new state
+    // XXX: Optimize this with a custom searcher (?)
+    for (uint64_t offset : bufInfo[currentLeakType]) {
+        // If we're leaking the canary, then we need to overwrite
+        // the least significant bit of the canary, so offset++.
+        if (currentLeakType == IOStates::LeakType::CANARY) {
+            offset++;
+        }
 
-    log<WARN>()
-        << "forked output state for leak detection (id="
-        << forkedState->getID() << ")\n";
+        S2EExecutionState *forkedState = m_ctx.fork(*inputState);
 
-    // Hijack sys_read(0, buf, len), setting len to `value`.
-    // Since the forked state is currently in symbolic mode,
-    // we have to write a klee::ConstantExpr instead of uint64_t.
-    uint64_t offset = bufInfo[currentLeakType].front();
-    if (currentLeakType == IOStates::LeakType::CANARY) {
-        offset++;
+        log<WARN>()
+            << "forked a new state for offset " << hexval(offset)
+            << "(id=" << forkedState->getID() << ")\n";
+
+        // Hijack sys_read(0, buf, len), setting len to `value`.
+        // Note that the forked state is currently in symbolic mode,
+        // so we have to write a klee::ConstantExpr instead of uint64_t.
+        ref<Expr> value = ConstantExpr::create(offset, Expr::Int64);
+        forkedState->regs()->write(CPU_OFFSET(regs[Register::X64::RDX]), value);
+
+        auto *forkedModState = m_ctx.getPluginModuleState(forkedState, this);
+        modState->leakableOffset = offset;
+        forkedModState->leakableOffset = offset;
     }
-
-    ref<Expr> value = ConstantExpr::create(offset, Expr::Int64);
-    forkedState->regs()->write(CPU_OFFSET(regs[Register::X64::RDX]), value);
-
-    auto *forkedModState = m_ctx.getPluginModuleState(forkedState, this);
-    modState->leakableOffset = offset;
-    forkedModState->leakableOffset = offset;
 }
 
 void IOStates::inputStateHookBottomHalf(S2EExecutionState *inputState,
@@ -182,13 +187,13 @@ void IOStates::outputStateHook(S2EExecutionState *outputState,
         stateInfo.baseOffset = outputStateInfoList.front().baseOffset;
         stateInfo.leakType = outputStateInfoList.front().leakType;
 
-        modState->currentLeakTargetIdx++;
-
         log<WARN>()
             << "*** WARN *** detected leak: ("
             << IOStates::s_leakTypes[stateInfo.leakType] << ", "
             << klee::hexval(stateInfo.bufIndex) << ", "
             << klee::hexval(stateInfo.baseOffset) << ")\n";
+
+        modState->currentLeakTargetIdx++;
     }
 
     modState->stateInfoList.push_back(std::move(stateInfo));
@@ -203,7 +208,7 @@ void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
         return;
     }
 
-    if (i.address == m_ctx.getExploit().getElf().symbols()["main"]) {
+    if (i.address == m_ctx.getExploit().getElf().getRuntimeAddress("main")) {
         hasReachedMain = true;
     }
 
@@ -211,6 +216,7 @@ void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
         i.mnemonic == "mov" && i.opStr == "rax, qword ptr fs:[0x28]") {
         uint64_t canary = m_ctx.reg().readConcrete(Register::X64::RAX);
         m_ctx.getExploit().getElf().setCanary(canary);
+
         log<WARN>()
             << '[' << klee::hexval(i.address) << "] "
             << "Intercepted canary: " << klee::hexval(canary) << '\n';
@@ -240,8 +246,11 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
     // -> 401289:       74 05                   je     401290 <main+0xa2>
     //    40128b:       e8 20 fe ff ff          call   4010b0 <__stack_chk_fail@plt>
     //    401290:       c9                      leave
+    const uint64_t stackChkFailPlt
+        = m_ctx.getExploit().getElf().getRuntimeAddress("__stack_chk_fail");
+
     if (nextInsn->mnemonic == "call" &&
-        std::stoull(nextInsn->opStr, nullptr, 16) == m_stackChkFailPlt) {
+        std::stoull(nextInsn->opStr, nullptr, 16) == stackChkFailPlt) {
         log<WARN>() << "Allowing fork before __stack_chk_fail@plt\n";
         // Make sure we don't overwrite the decision from other modules.
         *allowForking &= true;
@@ -252,7 +261,10 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
 
 void IOStates::onStackChkFailed(S2EExecutionState *state,
                                 const Instruction &i) {
-    if (i.address == m_stackChkFailPlt) {
+    const uint64_t stackChkFailPlt
+        = m_ctx.getExploit().getElf().getRuntimeAddress("__stack_chk_fail");
+
+    if (i.address == stackChkFailPlt) {
         // The program has reached __stack_chk_fail and
         // there's no return, so kill it.
         g_s2e->getExecutor()->terminateState(*state, "reached __stack_chk_fail@plt");
@@ -262,7 +274,7 @@ void IOStates::onStackChkFailed(S2EExecutionState *state,
 
 std::array<std::vector<uint64_t>, IOStates::LeakType::LAST>
 IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len) {
-    auto mapInfo = m_ctx.mem().getMapInfo(m_ctx.getTargetProcessPid());
+    auto mapInfo = m_ctx.mem().getMapInfo();
     uint64_t canary = m_ctx.getExploit().getElf().getCanary();
     std::array<std::vector<uint64_t>, IOStates::LeakType::LAST> bufInfo;
 
@@ -285,7 +297,7 @@ IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len)
 
 std::vector<IOStates::OutputStateInfo>
 IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len) {
-    auto mapInfo = m_ctx.mem().getMapInfo(m_ctx.getTargetProcessPid());
+    auto mapInfo = m_ctx.mem().getMapInfo();
     uint64_t canary = m_ctx.getExploit().getElf().getCanary();
     std::vector<IOStates::OutputStateInfo> leakInfo;
 

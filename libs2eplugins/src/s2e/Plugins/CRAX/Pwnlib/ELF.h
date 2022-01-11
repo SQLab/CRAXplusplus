@@ -51,6 +51,8 @@ public:
     FunctionMap functions() const;
     uint64_t bss() const;
 
+    uint64_t getRuntimeAddress(const std::string &symbol) const;
+
     const ELF::Checksec &getChecksec() const { return m_checksec; }
 
     uint64_t getBase() const { return m_base; }

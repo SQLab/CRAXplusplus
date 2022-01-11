@@ -119,7 +119,7 @@ void CRAX::onSymbolicRip(S2EExecutionState *exploitableState,
     reg().showRegInfo();
 
     // Dump virtual memory mappings.
-    mem().showMapInfo(m_targetProcessPid);
+    mem().showMapInfo();
 
     // Execute exploit generation hooks installed by the user.
     exploitGenerationHooks.emit();
@@ -159,6 +159,19 @@ void CRAX::onModuleLoad(S2EExecutionState *state,
     for (auto section : md.Sections) {
         section.name = md.Name;
         mem().getMappedSections().push_back(section);
+    }
+
+    // Resolve ELF base.
+    //
+    // Note that onModuleLoad() is triggered by load_elf_binary(),
+    // so libc and other shared libraries have not yet been loaded
+    // by the dynamic loader (ld-linux.so.2) at this point.
+    //
+    // See: github.com/S2E/s2e-linux-kernel: linux-4.9.3/fs/binfmt_elf.c
+    if (md.Name == "target") {
+        auto mapInfo = mem().getMapInfo();
+        m_exploit.getElf().setBase(mapInfo.begin()->start);
+        log<WARN>() << "ELF loaded at: " << hexval(mapInfo.begin()->start) << '\n';
     }
 }
 

@@ -45,10 +45,10 @@ std::optional<Instruction> Disassembler::disasm(uint64_t pc) {
 std::vector<Instruction> Disassembler::disasm(const std::string &symbol) {
     // The object `f` holds the information about the function `symbol`,
     // e.g., offset within ELF, size, etc.
-    // XXX: PIE
-    Function f = m_ctx.getExploit().getElf().functions()[symbol];
-    std::vector<uint8_t> code = m_ctx.mem().readConcrete(f.address, f.size);
-    std::vector<Instruction> insns = disasm(code, f.address);
+    const auto &elf = m_ctx.getExploit().getElf();
+    Function f = elf.functions()[symbol];
+    std::vector<uint8_t> code = m_ctx.mem().readConcrete(elf.getBase() + f.address, f.size);
+    std::vector<Instruction> insns = disasm(code, elf.getBase() + f.address);
 
     assert(insns.size());
     return insns;

@@ -91,10 +91,10 @@ public:
 
     // Get all the mapped memory region.
     [[nodiscard]]
-    std::set<MemoryRegion, MemoryRegionCmp> getMapInfo(uint64_t pid) const;
+    std::set<MemoryRegion, MemoryRegionCmp> getMapInfo() const;
 
     // Show all the mapped memory region.
-    void showMapInfo(uint64_t pid) const;
+    void showMapInfo() const;
 
     ModuleSections &getMappedSections() { return m_mappedSections; }
 

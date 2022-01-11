@@ -109,7 +109,7 @@ std::vector<uint64_t> Memory::search(const std::vector<uint8_t> &needle) const {
     std::vector<uint64_t> ret;
 
     // Iterate over all the mapped memory regions.
-    for (auto region : getMapInfo(m_ctx.getTargetProcessPid())) {
+    for (auto region : getMapInfo()) {
         // XXX: Some regions might be unaccessible even though it's mapped,
         // which I believe this is a bug in S2E. Just in case this happens,
         // we'll use `Memory::isMapped()` to scan through every address
@@ -148,7 +148,7 @@ Memory::getSymbolicMemory(uint64_t start, uint64_t end) const {
     return {};
 }
 
-std::set<MemoryRegion, MemoryRegionCmp> Memory::getMapInfo(uint64_t pid) const {
+std::set<MemoryRegion, MemoryRegionCmp> Memory::getMapInfo() const {
     std::set<MemoryRegion, MemoryRegionCmp> ret;
 
     auto callback = [this, &ret](uint64_t start,
@@ -177,7 +177,7 @@ std::set<MemoryRegion, MemoryRegionCmp> Memory::getMapInfo(uint64_t pid) const {
         return true;
     };
     
-    m_map->iterateRegions(m_ctx.getCurrentState(), pid, callback);
+    m_map->iterateRegions(m_ctx.getCurrentState(), m_ctx.getTargetProcessPid(), callback);
 
     // XXX: This workaround should be overhauled!!!
     //
@@ -248,14 +248,14 @@ std::set<MemoryRegion, MemoryRegionCmp> Memory::getMapInfo(uint64_t pid) const {
     return ret;
 }
 
-void Memory::showMapInfo(uint64_t pid) const {
+void Memory::showMapInfo() const {
     auto &os = log<WARN>();
 
     os << "Dummping memory map...\n"
         << "--------------- [VMMAP] ---------------\n"
         << "Start\t\tEnd\t\tPerm\tImage\n";
 
-    for (const auto &region : getMapInfo(pid)) {
+    for (const auto &region : getMapInfo()) {
         os << hexval(region.start) << '\t'
             << hexval(region.end) << '\t'
             << (region.prot & MM_READ ? 'r' : '-')

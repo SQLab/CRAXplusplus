@@ -146,6 +146,10 @@ public:
 
     void setCurrentState(S2EExecutionState *state) { m_currentState = state; }
 
+    void setShowInstructions(bool showInstructions) { m_showInstructions = showInstructions; }
+
+    void setShowSyscalls(bool showSyscalls) { m_showSyscalls = showSyscalls; }
+
     [[nodiscard]]
     bool isNativeForkingDisabled() const { return m_disableNativeForking; }
 

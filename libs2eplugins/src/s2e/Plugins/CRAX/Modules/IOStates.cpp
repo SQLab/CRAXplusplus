@@ -34,7 +34,7 @@ const std::array<std::string, IOStates::LeakType::LAST> IOStates::s_leakTypes = 
 IOStates::IOStates(CRAX &ctx)
     : Module(ctx),
       m_stackChkFailPlt(ctx.getExploit().getElf().symbols()["__stack_chk_fail"]),
-      m_leakQueue() {
+      m_leakTargets() {
     // Install input state syscall hook.
     ctx.beforeSyscallHooks.connect(
             sigc::mem_fun(*this, &IOStates::inputStateHookTopHalf));
@@ -50,10 +50,10 @@ IOStates::IOStates(CRAX &ctx)
     // according to checksec of the target binary.
     const auto &checksec = m_ctx.getExploit().getElf().getChecksec();
     if (checksec.hasCanary) {
-        m_leakQueue.push(IOStates::LeakType::CANARY);
+        m_leakTargets.push_back(IOStates::LeakType::CANARY);
     }
     if (checksec.hasPIE) {
-        m_leakQueue.push(IOStates::LeakType::CODE);
+        m_leakTargets.push_back(IOStates::LeakType::CODE);
     }
     // XXX: ASLR -> libc
 
@@ -93,10 +93,20 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
 
     // Now we assume that the first offset can help us
     // successfully leak the address we want.
-    IOStates::LeakType currentLeakType = m_leakQueue.front();
+    auto modState = m_ctx.getPluginModuleState(inputState, this);
+
+    if (modState->currentLeakTargetIdx >= m_leakTargets.size()) {
+        log<WARN>() << "No more leak targets :^)\n";
+        return;
+    }
+
+    IOStates::LeakType currentLeakType
+        = m_leakTargets[modState->currentLeakTargetIdx];
+
+    log<WARN>() << "Current leak target: " << s_leakTypes[currentLeakType] << '\n';
 
     if (bufInfo[currentLeakType].empty()) {
-        log<WARN>() << "No leak targets\n";
+        log<WARN>() << "No leak targets in current input state.\n";
         return;
     }
 
@@ -114,15 +124,12 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
     if (currentLeakType == IOStates::LeakType::CANARY) {
         offset++;
     }
+
     ref<Expr> value = ConstantExpr::create(offset, Expr::Int64);
     forkedState->regs()->write(CPU_OFFSET(regs[Register::X64::RDX]), value);
 
-    log<WARN>() << "inputStateHookTopHalf(): set leakableOffset to: " << offset << '\n';
-
-    auto modState = m_ctx.getPluginModuleState(inputState, this);
-    modState->leakableOffset = offset;
-
     auto *forkedModState = m_ctx.getPluginModuleState(forkedState, this);
+    modState->leakableOffset = offset;
     forkedModState->leakableOffset = offset;
 }
 
@@ -145,7 +152,6 @@ void IOStates::inputStateHookBottomHalf(S2EExecutionState *inputState,
         // `inputStateHookBottomHalf()` -> `analyzeLeak()` has found
         // something that can be leaked and stored it in `modState->leakableOffset`.
         stateInfo.offset = modState->leakableOffset;
-        log<WARN>() << "inputStateHookBottomHalf(): get offset: " << stateInfo.offset << '\n';
     } else {
         // Nothing to leak, set the offset as the original length of sys_read().
         stateInfo.offset = syscall.arg3;
@@ -164,8 +170,8 @@ void IOStates::outputStateHook(S2EExecutionState *outputState,
 
     m_ctx.setCurrentState(outputState);
 
-    log<WARN>() << "outputStateHook()\n";
     auto outputStateInfoList = detectLeak(outputState, syscall.arg2, syscall.arg3);
+    auto modState = m_ctx.getPluginModuleState(outputState, this);
 
     OutputStateInfo stateInfo;
     stateInfo.valid = false;
@@ -176,6 +182,8 @@ void IOStates::outputStateHook(S2EExecutionState *outputState,
         stateInfo.baseOffset = outputStateInfoList.front().baseOffset;
         stateInfo.leakType = outputStateInfoList.front().leakType;
 
+        modState->currentLeakTargetIdx++;
+
         log<WARN>()
             << "*** WARN *** detected leak: ("
             << IOStates::s_leakTypes[stateInfo.leakType] << ", "
@@ -183,7 +191,6 @@ void IOStates::outputStateHook(S2EExecutionState *outputState,
             << klee::hexval(stateInfo.baseOffset) << ")\n";
     }
 
-    auto modState = m_ctx.getPluginModuleState(outputState, this);
     modState->stateInfoList.push_back(std::move(stateInfo));
 }
 

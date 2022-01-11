@@ -27,7 +27,6 @@
 
 #include <array>
 #include <map>
-#include <queue>
 #include <string>
 #include <vector>
 #include <variant>
@@ -72,6 +71,7 @@ public:
         State()
             : leakableOffset(),
               lastInputStateInfoIdx(),
+              currentLeakTargetIdx(),
               stateInfoList() {}
         virtual ~State() = default;
 
@@ -83,9 +83,10 @@ public:
             return new State(*this);
         }
 
-        // XXX: maybe make this member private?
+        // XXX: maybe make these data members private?
         uint64_t leakableOffset;
-        uint64_t lastInputStateInfoIdx;
+        uint32_t lastInputStateInfoIdx;
+        uint32_t currentLeakTargetIdx;
         std::vector<std::variant<InputStateInfo, OutputStateInfo>> stateInfoList;
     };
 
@@ -135,7 +136,9 @@ private:
     LeakType getLeakType(const std::string &image) const;
 
     const uint64_t m_stackChkFailPlt;
-    std::queue<LeakType> m_leakQueue;
+
+    // The targets that must be leaked according to checksec.
+    std::vector<LeakType> m_leakTargets;
 };
 
 }  // namespace s2e::plugins::crax

@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
+#include <s2e/Plugins/CRAX/Pwnlib/Util.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 #include <s2e/Plugins/CRAX/Expr/BinaryExprEvaluator.h>
 
@@ -227,9 +228,7 @@ void Ret2csu::parseLibcCsuInit() {
 
 void Ret2csu::searchGadget2CallTarget(std::string funcName) {
     uint64_t funcAddr = m_ctx.getExploit().getElf().getRuntimeAddress(funcName);
-    std::vector<uint8_t> funcAddrBytes(8);
-
-    std::memcpy(funcAddrBytes.data(), &funcAddr, sizeof(funcAddr));
+    std::vector<uint8_t> funcAddrBytes = p64(funcAddr);
     std::vector<uint64_t> candidates = m_ctx.mem().search(funcAddrBytes);
 
     if (candidates.empty()) {

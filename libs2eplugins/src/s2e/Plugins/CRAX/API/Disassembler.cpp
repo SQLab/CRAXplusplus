@@ -31,7 +31,7 @@
 
 namespace s2e::plugins::crax {
 
-std::optional<Instruction> Disassembler::disasm(uint64_t pc) {
+std::optional<Instruction> Disassembler::disasm(uint64_t pc) const {
     std::vector<uint8_t> code = m_ctx.mem().readConcrete(pc, X86_64_INSN_MAX_NR_BYTES);
     std::vector<Instruction> insns = disasm(code, pc);
 
@@ -42,7 +42,7 @@ std::optional<Instruction> Disassembler::disasm(uint64_t pc) {
     }
 }
 
-std::vector<Instruction> Disassembler::disasm(const std::string &symbol) {
+std::vector<Instruction> Disassembler::disasm(const std::string &symbol) const {
     // The object `f` holds the information about the function `symbol`,
     // e.g., offset within ELF, size, etc.
     const auto &elf = m_ctx.getExploit().getElf();
@@ -56,7 +56,7 @@ std::vector<Instruction> Disassembler::disasm(const std::string &symbol) {
 
 std::vector<Instruction> Disassembler::disasm(const std::vector<uint8_t> &code,
                                               uint64_t virtAddr,
-                                              bool warnOnError) {
+                                              bool warnOnError) const {
     csh handle;
     cs_insn *insn;
     size_t count;

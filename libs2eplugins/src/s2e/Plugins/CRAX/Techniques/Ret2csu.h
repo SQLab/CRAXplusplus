@@ -21,6 +21,7 @@
 #ifndef S2E_PLUGINS_CRAX_RET2CSU_H
 #define S2E_PLUGINS_CRAX_RET2CSU_H
 
+#include <s2e/Plugins/CRAX/Expr/Expr.h>
 #include <s2e/Plugins/CRAX/Techniques/Technique.h>
 
 #include <exception>
@@ -58,10 +59,17 @@ public:
 
     virtual std::string toString() const override;
 
-    std::vector<SymbolicRopPayload> getSymbolicRopPayloadList(uint64_t addr,
-                                                              uint64_t arg1,
-                                                              uint64_t arg2,
-                                                              uint64_t arg3) const;
+    std::vector<SymbolicRopPayload>
+    getSymbolicRopPayloadList(const klee::ref<klee::Expr> &retAddr,
+                              const klee::ref<klee::Expr> &arg1,
+                              const klee::ref<klee::Expr> &arg2,
+                              const klee::ref<klee::Expr> &arg3) const;
+
+    std::vector<SymbolicRopPayload>
+    getSymbolicRopPayloadList(uint64_t retAddr,
+                              uint64_t arg1,
+                              uint64_t arg2,
+                              uint64_t arg3) const;
 
     static const std::string s_libcCsuInit;
     static const std::string s_libcCsuInitGadget1;
@@ -74,7 +82,7 @@ private:
     void buildSymbolicRopPayloadList();
     void buildAuxiliaryFunction();
 
-    uint64_t m_addr;
+    uint64_t m_retAddr;
     uint64_t m_arg1;
     uint64_t m_arg2;
     uint64_t m_arg3;

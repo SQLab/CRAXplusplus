@@ -63,7 +63,8 @@ std::vector<SymbolicRopPayload> BasicStackPivot::getSymbolicRopPayloadList() con
     assert(ret2csu);
 
     // RBP
-    SymbolicRopPayload part1 = { ConstantExpr::create(0, Expr::Int64) };
+    SymbolicRopPayload part1 = {
+        ConstantExpr::create(0, Expr::Int64)};
 
     // Write the 2nd stage ROP payload via read() to `pivot_dest`
     // via ret2csu(read, 0, pivot_dest, 1024).
@@ -71,15 +72,13 @@ std::vector<SymbolicRopPayload> BasicStackPivot::getSymbolicRopPayloadList() con
         BaseOffsetExpr::create(m_ctx.getExploit(), "sym", "read"),
         ConstantExpr::create(0, Expr::Int64),
         BaseOffsetExpr::create(m_ctx.getExploit(), "", "pivot_dest"),
-        ConstantExpr::create(1024, Expr::Int64)
-    )[0];
+        ConstantExpr::create(1024, Expr::Int64))[0];
 
     // Perform stack pivoting.
     SymbolicRopPayload part3 = {
         BaseOffsetExpr::create(m_ctx.getExploit(), "", "pop_rbp_ret"),
         BaseOffsetExpr::create(m_ctx.getExploit(), "", "pivot_dest"),
-        BaseOffsetExpr::create(m_ctx.getExploit(), "", "leave_ret"),
-    };
+        BaseOffsetExpr::create(m_ctx.getExploit(), "", "leave_ret")};
 
     SymbolicRopPayload ret;
     ret.reserve(part1.size() + part2.size() + part3.size());

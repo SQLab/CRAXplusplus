@@ -152,8 +152,7 @@ Ret2csu::getSymbolicRopPayloadList(uint64_t retAddr,
         ConstantExpr::create(retAddr, Expr::Int64),
         ConstantExpr::create(arg1, Expr::Int64),
         ConstantExpr::create(arg2, Expr::Int64),
-        ConstantExpr::create(arg3, Expr::Int64)
-    );
+        ConstantExpr::create(arg3, Expr::Int64));
 }
 
 void Ret2csu::parseLibcCsuInit() {

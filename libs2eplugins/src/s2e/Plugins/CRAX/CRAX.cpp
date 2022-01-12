@@ -333,23 +333,23 @@ std::string CRAX::getBelongingSymbol(uint64_t instructionAddr) const {
     }
 
     // Use binary search to find out which symbol `instructionAddr` belongs to.
-    int left = 0;
-    int right = syms.size() - 1;
+    int l = 0;
+    int r = syms.size() - 1;
 
-    while (left < right) {
-        int mid = left + (right + left) / 2;
-        uint64_t addr = syms[mid].second;
+    while (l < r) {
+        int m = l + (r + l) / 2;
+        uint64_t addr = syms[m].second;
         if (addr < instructionAddr) {
-            left = mid + 1;
+            l = m + 1;
         } else {
-            right = mid - 1;
+            r = m - 1;
         }
     }
 
-    if (instructionAddr < syms[left].second) {
-        left--;
+    if (instructionAddr < syms[l].second) {
+        l--;
     }
-    return syms[left].first;
+    return syms[l].first;
 }
 
 }  // namespace s2e::plugins::crax

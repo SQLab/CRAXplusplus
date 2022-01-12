@@ -58,14 +58,11 @@ public:
     uint64_t getBase() const { return m_base; }
     void setBase(uint64_t base) { m_base = base; }
 
-    uint64_t getCanary() const { return m_canary; }
-    void setCanary(uint64_t canary) { m_canary = canary; }
-
 private:
     pybind11::object m_elf;
     ELF::Checksec m_checksec;
+
     uint64_t m_base;
-    uint64_t m_canary;
 };
 
 }  // namespace s2e::plugins::crax

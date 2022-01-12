@@ -35,6 +35,7 @@ const std::array<std::string, IOStates::LeakType::LAST> IOStates::s_leakTypes = 
 
 IOStates::IOStates(CRAX &ctx)
     : Module(ctx),
+      m_canary(),
       m_leakTargets() {
     // Install input state syscall hook.
     ctx.beforeSyscallHooks.connect(
@@ -204,7 +205,9 @@ void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
                                          const Instruction &i) {
     static bool hasReachedMain = false;
 
-    if (m_ctx.getExploit().getElf().getCanary()) {
+    // If we've already intercepted the canary of the target ELF,
+    // then we don't need to proceed anymore.
+    if (m_canary) {
         return;
     }
 
@@ -215,7 +218,7 @@ void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
     if (hasReachedMain &&
         i.mnemonic == "mov" && i.opStr == "rax, qword ptr fs:[0x28]") {
         uint64_t canary = m_ctx.reg().readConcrete(Register::X64::RAX);
-        m_ctx.getExploit().getElf().setCanary(canary);
+        m_canary = canary;
 
         log<WARN>()
             << '[' << klee::hexval(i.address) << "] "
@@ -275,7 +278,7 @@ void IOStates::onStackChkFailed(S2EExecutionState *state,
 std::array<std::vector<uint64_t>, IOStates::LeakType::LAST>
 IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len) {
     auto mapInfo = m_ctx.mem().getMapInfo();
-    uint64_t canary = m_ctx.getExploit().getElf().getCanary();
+    uint64_t canary = m_canary;
     std::array<std::vector<uint64_t>, IOStates::LeakType::LAST> bufInfo;
 
     for (uint64_t i = 0; i < len; i += 8) {
@@ -298,7 +301,7 @@ IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len)
 std::vector<IOStates::OutputStateInfo>
 IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len) {
     auto mapInfo = m_ctx.mem().getMapInfo();
-    uint64_t canary = m_ctx.getExploit().getElf().getCanary();
+    uint64_t canary = m_canary;
     std::vector<IOStates::OutputStateInfo> leakInfo;
 
     for (uint64_t i = 0; i < len; i += 8) {

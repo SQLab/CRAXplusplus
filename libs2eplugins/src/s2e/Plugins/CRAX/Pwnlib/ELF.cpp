@@ -37,8 +37,7 @@ namespace s2e::plugins::crax {
 ELF::ELF(const std::string &filename)
     : m_elf(CRAX::s_pwnlib.attr("elf").attr("ELF").call(filename)),
       m_checksec(filename),
-      m_base(),
-      m_canary() {}
+      m_base() {}
 
 
 ELF::SymbolMap ELF::symbols() const {

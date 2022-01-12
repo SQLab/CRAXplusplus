@@ -21,6 +21,7 @@
 #include <klee/Expr.h>
 #include <s2e/Plugins/CRAX/CRAX.h>
 #include <s2e/Plugins/CRAX/Expr/BinaryExprEvaluator.h>
+#include <s2e/Plugins/CRAX/Modules/IOStates.h>
 #include <s2e/Plugins/CRAX/Techniques/Technique.h>
 #include <s2e/Plugins/CRAX/Techniques/StackPivot.h>
 #include <s2e/Plugins/CRAX/Pwnlib/Util.h>
@@ -38,6 +39,8 @@ bool RopChainBuilder::build(Exploit &exploit,
     using VarValuePair = std::pair<std::string, std::vector<uint8_t>>;
     using ConcreteInputs = std::vector<VarValuePair>;
     using SymbolicRopPayload = Technique::SymbolicRopPayload;
+
+    auto iostates = dynamic_cast<IOStates *>(CRAX::getModule("IOStates"));
 
     for (const auto &t : techniques) {
         std::vector<SymbolicRopPayload> symbolicRopPayloadList = t->getSymbolicRopPayloadList();
@@ -98,13 +101,13 @@ bool RopChainBuilder::build(Exploit &exploit,
             // Maybe replace canary.
             // XXX: currently our canary cannot survive input transformation...
             if (exploit.getElf().getChecksec().hasCanary) {
-                assert(exploit.getElf().getCanary() != 0 && "Corrupted canary?");
+                assert(iostates->getCanary() && "Canary is enabled but not intercepted?");
 
                 std::string canaryBytes;  // in "\xff\xff..." form
-                for (auto __byte : p64(exploit.getElf().getCanary())) {
+                for (auto __byte : p64(iostates->getCanary())) {
                     canaryBytes += format("\\x%02x", __byte);
                 }
-                log<WARN>() << "canary: " << klee::hexval(exploit.getElf().getCanary()) << '\n';
+                log<WARN>() << "canary: " << klee::hexval(iostates->getCanary()) << '\n';
                 log<WARN>() << "replacing: " << canaryBytes << '\n';
                 symbolicPayload = replace(symbolicPayload, canaryBytes, "' + canary + b'");
             }

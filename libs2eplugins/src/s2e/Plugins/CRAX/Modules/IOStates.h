@@ -130,10 +130,14 @@ public:
 
     void print() const;
 
+    uint64_t getCanary() const { return m_canary; }
+
     static const std::array<std::string, LeakType::LAST> s_leakTypes;
 
 private:
     LeakType getLeakType(const std::string &image) const;
+
+    uint64_t m_canary;
 
     // The targets that must be leaked according to checksec.
     std::vector<LeakType> m_leakTargets;

@@ -89,33 +89,46 @@ public:
     }
 
     // For expr such as:
-    // 1. "elf_base + elf.sym['read']"
-    // 2. "elf_base + __libc_csu_init_gadget1"
+    // 1. "elf_base + __libc_csu_init_gadget1"
+    // 2. "elf_base + elf.sym['read']"
+    // 3. "elf_base + elf.got['read']"
+    // 4. "elf_base + elf.bss()"
     //
     // XXX: Add support for libc base/offset
-    static ref<Expr> create(const Exploit &exploit, const std::string &symbol) {
+    static ref<Expr> create(const Exploit &exploit,
+                            const std::string &attr,
+                            std::string symbol = "") {
         uint64_t base = exploit.getElf().getBase();
         uint64_t offset = 0;
+
         std::string strBase = "elf_base";
         std::string strOffset;
 
-        const auto &symbolMap = exploit.getElf().symbols();
-        const auto &symtab = exploit.getSymtab();
-
-        auto it1 = symbolMap.find(symbol);
-        auto it2 = symtab.find(symbol);
-
-        if (it1 != symbolMap.end()) {
-            // The symbol exists in elf.sym, so it's relative to elf_base.
-            offset = it1->second;
-            strOffset = "elf.sym['" + symbol + "']";
-        } else if (it2 != symtab.end()) {
-            // The symbol doesn't exist in elf.sym, but exist in exploit script's symbol table,
-            // so it's still relative to elf_base.
-            offset = it2->second;
+        if (attr.empty()) {
+            const auto &symtab = exploit.getSymtab();
+            auto it = symtab.find(symbol);
+            assert(it != symtab.end() && "Symbol doesn't exist in exp script's symtab");
+            offset = it->second;
             strOffset = symbol;
-        } else {
-            // XXX:
+
+        } else if (attr == "sym") {
+            // The symbol exists in elf.sym, so it's relative to elf_base.
+            const auto &symbolMap = exploit.getElf().symbols();
+            auto it = symbolMap.find(symbol);
+            assert(it != symbolMap.end() && "Symbol doesn't exist in elf.sym");
+            offset = it->second;
+            strOffset = format("elf.sym['%s']", symbol.c_str());
+
+        } else if (attr == "got") {
+            const auto &gotMap = exploit.getElf().got();
+            auto it = gotMap.find(symbol);
+            assert(it != gotMap.end() && "Symbol doesn't exist in elf.got");
+            offset = it->second;
+            strOffset = format("elf.got['%s']", symbol.c_str());
+
+        } else if (attr == "bss") {
+            offset = exploit.getElf().bss();
+            strOffset = "elf.bss()";
         }
 
         return create(base, offset, std::move(strBase), std::move(strOffset));

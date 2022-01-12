@@ -168,7 +168,7 @@ void CRAX::onModuleLoad(S2EExecutionState *state,
     // by the dynamic loader (ld-linux.so.2) at this point.
     //
     // See: github.com/S2E/s2e-linux-kernel: linux-4.9.3/fs/binfmt_elf.c
-    if (md.Name == "target") {
+    if (md.Name == "target" && m_exploit.getElf().getChecksec().hasPIE) {
         auto mapInfo = mem().getMapInfo();
         m_exploit.getElf().setBase(mapInfo.begin()->start);
         log<WARN>() << "ELF loaded at: " << hexval(mapInfo.begin()->start) << '\n';

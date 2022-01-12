@@ -306,4 +306,13 @@ void CRAX::onStateForkDecide(S2EExecutionState *state,
     *allowForking |= m_allowedForkingStates.erase(state) == 1;
 }
 
+
+bool CRAX::isCallSiteOf(uint64_t pc, const std::string &symbol) const {
+    std::optional<Instruction> i = m_disassembler.disasm(pc);
+    assert(i && "isCallSiteOf(): Unable to disassemble the instruction");
+
+    const uint64_t symbolPlt = m_exploit.getElf().getRuntimeAddress(symbol);
+    return i->mnemonic == "call" && symbolPlt == std::stoull(i->opStr, nullptr, 16);
+}
+
 }  // namespace s2e::plugins::crax

@@ -234,31 +234,22 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
         return;
     }
 
-    // Look ahead the next instruction.
-    std::optional<Instruction> insn
-        = m_ctx.getDisassembler().disasm(state->regs()->getPc());  
-    assert(insn && "Disassemble failed? (insn)");
-
-    std::optional<Instruction> nextInsn
-        = m_ctx.getDisassembler().disasm(state->regs()->getPc() + insn->size);
-    assert(nextInsn && "Disassemble failed? (nextInsn)");
-
     // If the current branch instruction is the one before `call __stack_chk_fail@plt`,
     // then allow it to fork the current state.
     //
     // -> 401289:       74 05                   je     401290 <main+0xa2>
     //    40128b:       e8 20 fe ff ff          call   4010b0 <__stack_chk_fail@plt>
     //    401290:       c9                      leave
-    const uint64_t stackChkFailPlt
-        = m_ctx.getExploit().getElf().getRuntimeAddress("__stack_chk_fail");
+    uint64_t pc = state->regs()->getPc();
+    std::optional<Instruction> i = m_ctx.getDisassembler().disasm(pc);  
+    assert(i && "Disassemble failed?");
 
-    if (nextInsn->mnemonic == "call" &&
-        std::stoull(nextInsn->opStr, nullptr, 16) == stackChkFailPlt) {
-        log<WARN>() << "Allowing fork before __stack_chk_fail@plt\n";
-        // Make sure we don't overwrite the decision from other modules.
-        *allowForking &= true;
-    } else {
+    // Look ahead the next instruction.
+    if (!m_ctx.isCallSiteOf(pc + i->size, "__stack_chk_fail")) {
         *allowForking = false;
+    } else {
+        log<WARN>() << "Allowing fork before __stack_chk_fail@plt\n";
+        *allowForking &= true;  // use &= so previous result is not overwritten.
     }
 }
 

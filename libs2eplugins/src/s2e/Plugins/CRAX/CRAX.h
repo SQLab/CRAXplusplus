@@ -180,6 +180,9 @@ public:
         return (it != Module::s_mapper.end()) ? it->second : nullptr;
     }
 
+    [[nodiscard]]
+    bool isCallSiteOf(uint64_t pc, const std::string &symbol) const;
+
 
     // clang-format off
     sigc::signal<void,

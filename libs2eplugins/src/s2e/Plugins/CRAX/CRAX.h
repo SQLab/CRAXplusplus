@@ -183,6 +183,9 @@ public:
     [[nodiscard]]
     bool isCallSiteOf(uint64_t pc, const std::string &symbol) const;
 
+    [[nodiscard]]
+    std::string getBelongingSymbol(uint64_t instructionAddr) const;
+
 
     // clang-format off
     sigc::signal<void,

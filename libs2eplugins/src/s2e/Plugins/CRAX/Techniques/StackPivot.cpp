@@ -201,38 +201,11 @@ std::string AdvancedStackPivot::toString() const {
 }
 
 uint64_t AdvancedStackPivot::determineOffset() const {
-    ELF::SymbolMap __s = m_ctx.getExploit().getElf().symbols();
-    std::vector<std::pair<std::string, uint64_t>> syms(__s.begin(), __s.end());
-
-    std::sort(syms.begin(),
-              syms.end(),
-              [](const auto &p1, const auto& p2) {
-                return p1.second < p2.second;
-              });
-
-    // Use binary search to find out which symbol `target` belongs to.
     uint64_t target = m_ctx.getWritePrimitives()[0];
-    int left = 0;
-    int right = syms.size() - 1;
+    std::string symbol = m_ctx.getBelongingSymbol(target);
+    log<WARN>() << hexval(target) << " is within " << symbol << "\n";
 
-    while (left < right) {
-        int mid = left + (right - left) / 2;
-        uint64_t addr = syms[mid].second;
-
-        if (addr < target) {
-            left = mid + 1;
-        } else if (addr > target) {
-            right = mid - 1;
-        }
-    }
-
-    if (target < syms[left].second) {
-        --left;
-    }
-
-    log<WARN>() << hexval(target) << " is within " << syms[left].first << "\n";
-
-    std::vector<Instruction> insns = m_ctx.getDisassembler().disasm(syms[left].first);
+    std::vector<Instruction> insns = m_ctx.getDisassembler().disasm(symbol);
     uint64_t offset = 0;
 
     for (int i = insns.size() - 2; i >= 0; i--) {

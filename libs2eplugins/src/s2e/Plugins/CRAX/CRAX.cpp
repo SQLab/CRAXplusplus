@@ -24,6 +24,8 @@
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
+#include <algorithm>
+
 #include "CRAX.h"
 
 using namespace klee;
@@ -313,6 +315,41 @@ bool CRAX::isCallSiteOf(uint64_t pc, const std::string &symbol) const {
 
     const uint64_t symbolPlt = m_exploit.getElf().getRuntimeAddress(symbol);
     return i->mnemonic == "call" && symbolPlt == std::stoull(i->opStr, nullptr, 16);
+}
+
+std::string CRAX::getBelongingSymbol(uint64_t instructionAddr) const {
+    ELF::SymbolMap __s = m_exploit.getElf().symbols();
+    std::vector<std::pair<std::string, uint64_t>> syms(__s.begin(), __s.end());
+
+    std::sort(syms.begin(),
+              syms.end(),
+              [](const auto &p1, const auto &p2) { return p1.second < p2.second; });
+
+    if (instructionAddr < syms.front().second) {
+        log<WARN>()
+            << "Unable to find which symbol " << hexval(instructionAddr)
+            << " belongs to.\n";
+        return "";
+    }
+
+    // Use binary search to find out which symbol `instructionAddr` belongs to.
+    int left = 0;
+    int right = syms.size() - 1;
+
+    while (left < right) {
+        int mid = left + (right + left) / 2;
+        uint64_t addr = syms[mid].second;
+        if (addr < instructionAddr) {
+            left = mid + 1;
+        } else {
+            right = mid - 1;
+        }
+    }
+
+    if (instructionAddr < syms[left].second) {
+        left--;
+    }
+    return syms[left].first;
 }
 
 }  // namespace s2e::plugins::crax

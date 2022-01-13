@@ -5,6 +5,7 @@ version: early alpha
 CRAX++ is being actively developed by:
 
 * Marco Wang \<aesophor.cs09g@nctu.edu.tw\>
+* Tim Yang \<tl455047.gcs09g@nctu.edu.tw\>
 
 <br>
 

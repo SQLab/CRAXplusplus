@@ -30,6 +30,7 @@ add_library(
     s2e/Plugins/CRAX/API/Memory.cpp
     s2e/Plugins/CRAX/API/Disassembler.cpp
     s2e/Plugins/CRAX/API/Logging.cpp
+    s2e/Plugins/CRAX/Expr/BinaryExprEvaluator.cpp
     s2e/Plugins/CRAX/Modules/Module.cpp
     s2e/Plugins/CRAX/Modules/ExploitGenerator.cpp
     s2e/Plugins/CRAX/Modules/RopChainBuilder.cpp

@@ -62,7 +62,7 @@ bool RopChainBuilder::build(Exploit &exploit,
 
             for (const auto &payload : symbolicRopPayloadList) {
                 for (const ref<Expr> &e : payload) {
-                    exploit.appendRopPayload(BinaryExprEvaluator<std::string>().evaluate(e));
+                    exploit.appendRopPayload(evaluate<std::string>(e));
                 }
                 exploit.flushRopPayload();
             }
@@ -131,7 +131,7 @@ bool RopChainBuilder::build(Exploit &exploit,
 
             for (size_t i = 1; i < symbolicRopPayloadList.size(); i++) {
                 for (const ref<Expr> &e : symbolicRopPayloadList[i]) {
-                    exploit.appendRopPayload(BinaryExprEvaluator<std::string>().evaluate(e));
+                    exploit.appendRopPayload(evaluate<std::string>(e));
                 }
                 exploit.flushRopPayload();
             }
@@ -151,26 +151,26 @@ bool RopChainBuilder::shouldSwitchToDirectMode(const Technique *t) const {
 }
 
 bool RopChainBuilder::addRegisterConstraint(Register::X64 reg, const ref<Expr> &e) {
-    uint64_t value = BinaryExprEvaluator<uint64_t>().evaluate(e);
+    uint64_t value = evaluate<uint64_t>(e);
     auto regExpr = m_ctx.reg().readSymbolic(reg);
     auto constraint = EqExpr::create(regExpr, ConstantExpr::create(value, Expr::Int64));
 
     log<INFO>()
         << m_ctx.reg().getName(reg) << " = "
-        << BinaryExprEvaluator<std::string>().evaluate(e)
+        << evaluate<std::string>(e)
         << " (concretized=" << klee::hexval(value) << ")\n";
 
     return m_ctx.getCurrentState()->addConstraint(constraint, true);
 }
 
 bool RopChainBuilder::addMemoryConstraint(uint64_t addr, const ref<Expr> &e) {
-    uint64_t value = BinaryExprEvaluator<uint64_t>().evaluate(e);
+    uint64_t value = evaluate<uint64_t>(e);
     auto memExpr = m_ctx.mem().readSymbolic(addr, klee::Expr::Int64);
     auto constraint = EqExpr::create(memExpr, ConstantExpr::create(value, Expr::Int64));
 
     log<INFO>()
         << "[RSP + " << m_symbolicModeRspOffset << "] = "
-        << BinaryExprEvaluator<std::string>().evaluate(e)
+        << evaluate<std::string>(e)
         << " (concretized=" << klee::hexval(value) << ")\n";
 
     return m_ctx.getCurrentState()->addConstraint(constraint, true);

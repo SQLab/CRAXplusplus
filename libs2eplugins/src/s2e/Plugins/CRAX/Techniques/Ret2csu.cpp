@@ -136,7 +136,7 @@ Ret2csu::getSymbolicRopPayloadList(const ref<Expr> &retAddr,
     }
 
     // If arg1 cannot fit within EDI, chain the gadgets to set RDI.
-    if (BinaryExprEvaluator<uint64_t>().evaluate(arg1) >= (static_cast<uint64_t>(1) << 32)) {
+    if (evaluate<uint64_t>(arg1) >= (static_cast<uint64_t>(1) << 32)) {
         uint64_t gadgetAddr = m_ctx.getExploit().resolveGadget("pop rdi ; ret");
         rop.back() = ConstantExpr::create(gadgetAddr, Expr::Int64);
         rop.push_back(arg1);
@@ -286,7 +286,7 @@ void Ret2csu::buildAuxiliaryFunction() {
         if (auto phe = dyn_cast<PlaceholderExpr>(e)) {
             s = phe->getTag();
         } else {
-            s = BinaryExprEvaluator<std::string>().evaluate(e);
+            s = evaluate<std::string>(e);
         }
 
         if (f.empty()) {

@@ -22,150 +22,25 @@
 #define S2E_PLUGINS_CRAX_BINARY_EXPR_EVALUATOR_H
 
 #include <s2e/Plugins/CRAX/Expr/Expr.h>
-#include <s2e/Plugins/CRAX/Expr/BinaryExprIterator.h>
-#include <s2e/Plugins/CRAX/Pwnlib/Util.h>
 
-#include <stack>
 #include <string>
-#include <type_traits>
-
-using s2e::plugins::crax::u64;
 
 namespace klee {
 
 // This is CRAX's extension to klee.
 //
 // Given an expression tree (where each node of the tree is either a BinaryExpr or ConstantExpr),
-// evaluate it to either a constant value (uint64_t) or a std::string of infix expression.
-
-template <typename>
-inline constexpr bool always_false_v = false;
-
-
+// evaluate it to either a constant value (uint64_t) or an infix expr (std::string).
 template <typename T>
-class BinaryExprEvaluator {
-public:
-    BinaryExprEvaluator() = default;
+T evaluate(const ref<Expr> &e);
 
-    T evaluate(const ref<Expr> &e) const;
+// Explicit (full) template specialization for T = uint64_t.
+template <>
+uint64_t evaluate(const ref<Expr> &e);
 
-private:
-    bool isValidOperator(const ref<Expr> &e) const {
-        return dyn_cast<AddExpr>(e) ||
-               dyn_cast<SubExpr>(e) ||
-               dyn_cast<MulExpr>(e);
-    }
-};
-
-
-// Implementations
-template <typename T>
-T BinaryExprEvaluator<T>::evaluate(const ref<Expr> &e) const {
-    T ret {};
-
-    if constexpr (std::is_same_v<uint64_t, T>) {
-        // ByteVectorExpr should only exist as expr tree's root node.
-        if (auto bve = dyn_cast<ByteVectorExpr>(e)) {
-            ret = u64(bve->getBytes());
-            return ret;
-        }
-
-        std::stack<ref<Expr>> stack;
-
-        // Evaluates an expr to an integer constant.
-        for (auto it = BinaryExprIterator<IterStrategy::POST_ORDER>::begin(e);
-             it != decltype(it)::end();
-             it++) {
-            ref<Expr> node = *it;
-
-            if (auto boe = dyn_cast<BaseOffsetExpr>(node)) {
-                // BaseOffsetExpr, essentially, is an AddExpr,
-                // but during reverse polish notation evaluation
-                // we should treat it like a ConstantExpr.
-                stack.push(boe->toConstantExpr());
-            } else if (auto ce = dyn_cast<ConstantExpr>(node)) {
-                stack.push(ce);
-            } else if (isValidOperator(node)) {
-                assert(stack.size() >= 2);
-
-                auto op2 = dyn_cast<ConstantExpr>(stack.top());
-                stack.pop();
-                auto op1 = dyn_cast<ConstantExpr>(stack.top());
-                stack.pop();
-                assert(op1 && op2);
-
-                ref<ConstantExpr> result = nullptr;
-
-                switch (node->getKind()) {
-                    case Expr::Kind::Add:
-                        result = op1->Add(op2);
-                        break;
-                    case Expr::Kind::Sub:
-                        result = op1->Sub(op2);
-                        break;
-                    case Expr::Kind::Mul:
-                        result = op1->Mul(op2);
-                        break;
-                    default:
-                        break;
-                }
-
-                stack.push(result);
-            }
-        }
-
-        assert(stack.size() == 1);
-        auto ce = dyn_cast<ConstantExpr>(stack.top());
-        ret = ce->getZExtValue();
-
-    } else if constexpr (std::is_same_v<std::string, T>) {
-        // ByteVectorExpr should only exist as expr tree's root node.
-        if (auto bve = dyn_cast<ByteVectorExpr>(e)) {
-            ret = bve->toString();
-            return ret;
-        }
-
-        ret += "p64(";
-
-        // Evaluates an expr to a string of infix expression,
-        // e.g., "3 + 2", "0 + elf.sym['read'] + 0x30 * 2"
-        for (auto it = BinaryExprIterator<IterStrategy::IN_ORDER>::begin(e);
-             it != decltype(it)::end();
-             it++) {
-            ref<Expr> node = *it;
-
-            if (auto boe = dyn_cast<BaseOffsetExpr>(node)) {
-                ret += boe->toString();
-            } else if (auto ce = dyn_cast<ConstantExpr>(node)) {
-                std::string s;
-                ce->toString(s, /*Base=*/16);
-                ret += "0x" + s;
-            } else {
-                switch (node->getKind()) {
-                    case Expr::Kind::Add:
-                        ret += " + ";
-                        break;
-                    case Expr::Kind::Sub:
-                        ret += " - ";
-                        break;
-                    case Expr::Kind::Mul:
-                        ret += " * ";
-                        break;
-                    default:
-                        break;
-                }
-            }
-        }
-
-        ret += ')';
-
-    } else {
-        // https://stackoverflow.com/questions/53945490/how-to-assert-that-a-constexpr-if-else-clause-never-happen
-        static_assert(always_false_v<T>, "unsupported operation!");
-    }
-
-    return ret;
-}
+// Explicit (full) template specialization for T = std::string.
+template <>
+std::string evaluate(const ref<Expr> &e);
 
 }  // namespace klee
 

@@ -19,7 +19,6 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
-#include <s2e/Plugins/CRAX/Expr/BinaryExprEvaluator.h>
 #include <s2e/Plugins/CRAX/Techniques/Ret2csu.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 

@@ -13,8 +13,8 @@ s2e = {
     logging = {
         -- Possible values include "all", "debug", "info", "warn" and "none".
         -- See Logging.h in libs2ecore.
-        console = "debug",
-        logLevel = "debug",
+        console = "info",
+        logLevel = "info",
     },
 
     -- All the cl::opt options defined in the engine can be tweaked here.
@@ -382,6 +382,9 @@ pluginsConfig.CRAX = {
     -- Disable forking except those performed by CRAXplusplus.
     disableNativeForking = true,
 
+    -- Use solver for exploit generation.
+    useSolver = false,
+
     -- Modules of CRAX++ that you wish to load.
     modules = {
         "ExploitGenerator",
@@ -393,6 +396,7 @@ pluginsConfig.CRAX = {
     techniques = {
         "Ret2csu",
         "BasicStackPivot",
+        --"AdvancedStackPivot",
         "GotPartialOverwrite",
     },
 }

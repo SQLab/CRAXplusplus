@@ -58,7 +58,10 @@ Ret2csu::Ret2csu(CRAX &ctx)
       m_gadget2CallReg1(),
       m_gadget2CallReg2(),
       m_symbolicRopPayloadList(),
-      m_auxiliaryFunction() {
+      m_auxiliaryFunction() {}
+
+
+void Ret2csu::initialize() {
     parseLibcCsuInit();
     searchGadget2CallTarget();
     resolveRequiredGadgets();
@@ -66,7 +69,6 @@ Ret2csu::Ret2csu(CRAX &ctx)
     buildSymbolicRopPayloadList();
     buildAuxiliaryFunction();
 }
-
 
 bool Ret2csu::checkRequirements() const {
    auto symbolMap = m_ctx.getExploit().getElf().symbols();
@@ -159,7 +161,6 @@ Ret2csu::getSymbolicRopPayloadList(uint64_t retAddr,
 void Ret2csu::parseLibcCsuInit() {
     // Since there are several variants of __libc_csu_init(),
     // we'll manually disassemble it and parse the offsets of its two gadgets.
-    // XXX: define the string literals.
     m_libcCsuInit = m_ctx.getExploit().getElf().symbols()[s_libcCsuInit];
 
     // Convert instruction generator into a list of instructions.

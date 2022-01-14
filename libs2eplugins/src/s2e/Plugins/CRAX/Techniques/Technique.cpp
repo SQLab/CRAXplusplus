@@ -38,6 +38,8 @@ std::unique_ptr<Technique> Technique::create(CRAX &ctx, const std::string &name)
         ret = std::make_unique<Ret2csu>(ctx);
     } else if (name == "BasicStackPivot") {
         ret = std::make_unique<BasicStackPivot>(ctx);
+    } else if (name == "AdvancedStackPivot") {
+        ret = std::make_unique<AdvancedStackPivot>(ctx);
     } else if (name == "GotPartialOverwrite") {
         ret = std::make_unique<GotPartialOverwrite>(ctx);
     }

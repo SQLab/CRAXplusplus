@@ -97,7 +97,12 @@ public:
         return "IOState";
     }
 
+    void print() const;
+    uint64_t getCanary() const { return m_canary; }
 
+    static const std::array<std::string, LeakType::LAST> s_leakTypes;
+
+private:
     void inputStateHookTopHalf(S2EExecutionState *inputState,
                                SyscallCtx &syscall);
 
@@ -128,14 +133,8 @@ public:
     std::vector<IOStates::OutputStateInfo>
     detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len);
 
-    void print() const;
-
-    uint64_t getCanary() const { return m_canary; }
-
-    static const std::array<std::string, LeakType::LAST> s_leakTypes;
-
-private:
     LeakType getLeakType(const std::string &image) const;
+
 
     uint64_t m_canary;
 

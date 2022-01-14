@@ -21,9 +21,11 @@
 #ifndef S2E_PLUGINS_CRAX_STACK_PIVOT_H
 #define S2E_PLUGINS_CRAX_STACK_PIVOT_H
 
+#include <s2e/Plugins/CRAX/API/Disassembler.h>
 #include <s2e/Plugins/CRAX/Techniques/Technique.h>
 
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -43,6 +45,7 @@ public:
     explicit BasicStackPivot(CRAX &ctx);
     virtual ~BasicStackPivot() = default;
 
+    virtual void initialize() override;
     virtual bool checkRequirements() const override;
     virtual void resolveRequiredGadgets() override;
     virtual std::string getAuxiliaryFunctions() const override;
@@ -58,6 +61,7 @@ public:
     explicit AdvancedStackPivot(CRAX &ctx);
     virtual ~AdvancedStackPivot() = default;
 
+    virtual void initialize() override;
     virtual bool checkRequirements() const override;
     virtual void resolveRequiredGadgets() override;
     virtual std::string getAuxiliaryFunctions() const override;
@@ -67,8 +71,35 @@ public:
 
     virtual std::string toString() const override;
 
-protected:
-    uint64_t determineOffset() const;
+private:
+    // XXX: This is temporary
+    struct ReadCallSiteInfo {
+        uint64_t address;
+        uint64_t buf;
+        uint64_t len;
+    };
+
+    struct ReadCallSiteInfoCmp {
+        bool operator ()(const ReadCallSiteInfo &i1,
+                         const ReadCallSiteInfo &i2) const {
+            return i1.address < i2.address;
+        }
+    };
+
+
+    void maybeInterceptReadCallSites(S2EExecutionState *state,
+                                     const Instruction &i);
+
+    void beforeExploitGeneration();
+
+    uint64_t determineRetAddr(uint64_t readCallSiteAddr) const;
+
+
+    uint32_t m_offsetToRetAddr;
+
+    // 40121a:   e8 51 fe ff ff    call 401070 <read@plt>
+    // 0x40121a is a call site of read@libc.
+    std::set<ReadCallSiteInfo, ReadCallSiteInfoCmp> m_readCallSites;
 };
 
 }  // namespace s2e::plugins::crax

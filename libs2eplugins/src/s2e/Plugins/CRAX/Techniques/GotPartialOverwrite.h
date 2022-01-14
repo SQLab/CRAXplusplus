@@ -36,6 +36,7 @@ public:
     explicit GotPartialOverwrite(CRAX &ctx);
     virtual ~GotPartialOverwrite() = default;
 
+    virtual void initialize() override;
     virtual bool checkRequirements() const override;
     virtual void resolveRequiredGadgets() override;
     virtual std::string getAuxiliaryFunctions() const override;

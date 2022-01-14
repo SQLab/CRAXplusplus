@@ -29,9 +29,7 @@
 #include <string>
 #include <type_traits>
 
-using s2e::plugins::crax::p64;
 using s2e::plugins::crax::u64;
-
 
 namespace klee {
 

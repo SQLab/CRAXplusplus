@@ -34,15 +34,16 @@ using namespace klee;
 namespace s2e::plugins::crax {
 
 bool RopChainBuilder::build(Exploit &exploit,
-                            const std::vector<std::unique_ptr<Technique>> &techniques,
+                            const std::vector<Technique *> &techniques,
                             uint64_t nrSkippedBytes) {
     using VarValuePair = std::pair<std::string, std::vector<uint8_t>>;
     using ConcreteInputs = std::vector<VarValuePair>;
     using SymbolicRopPayload = Technique::SymbolicRopPayload;
 
     auto iostates = dynamic_cast<IOStates *>(CRAX::getModule("IOStates"));
+    bool sliceRbp = false;
 
-    for (const auto &t : techniques) {
+    for (auto t : techniques) {
         std::vector<SymbolicRopPayload> symbolicRopPayloadList = t->getSymbolicRopPayloadList();
 
         if (symbolicRopPayloadList.empty()) {
@@ -51,12 +52,16 @@ bool RopChainBuilder::build(Exploit &exploit,
 
         // Direct payload generation mode
         if (!m_symbolicMode) {
+            if (sliceRbp) {
+                symbolicRopPayloadList[0].erase(symbolicRopPayloadList[0].begin());
+            }
             for (const auto &payload : symbolicRopPayloadList) {
                 for (const ref<Expr> &e : payload) {
                     exploit.appendRopPayload(BinaryExprEvaluator<std::string>().evaluate(e));
                 }
                 exploit.flushRopPayload();
             }
+            sliceRbp = true;
             continue;
         }
 
@@ -81,7 +86,7 @@ bool RopChainBuilder::build(Exploit &exploit,
             }
         }
 
-        if (shouldSwitchToDirectMode(t.get())) {
+        if (shouldSwitchToDirectMode(t)) {
             log<WARN>() << "Switching from symbolic mode to direct mode...\n";
             m_symbolicMode = false;
 

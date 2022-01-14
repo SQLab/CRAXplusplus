@@ -33,16 +33,22 @@ using SymbolicRopPayload = Technique::SymbolicRopPayload;
 using ConcreteRopPayload = Technique::ConcreteRopPayload;
 
 
-GotPartialOverwrite::GotPartialOverwrite(CRAX &ctx) : Technique(ctx) {
+GotPartialOverwrite::GotPartialOverwrite(CRAX &ctx)
+    : Technique(ctx) {
     resolveRequiredGadgets();
 }
 
+
+void GotPartialOverwrite::initialize() {
+
+}
 
 bool GotPartialOverwrite::checkRequirements() const {
     return true;
 }
 
 void GotPartialOverwrite::resolveRequiredGadgets() {
+
 }
 
 std::string GotPartialOverwrite::getAuxiliaryFunctions() const {

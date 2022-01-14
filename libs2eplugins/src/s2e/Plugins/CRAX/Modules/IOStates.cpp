@@ -73,6 +73,25 @@ IOStates::IOStates(CRAX &ctx)
 }
 
 
+void IOStates::print() const {
+    auto modState = m_ctx.getPluginModuleState(m_ctx.getCurrentState(), this);
+
+    auto &os = log<WARN>();
+    os << "Dumping IOStates: [";
+
+    for (size_t i = 0; i < modState->stateInfoList.size(); i++) {
+        if (const auto &inputStateInfo = std::get_if<InputStateInfo>(&modState->stateInfoList[i])) {
+            os << "input";
+        } else {
+            os << "output";
+        }
+        if (i != modState->stateInfoList.size() - 1) {
+            os << ", ";
+        }
+    }
+    os << "]\n";
+}
+
 void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
                                      SyscallCtx &syscall) {
     if (syscall.nr != 0 || syscall.arg1 != STDIN_FILENO) {
@@ -285,7 +304,6 @@ IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len)
             }
         }
     }
-
     return bufInfo;
 }
 
@@ -317,29 +335,8 @@ IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len)
             }
         }
     }
-
     return leakInfo;
 }
-
-void IOStates::print() const {
-    auto modState = m_ctx.getPluginModuleState(m_ctx.getCurrentState(), this);
-
-    auto &os = log<WARN>();
-    os << "Dumping IOStates: [";
-
-    for (size_t i = 0; i < modState->stateInfoList.size(); i++) {
-        if (const auto &inputStateInfo = std::get_if<InputStateInfo>(&modState->stateInfoList[i])) {
-            os << "input";
-        } else {
-            os << "output";
-        }
-        if (i != modState->stateInfoList.size() - 1) {
-            os << ", ";
-        }
-    }
-    os << "]\n";
-}
-
 
 IOStates::LeakType IOStates::getLeakType(const std::string &image) const {
     if (image == m_ctx.getExploit().getElfFilename()) {

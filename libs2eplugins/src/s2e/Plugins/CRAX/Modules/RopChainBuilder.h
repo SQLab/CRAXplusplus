@@ -26,7 +26,6 @@
 #include <s2e/Plugins/CRAX/API/Memory.h>
 #include <s2e/Plugins/CRAX/Modules/Module.h>
 
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -58,7 +57,7 @@ public:
 
     [[nodiscard]]
     bool build(Exploit &exploit,
-               const std::vector<std::unique_ptr<Technique>> &techniques,
+               const std::vector<Technique *> &techniques,
                uint64_t nrSkippedBytes = 0);
 
     void useSolver(bool useSolver) {

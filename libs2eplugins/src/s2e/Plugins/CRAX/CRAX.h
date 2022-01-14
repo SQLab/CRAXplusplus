@@ -25,17 +25,18 @@
 #include <s2e/Plugins/Core/BaseInstructions.h>
 #include <s2e/Plugins/OSMonitors/ModuleDescriptor.h>
 #include <s2e/Plugins/OSMonitors/Linux/LinuxMonitor.h>
-#include <s2e/Plugins/ExecutionMonitors/StackMonitor.h>
 #include <s2e/Plugins/CRAX/API/Register.h>
 #include <s2e/Plugins/CRAX/API/Memory.h>
 #include <s2e/Plugins/CRAX/API/Disassembler.h>
 #include <s2e/Plugins/CRAX/API/Logging.h>
 #include <s2e/Plugins/CRAX/Modules/Module.h>
+#include <s2e/Plugins/CRAX/Techniques/Technique.h>
 #include <s2e/Plugins/CRAX/Exploit.h>
 
 #include <pybind11/embed.h>
 
 #include <cassert>
+#include <algorithm>
 #include <map>
 #include <memory>
 #include <string>
@@ -154,6 +155,9 @@ public:
     bool isNativeForkingDisabled() const { return m_disableNativeForking; }
 
     [[nodiscard]]
+    bool isSolverEnabled() const { return m_useSolver; }
+
+    [[nodiscard]]
     Register &reg() { return m_register; }
 
     [[nodiscard]]
@@ -166,19 +170,30 @@ public:
     Exploit &getExploit() { return m_exploit; }
 
     [[nodiscard]]
-    uint64_t getTargetProcessPid() const { return m_targetProcessPid; }
-
-    [[nodiscard]]
-    const std::vector<uint64_t> &getReadPrimitives() const { return m_readPrimitives; }
-
-    [[nodiscard]]
-    const std::vector<uint64_t> &getWritePrimitives() const { return m_writePrimitives; }
+    std::vector<Technique *> getTechniques() {
+        std::vector<Technique *> ret(m_techniques.size());
+        std::transform(m_techniques.begin(),
+                       m_techniques.end(),
+                       ret.begin(),
+                       [](const auto &p) { return p.get(); });
+        return ret;
+    }
 
     [[nodiscard]]
     static Module *getModule(const std::string &name) {
         auto it = Module::s_mapper.find(name);
         return (it != Module::s_mapper.end()) ? it->second : nullptr;
     }
+
+    [[nodiscard]]
+    static Technique *getTechnique(const std::string &name) {
+        auto it = Technique::s_mapper.find(name);
+        return (it != Technique::s_mapper.end()) ? it->second : nullptr;
+    }
+
+
+    [[nodiscard]]
+    uint64_t getTargetProcessPid() const { return m_targetProcessPid; }
 
     [[nodiscard]]
     bool isCallSiteOf(uint64_t pc, const std::string &symbol) const;
@@ -208,13 +223,13 @@ public:
                  const SyscallCtx&>
         afterSyscallHooks;
 
-    sigc::signal<void>
-        exploitGenerationHooks;
-
     sigc::signal<void,
                  S2EExecutionState*,
                  bool*>
         onStateForkModuleDecide;
+
+    sigc::signal<void> beforeExploitGenerationHooks;
+    sigc::signal<void> exploitGenerationHooks;
     // clang-format on
 
     // Embedded Python interpreter from pybind11 library.
@@ -276,20 +291,19 @@ private:
     bool m_showInstructions;
     bool m_showSyscalls;
     bool m_disableNativeForking;
+    bool m_useSolver;
 
     // CRAX's attributes.
     Register m_register;
     Memory m_memory;
     Disassembler m_disassembler;
     Exploit m_exploit;
+    std::vector<std::unique_ptr<Module>> m_modules;
+    std::vector<std::unique_ptr<Technique>> m_techniques;
+
     uint64_t m_targetProcessPid;
     std::map<uint64_t, SyscallCtx> m_scheduledAfterSyscallHooks;  // <pc, SyscallCtx>
     std::unordered_set<S2EExecutionState *> m_allowedForkingStates;
-
-    // Exploitation-specific attributes.
-    std::vector<std::unique_ptr<Module>> m_modules;
-    std::vector<uint64_t> m_readPrimitives;
-    std::vector<uint64_t> m_writePrimitives;
 };
 
 }  // namespace s2e::plugins::crax

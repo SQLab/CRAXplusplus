@@ -24,8 +24,6 @@
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
-#include <algorithm>
-
 #include "CRAX.h"
 
 using namespace klee;
@@ -49,24 +47,25 @@ CRAX::CRAX(S2E *s2e)
       afterInstructionHooks(),
       beforeSyscallHooks(),
       afterSyscallHooks(),
-      exploitGenerationHooks(),
       onStateForkModuleDecide(),
+      beforeExploitGenerationHooks(),
+      exploitGenerationHooks(),
       m_currentState(),
       m_linuxMonitor(),
       m_showInstructions(CRAX_CONFIG_GET_BOOL(".showInstructions", false)),
       m_showSyscalls(CRAX_CONFIG_GET_BOOL(".showSyscalls", true)),
       m_disableNativeForking(CRAX_CONFIG_GET_BOOL(".disableNativeForking", false)),
+      m_useSolver(CRAX_CONFIG_GET_BOOL(".useSolver", true)),
       m_register(*this),
       m_memory(*this),
       m_disassembler(*this),
       m_exploit(CRAX_CONFIG_GET_STRING(".elfFilename"),
                 CRAX_CONFIG_GET_STRING(".libcFilename")),
+      m_modules(),
+      m_techniques(),
       m_targetProcessPid(),
       m_scheduledAfterSyscallHooks(),
-      m_allowedForkingStates(),
-      m_modules(),
-      m_readPrimitives(),
-      m_writePrimitives() {}
+      m_allowedForkingStates() {}
 
 
 void CRAX::initialize() {
@@ -90,9 +89,18 @@ void CRAX::initialize() {
     // Initialize modules.
     ConfigFile *cfg = s2e()->getConfig();
     ConfigFile::string_list moduleNames = cfg->getStringList(getConfigKey() + ".modules");
+
     foreach2 (it, moduleNames.begin(), moduleNames.end()) {
-        log<WARN>() << "initializing: " << *it << '\n';
+        log<INFO>() << "Creating module: " << *it << '\n';
         m_modules.push_back(Module::create(*this, *it));
+    }
+
+    // Initialize techniques.
+    ConfigFile::string_list techniqueNames = cfg->getStringList(getConfigKey() + ".techniques");
+
+    foreach2 (it, techniqueNames.begin(), techniqueNames.end()) {
+        log<INFO>() << "Creating technique: " << *it << '\n';
+        m_techniques.push_back(Technique::create(*this, *it));
     }
 }
 
@@ -113,7 +121,7 @@ void CRAX::onSymbolicRip(S2EExecutionState *exploitableState,
     log<WARN>()
         << "Detected symbolic RIP: " << hexval(concreteRip)
         << ", original value is: " << hexval(reg().readConcrete(Register::X64::RIP))
-        << "\n";
+        << '\n';
 
     reg().setRipSymbolic(symbolicRip);
 
@@ -122,6 +130,9 @@ void CRAX::onSymbolicRip(S2EExecutionState *exploitableState,
 
     // Dump virtual memory mappings.
     mem().showMapInfo();
+
+    // Do whatever that needs to be done right before exploit generation.
+    beforeExploitGenerationHooks.emit();
 
     // Execute exploit generation hooks installed by the user.
     exploitGenerationHooks.emit();
@@ -135,7 +146,7 @@ void CRAX::onProcessLoad(S2EExecutionState *state,
                          const std::string &imageFileName) {
     setCurrentState(state);
 
-    log<WARN>() << "onProcessLoad: " << imageFileName << "\n";
+    log<WARN>() << "onProcessLoad: " << imageFileName << '\n';
 
     if (imageFileName.find(m_exploit.getElfFilename()) != imageFileName.npos) {
         m_targetProcessPid = pid;
@@ -313,8 +324,18 @@ bool CRAX::isCallSiteOf(uint64_t pc, const std::string &symbol) const {
     std::optional<Instruction> i = m_disassembler.disasm(pc);
     assert(i && "isCallSiteOf(): Unable to disassemble the instruction");
 
+    if (i->mnemonic != "call") {
+        return false;
+    }
+
     const uint64_t symbolPlt = m_exploit.getElf().getRuntimeAddress(symbol);
-    return i->mnemonic == "call" && symbolPlt == std::stoull(i->opStr, nullptr, 16);
+    uint64_t operand = 0;
+    try {
+        operand = std::stoull(i->opStr, nullptr, 16);
+    } catch (...) {
+        // Just silently swallow it...
+    }
+    return symbolPlt == operand;
 }
 
 std::string CRAX::getBelongingSymbol(uint64_t instructionAddr) const {
@@ -337,7 +358,7 @@ std::string CRAX::getBelongingSymbol(uint64_t instructionAddr) const {
     int r = syms.size() - 1;
 
     while (l < r) {
-        int m = l + (r + l) / 2;
+        int m = l + (r - l) / 2;
         uint64_t addr = syms[m].second;
         if (addr < instructionAddr) {
             l = m + 1;

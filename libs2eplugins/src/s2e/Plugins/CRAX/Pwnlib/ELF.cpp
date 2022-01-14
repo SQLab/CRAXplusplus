@@ -37,18 +37,25 @@ namespace s2e::plugins::crax {
 ELF::ELF(const std::string &filename)
     : m_elf(CRAX::s_pwnlib.attr("elf").attr("ELF").call(filename)),
       m_checksec(filename),
+      m_symbols(symbols(/*refetch=*/true)),
+      m_got(got(/*refetch=*/true)),
+      m_functions(functions(/*refetch=*/true)),
       m_base() {}
 
 
-ELF::SymbolMap ELF::symbols() const {
-    return m_elf.attr("symbols").cast<ELF::SymbolMap>();
+ELF::SymbolMap ELF::symbols(bool refetch) const {
+    return (!refetch) ? m_symbols : m_elf.attr("symbols").cast<ELF::SymbolMap>();
 }
 
-ELF::SymbolMap ELF::got() const {
-    return m_elf.attr("got").cast<ELF::SymbolMap>();
+ELF::SymbolMap ELF::got(bool refetch) const {
+    return (!refetch) ? m_got : m_elf.attr("got").cast<ELF::SymbolMap>();
 }
 
-ELF::FunctionMap ELF::functions() const {
+ELF::FunctionMap ELF::functions(bool refetch) const {
+    if (!refetch) {
+        return m_functions;
+    }
+
     // The ELF class from pwntools is huge and I don't want to
     // introduce the entire of it into crax, so I'll perform
     // manual conversion here.

@@ -90,9 +90,10 @@ public:
 
     // For expr such as:
     // 1. "elf_base + __libc_csu_init_gadget1"
-    // 2. "elf_base + elf.sym['read']"
-    // 3. "elf_base + elf.got['read']"
-    // 4. "elf_base + elf.bss()"
+    // 2. "elf_base + 0x666"
+    // 3. "elf_base + elf.sym['read']"
+    // 4. "elf_base + elf.got['read']"
+    // 5. "elf_base + elf.bss()"
     //
     // XXX: Add support for libc base/offset
     static ref<Expr> create(const Exploit &exploit,
@@ -107,9 +108,14 @@ public:
         if (attr.empty()) {
             const auto &symtab = exploit.getSymtab();
             auto it = symtab.find(symbol);
-            assert(it != symtab.end() && "Symbol doesn't exist in exp script's symtab");
-            offset = it->second;
-            strOffset = symbol;
+
+            if (it != symtab.end()) {
+                offset = it->second;
+                strOffset = symbol;
+            } else {
+                offset = std::stoull(symbol);
+                strOffset = symbol;
+            }
 
         } else if (attr == "sym") {
             // The symbol exists in elf.sym, so it's relative to elf_base.

@@ -24,8 +24,6 @@
 #include <s2e/Plugins/CRAX/Expr/Expr.h>
 #include <s2e/Plugins/CRAX/Exploit.h>
 
-#include <klee/Expr.h>
-
 #include <memory>
 #include <map>
 #include <string>
@@ -47,6 +45,7 @@ public:
     explicit Technique(CRAX &ctx) : m_ctx(ctx) {}
     virtual ~Technique() = default;
 
+    virtual void initialize() = 0;
     virtual bool checkRequirements() const = 0;
     virtual void resolveRequiredGadgets() = 0;
     virtual std::string getAuxiliaryFunctions() const = 0;

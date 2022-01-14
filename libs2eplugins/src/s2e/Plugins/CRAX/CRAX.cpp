@@ -320,8 +320,9 @@ void CRAX::onStateForkDecide(S2EExecutionState *state,
 }
 
 
-bool CRAX::isCallSiteOf(uint64_t pc, const std::string &symbol) const {
-    std::optional<Instruction> i = m_disassembler.disasm(pc);
+bool CRAX::isCallSiteOf(uint64_t instructionAddr,
+                        const std::string &symbol) const {
+    std::optional<Instruction> i = m_disassembler.disasm(instructionAddr);
     assert(i && "isCallSiteOf(): Unable to disassemble the instruction");
 
     if (i->mnemonic != "call") {
@@ -333,7 +334,8 @@ bool CRAX::isCallSiteOf(uint64_t pc, const std::string &symbol) const {
     try {
         operand = std::stoull(i->opStr, nullptr, 16);
     } catch (...) {
-        // Just silently swallow it...
+        // This can happen when `i` is something like `call r13`,
+        // which is legit, so let's just silently swallow it...
     }
     return symbolPlt == operand;
 }

@@ -196,7 +196,8 @@ public:
     uint64_t getTargetProcessPid() const { return m_targetProcessPid; }
 
     [[nodiscard]]
-    bool isCallSiteOf(uint64_t pc, const std::string &symbol) const;
+    bool isCallSiteOf(uint64_t instructionAddr,
+                      const std::string &symbol) const;
 
     [[nodiscard]]
     std::string getBelongingSymbol(uint64_t instructionAddr) const;

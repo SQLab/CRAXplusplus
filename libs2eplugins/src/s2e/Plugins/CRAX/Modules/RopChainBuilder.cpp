@@ -52,16 +52,25 @@ bool RopChainBuilder::build(Exploit &exploit,
 
         // Direct payload generation mode
         if (!m_symbolicMode) {
-            if (sliceRbp) {
+            // The first expr in symbolicRopPayloadList[0] is saved rbp.
+            // It should only be used for constructing the initial rop payload.
+            if (!sliceRbp) {
+                sliceRbp = true;
+            } else {
                 symbolicRopPayloadList[0].erase(symbolicRopPayloadList[0].begin());
             }
+
             for (const auto &payload : symbolicRopPayloadList) {
                 for (const ref<Expr> &e : payload) {
                     exploit.appendRopPayload(BinaryExprEvaluator<std::string>().evaluate(e));
                 }
                 exploit.flushRopPayload();
             }
-            sliceRbp = true;
+
+            // Extra payload?
+            for (uint64_t payload : t->getExtraPayload()) {
+                exploit.appendRopPayload("p64(" + std::to_string(payload) + ")");
+            }
             continue;
         }
 

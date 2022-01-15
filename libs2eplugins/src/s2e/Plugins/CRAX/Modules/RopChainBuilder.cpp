@@ -33,51 +33,52 @@ using namespace klee;
 
 namespace s2e::plugins::crax {
 
+using RopSubchain = Technique::RopSubchain;
+
 bool RopChainBuilder::build(Exploit &exploit,
                             const std::vector<Technique *> &techniques,
                             uint64_t nrSkippedBytes) {
     using VarValuePair = std::pair<std::string, std::vector<uint8_t>>;
     using ConcreteInputs = std::vector<VarValuePair>;
-    using SymbolicRopPayload = Technique::SymbolicRopPayload;
 
     auto iostates = dynamic_cast<IOStates *>(CRAX::getModule("IOStates"));
     bool sliceRbp = false;
 
     for (auto t : techniques) {
-        std::vector<SymbolicRopPayload> symbolicRopPayloadList = t->getSymbolicRopPayloadList();
+        std::vector<RopSubchain> ropSubchains = t->getRopSubchains();
 
-        if (symbolicRopPayloadList.empty()) {
+        if (ropSubchains.empty()) {
             continue;
         }
 
         // Direct payload generation mode
         if (!m_symbolicMode) {
-            // The first expr in symbolicRopPayloadList[0] is saved rbp.
+            // The first expr in ropSubchains[0] is saved rbp.
             // It should only be used for constructing the initial rop payload.
             if (!sliceRbp) {
                 sliceRbp = true;
             } else {
-                symbolicRopPayloadList[0].erase(symbolicRopPayloadList[0].begin());
+                ropSubchains[0].erase(ropSubchains[0].begin());
             }
 
-            for (const auto &payload : symbolicRopPayloadList) {
-                for (const ref<Expr> &e : payload) {
+            for (const auto &subchain: ropSubchains) {
+                for (const ref<Expr> &e : subchain) {
                     exploit.appendRopPayload(evaluate<std::string>(e));
                 }
                 exploit.flushRopPayload();
             }
 
             // Extra payload?
-            for (uint64_t payload : t->getExtraPayload()) {
-                exploit.appendRopPayload("p64(" + std::to_string(payload) + ")");
+            for (const ref<Expr> &e : t->getExtraRopSubchain()) {
+                exploit.appendRopPayload(evaluate<std::string>(e));
             }
             continue;
         }
 
         // Symbolic payload generation mode
         log<WARN>() << "Building exploit constraints...\n";
-        for (size_t i = 0; i < symbolicRopPayloadList[0].size(); i++) {
-            const ref<Expr> &e = symbolicRopPayloadList[0][i];
+        for (size_t i = 0; i < ropSubchains[0].size(); i++) {
+            const ref<Expr> &e = ropSubchains[0][i];
             bool ok = false;
 
             if (i == 0) {
@@ -129,8 +130,8 @@ bool RopChainBuilder::build(Exploit &exploit,
             exploit.appendRopPayload(symbolicPayload);
             exploit.flushRopPayload();
 
-            for (size_t i = 1; i < symbolicRopPayloadList.size(); i++) {
-                for (const ref<Expr> &e : symbolicRopPayloadList[i]) {
+            for (size_t i = 1; i < ropSubchains.size(); i++) {
+                for (const ref<Expr> &e : ropSubchains[i]) {
                     exploit.appendRopPayload(evaluate<std::string>(e));
                 }
                 exploit.flushRopPayload();
@@ -149,6 +150,7 @@ bool RopChainBuilder::shouldSwitchToDirectMode(const Technique *t) const {
     // without solving exploit constraints.
     return dynamic_cast<const StackPivot *>(t);
 }
+
 
 bool RopChainBuilder::addRegisterConstraint(Register::X64 reg, const ref<Expr> &e) {
     uint64_t value = evaluate<uint64_t>(e);

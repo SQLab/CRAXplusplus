@@ -44,7 +44,8 @@ std::unique_ptr<Technique> Technique::create(CRAX &ctx, const std::string &name)
         ret = std::make_unique<GotPartialOverwrite>(ctx);
     }
 
-    assert(ret && "Technique::create() failed, possibly due to incorrect technique name!");
+    assert(ret &&
+           "Technique::create() failed, possibly due to incorrect technique name!");
 
     Technique::s_mapper[name] = ret.get();
     return ret;

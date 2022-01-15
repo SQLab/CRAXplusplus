@@ -31,6 +31,10 @@
 
 namespace s2e::plugins::crax {
 
+// To begin with, each exploitation technique can contain N * ROP subchains.
+// The task of RopChainBuilder is to concatenate the subchains of each
+// technique into a single complete ROP chain.
+//
 // CRAX supports two modes of ROP chain generation:
 // 1. Symbolic mode (usually used before stack pivoting)
 // 2. Direct mode (usually used after stack pivoting)
@@ -41,6 +45,8 @@ class Exploit;
 class Technique;
 
 class RopChainBuilder : public Module {
+    using RopSubchain = Technique::RopSubchain;
+
 public:
     explicit RopChainBuilder(CRAX &ctx)
         : Module(ctx),
@@ -60,6 +66,7 @@ public:
                const std::vector<Technique *> &techniques,
                uint64_t nrSkippedBytes = 0);
 
+    
     void useSolver(bool useSolver) {
         m_useSolver = useSolver;
         reset();

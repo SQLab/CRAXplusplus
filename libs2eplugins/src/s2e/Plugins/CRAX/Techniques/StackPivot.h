@@ -48,12 +48,10 @@ public:
     virtual void initialize() override;
     virtual bool checkRequirements() const override;
     virtual void resolveRequiredGadgets() override;
-    virtual std::string getAuxiliaryFunctions() const override;
+    virtual std::string toString() const override { return "BasicStackPivot"; }
 
-    virtual std::vector<SymbolicRopPayload> getSymbolicRopPayloadList() const override;
-    virtual ConcreteRopPayload getExtraPayload() const override;
-
-    virtual std::string toString() const override;
+    virtual std::vector<RopSubchain> getRopSubchains() const override;
+    virtual RopSubchain getExtraRopSubchain() const override;
 };
 
 class AdvancedStackPivot : public StackPivot {
@@ -64,12 +62,10 @@ public:
     virtual void initialize() override;
     virtual bool checkRequirements() const override;
     virtual void resolveRequiredGadgets() override;
-    virtual std::string getAuxiliaryFunctions() const override;
+    virtual std::string toString() const override { return "AdvancedStackPivot"; }
 
-    virtual std::vector<SymbolicRopPayload> getSymbolicRopPayloadList() const override;
-    virtual ConcreteRopPayload getExtraPayload() const override;
-
-    virtual std::string toString() const override;
+    virtual std::vector<RopSubchain> getRopSubchains() const override;
+    virtual RopSubchain getExtraRopSubchain() const override { return {}; }
 
 private:
     // XXX: This is temporary

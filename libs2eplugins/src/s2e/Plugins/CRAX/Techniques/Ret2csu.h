@@ -53,24 +53,22 @@ public:
     virtual void initialize() override;
     virtual bool checkRequirements() const override;
     virtual void resolveRequiredGadgets() override;
-    virtual std::string getAuxiliaryFunctions() const override;
+    virtual std::string toString() const override { return "Ret2csu"; }
 
-    virtual std::vector<SymbolicRopPayload> getSymbolicRopPayloadList() const override;
-    virtual ConcreteRopPayload getExtraPayload() const override;
+    virtual std::vector<RopSubchain> getRopSubchains() const override;
+    virtual RopSubchain getExtraRopSubchain() const override { return {}; }
 
-    virtual std::string toString() const override;
+    std::vector<RopSubchain>
+    getRopSubchains(const klee::ref<klee::Expr> &retAddr,
+                    const klee::ref<klee::Expr> &arg1,
+                    const klee::ref<klee::Expr> &arg2,
+                    const klee::ref<klee::Expr> &arg3) const;
 
-    std::vector<SymbolicRopPayload>
-    getSymbolicRopPayloadList(const klee::ref<klee::Expr> &retAddr,
-                              const klee::ref<klee::Expr> &arg1,
-                              const klee::ref<klee::Expr> &arg2,
-                              const klee::ref<klee::Expr> &arg3) const;
-
-    std::vector<SymbolicRopPayload>
-    getSymbolicRopPayloadList(uint64_t retAddr,
-                              uint64_t arg1,
-                              uint64_t arg2,
-                              uint64_t arg3) const;
+    std::vector<RopSubchain>
+    getRopSubchains(uint64_t retAddr,
+                    uint64_t arg1,
+                    uint64_t arg2,
+                    uint64_t arg3) const;
 
     static const std::string s_libcCsuInit;
     static const std::string s_libcCsuInitGadget1;
@@ -80,8 +78,7 @@ public:
 private:
     void parseLibcCsuInit();
     void searchGadget2CallTarget(std::string funcName = "_fini");
-    void buildSymbolicRopPayloadList();
-    void buildAuxiliaryFunction();
+    void buildRopSubchainTemplate();
 
     uint64_t m_retAddr;
     uint64_t m_arg1;
@@ -100,8 +97,7 @@ private:
     std::string m_gadget2CallReg1;
     std::string m_gadget2CallReg2;
 
-    std::vector<SymbolicRopPayload> m_symbolicRopPayloadList;
-    std::string m_auxiliaryFunction;
+    std::vector<RopSubchain> m_ropSubchainTemplate;
 };
 
 }  // namespace s2e::plugins::crax

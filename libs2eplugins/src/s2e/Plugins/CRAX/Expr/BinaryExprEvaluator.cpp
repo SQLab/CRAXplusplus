@@ -49,8 +49,8 @@ uint64_t evaluate(const ref<Expr> &e) {
 
     // Evaluates an expr to an integer constant.
     for (auto it = BinaryExprIterator<IterStrategy::POST_ORDER>::begin(e);
-            it != decltype(it)::end();
-            it++) {
+         it != decltype(it)::end();
+         it++) {
         ref<Expr> node = *it;
 
         if (auto boe = dyn_cast<BaseOffsetExpr>(node)) {
@@ -107,8 +107,8 @@ std::string evaluate(const ref<Expr> &e) {
     // Evaluates an expr to a string of infix expression,
     // e.g., "3 + 2", "0 + elf.sym['read'] + 0x30 * 2"
     for (auto it = BinaryExprIterator<IterStrategy::IN_ORDER>::begin(e);
-            it != decltype(it)::end();
-            it++) {
+         it != decltype(it)::end();
+         it++) {
         ref<Expr> node = *it;
 
         if (auto boe = dyn_cast<BaseOffsetExpr>(node)) {

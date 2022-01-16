@@ -382,13 +382,8 @@ pluginsConfig.CRAX = {
     -- Disable forking except those performed by CRAXplusplus.
     disableNativeForking = true,
 
-    -- Use solver for exploit generation.
-    useSolver = false,
-
     -- Modules of CRAX++ that you wish to load.
     modules = {
-        "ExploitGenerator",
-        "RopChainBuilder",
         "IOStates",
     },
 

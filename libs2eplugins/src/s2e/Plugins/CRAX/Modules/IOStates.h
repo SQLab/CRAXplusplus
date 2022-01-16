@@ -93,9 +93,7 @@ public:
     explicit IOStates(CRAX &ctx);
     virtual ~IOStates() = default;
 
-    virtual std::string toString() const override {
-        return "IOState";
-    }
+    virtual std::string toString() const override { return "IOState"; }
 
     void print() const;
     uint64_t getCanary() const { return m_canary; }

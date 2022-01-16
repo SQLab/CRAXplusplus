@@ -24,9 +24,7 @@
 #include <klee/Expr.h>
 #include <s2e/Plugins/CRAX/API/Register.h>
 #include <s2e/Plugins/CRAX/API/Memory.h>
-#include <s2e/Plugins/CRAX/Modules/Module.h>
 
-#include <string>
 #include <vector>
 
 namespace s2e::plugins::crax {
@@ -44,56 +42,55 @@ class CRAX;
 class Exploit;
 class Technique;
 
-class RopChainBuilder : public Module {
+class RopChainBuilder {
+    using ConcreteInput = std::vector<uint8_t>;
+    using VarValuePair = std::pair<std::string, ConcreteInput>;
+    using ConcreteInputs = std::vector<VarValuePair>;
     using RopSubchain = Technique::RopSubchain;
 
 public:
-    explicit RopChainBuilder(CRAX &ctx)
-        : Module(ctx),
-          m_useSolver(true),
-          m_symbolicMode(m_useSolver),
-          m_symbolicModeRspOffset() {}
-
+    explicit RopChainBuilder(CRAX &ctx);
     virtual ~RopChainBuilder() = default;
 
-    virtual std::string toString() const override {
-        return "RopChainBuilder";
-    }
-
+    void reset();
 
     [[nodiscard]]
-    bool build(Exploit &exploit,
-               const std::vector<Technique *> &techniques,
-               uint64_t nrSkippedBytes = 0);
+    bool chain(const Technique &technique);
 
-    
-    void useSolver(bool useSolver) {
-        m_useSolver = useSolver;
-        reset();
-    }
-
-    void reset() {
-        m_symbolicMode = m_useSolver;
-        m_symbolicModeRspOffset = 0;
-    }
+    [[nodiscard]]
+    const std::vector<RopSubchain> &build() const;
 
 private:
     [[nodiscard]]
+    bool doChainSymbolic(const Technique &technique);
+
+    [[nodiscard]]
+    bool doChainDirect(const Technique &technique);
+
+    [[nodiscard]]
     bool shouldSwitchToDirectMode(const Technique *t) const;
 
-    // When building ROP chain using symbolic mode,
-    // exploit constraints are added to the input constraints
-    // in order to generate ROP payload.
-    [[nodiscard]]
-    bool addRegisterConstraint(Register::X64 reg, const klee::ref<klee::Expr> &e);
 
     [[nodiscard]]
-    bool addMemoryConstraint(uint64_t addr, const klee::ref<klee::Expr> &e);
-    
+    bool addRegisterConstraint(Register::X64 reg,
+                               const klee::ref<klee::Expr> &e);
 
-    bool m_useSolver;
-    bool m_symbolicMode;  // true: symbolic, false: direct
-    uint32_t m_symbolicModeRspOffset;
+    [[nodiscard]]
+    bool addMemoryConstraint(uint64_t addr,
+                             const klee::ref<klee::Expr> &e);
+
+    [[nodiscard]]
+    ConcreteInputs getConcreteInputs();
+
+    [[nodiscard]]
+    ConcreteInput getFirstConcreteInput();
+
+
+    CRAX &m_ctx;
+    bool m_isSymbolicMode;  // true: symbolic, false: direct
+    bool m_shouldSkipSavedRbp;
+    uint32_t m_rspOffset;
+    std::vector<RopSubchain> m_ropChain;
 };
 
 }  // namespace s2e::plugins::crax

@@ -55,7 +55,6 @@ namespace klee {
 // 3. `__libc_csu_init_gadget1` is a symbol used by the script itself
 //     and can be rewritten as `elf_base + __libc_csu_init_gadget1`,
 //     so essentially it is also a klee::AddExpr.
-
 class BaseOffsetExpr : public AddExpr {
     using Exploit = s2e::plugins::crax::Exploit;
     using ELF = s2e::plugins::crax::ELF;
@@ -195,7 +194,6 @@ private:
 
 
 // In ret2csu, we need to have placeholder expr tree node.
-
 class PlaceholderExpr : public Expr {
 public:
     virtual ~PlaceholderExpr() = default;
@@ -260,7 +258,6 @@ private:
 
 
 // Sometimes we want to send a sequence of bytes whose size is not simply a QWORD.
-
 class ByteVectorExpr : public Expr {
 public:
     virtual ~ByteVectorExpr() = default;

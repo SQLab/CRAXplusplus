@@ -236,6 +236,7 @@ void Ret2csu::buildRopSubchainTemplate() {
         {m_gadget2CallReg1, s_libcCsuInitCallTarget}
     };
 
+    m_ropSubchainTemplate.clear();
     m_ropSubchainTemplate.resize(1);
 
     RopSubchain &rop = m_ropSubchainTemplate[0];

@@ -19,8 +19,6 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
-#include <s2e/Plugins/CRAX/Modules/ExploitGenerator.h>
-#include <s2e/Plugins/CRAX/Modules/RopChainBuilder.h>
 #include <s2e/Plugins/CRAX/Modules/IOStates.h>
 
 #include <cassert>
@@ -39,11 +37,7 @@ ModuleState *Module::getModuleState(CRAXState *s, ModuleStateFactory f) const {
 std::unique_ptr<Module> Module::create(CRAX &ctx, const std::string &name) {
     std::unique_ptr<Module> ret;
 
-    if (name == "ExploitGenerator") {
-        ret = std::make_unique<ExploitGenerator>(ctx);
-    } else if (name == "RopChainBuilder") {
-        ret = std::make_unique<RopChainBuilder>(ctx);
-    } else if (name == "IOStates") {
+    if (name == "IOStates") {
         ret = std::make_unique<IOStates>(ctx);
     }
 

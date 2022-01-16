@@ -45,7 +45,7 @@ public:
     explicit BasicStackPivot(CRAX &ctx);
     virtual ~BasicStackPivot() = default;
 
-    virtual void initialize() override;
+    virtual void initialize() override {}
     virtual bool checkRequirements() const override;
     virtual void resolveRequiredGadgets() override;
     virtual std::string toString() const override { return "BasicStackPivot"; }
@@ -59,7 +59,7 @@ public:
     explicit AdvancedStackPivot(CRAX &ctx);
     virtual ~AdvancedStackPivot() = default;
 
-    virtual void initialize() override;
+    virtual void initialize() override {}
     virtual bool checkRequirements() const override;
     virtual void resolveRequiredGadgets() override;
     virtual std::string toString() const override { return "AdvancedStackPivot"; }

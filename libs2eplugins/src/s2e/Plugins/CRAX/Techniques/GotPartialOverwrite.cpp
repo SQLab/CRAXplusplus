@@ -99,7 +99,7 @@ std::vector<RopSubchain> GotPartialOverwrite::getRopSubchains() const {
 }
 
 RopSubchain GotPartialOverwrite::getExtraRopSubchain() const {
-    return { ConstantExpr::create(0, Expr::Int64) };  // rbp
+    return {};
 }
 
 

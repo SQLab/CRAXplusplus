@@ -32,6 +32,7 @@
 #include <s2e/Plugins/CRAX/Modules/Module.h>
 #include <s2e/Plugins/CRAX/Techniques/Technique.h>
 #include <s2e/Plugins/CRAX/Exploit.h>
+#include <s2e/Plugins/CRAX/ExploitGenerator.h>
 
 #include <pybind11/embed.h>
 
@@ -155,9 +156,6 @@ public:
     bool isNativeForkingDisabled() const { return m_disableNativeForking; }
 
     [[nodiscard]]
-    bool isSolverEnabled() const { return m_useSolver; }
-
-    [[nodiscard]]
     Register &reg() { return m_register; }
 
     [[nodiscard]]
@@ -207,31 +205,31 @@ public:
     sigc::signal<void,
                  S2EExecutionState*,
                  const Instruction&>
-        beforeInstructionHooks;
+        beforeInstruction;
 
     sigc::signal<void,
                  S2EExecutionState*,
                  const Instruction&>
-        afterInstructionHooks;
+        afterInstruction;
 
     sigc::signal<void,
                  S2EExecutionState*,
                  SyscallCtx&>
-        beforeSyscallHooks;
+        beforeSyscall;
 
     sigc::signal<void,
                  S2EExecutionState*,
                  const SyscallCtx&>
-        afterSyscallHooks;
+        afterSyscall;
 
     sigc::signal<void,
                  S2EExecutionState*,
                  bool*>
         onStateForkModuleDecide;
 
-    sigc::signal<void> beforeExploitGenerationHooks;
-    sigc::signal<void> exploitGenerationHooks;
+    sigc::signal<void> beforeExploitGeneration;
     // clang-format on
+
 
     // Embedded Python interpreter from pybind11 library.
     static pybind11::scoped_interpreter s_pybind11;
@@ -292,13 +290,13 @@ private:
     bool m_showInstructions;
     bool m_showSyscalls;
     bool m_disableNativeForking;
-    bool m_useSolver;
 
     // CRAX's attributes.
     Register m_register;
     Memory m_memory;
     Disassembler m_disassembler;
     Exploit m_exploit;
+    ExploitGenerator m_exploitGenerator;
     std::vector<std::unique_ptr<Module>> m_modules;
     std::vector<std::unique_ptr<Technique>> m_techniques;
 

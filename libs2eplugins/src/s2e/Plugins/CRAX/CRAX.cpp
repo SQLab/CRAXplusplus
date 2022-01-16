@@ -43,24 +43,23 @@ pybind11::module CRAX::s_pwnlib(pybind11::module::import("pwnlib.elf"));
 
 CRAX::CRAX(S2E *s2e)
     : Plugin(s2e),
-      beforeInstructionHooks(),
-      afterInstructionHooks(),
-      beforeSyscallHooks(),
-      afterSyscallHooks(),
+      beforeInstruction(),
+      afterInstruction(),
+      beforeSyscall(),
+      afterSyscall(),
       onStateForkModuleDecide(),
-      beforeExploitGenerationHooks(),
-      exploitGenerationHooks(),
+      beforeExploitGeneration(),
       m_currentState(),
       m_linuxMonitor(),
       m_showInstructions(CRAX_CONFIG_GET_BOOL(".showInstructions", false)),
       m_showSyscalls(CRAX_CONFIG_GET_BOOL(".showSyscalls", true)),
       m_disableNativeForking(CRAX_CONFIG_GET_BOOL(".disableNativeForking", false)),
-      m_useSolver(CRAX_CONFIG_GET_BOOL(".useSolver", true)),
       m_register(*this),
       m_memory(*this),
       m_disassembler(*this),
       m_exploit(CRAX_CONFIG_GET_STRING(".elfFilename"),
                 CRAX_CONFIG_GET_STRING(".libcFilename")),
+      m_exploitGenerator(*this),
       m_modules(),
       m_techniques(),
       m_targetProcessPid(),
@@ -131,11 +130,15 @@ void CRAX::onSymbolicRip(S2EExecutionState *exploitableState,
     // Dump virtual memory mappings.
     mem().showMapInfo();
 
-    // Do whatever that needs to be done right before exploit generation.
-    beforeExploitGenerationHooks.emit();
-
-    // Execute exploit generation hooks installed by the user.
-    exploitGenerationHooks.emit();
+    beforeExploitGeneration.emit();
+    
+    if (m_exploitGenerator.generateExploit()) {
+        log<WARN>()
+            << "Generated exploit: "
+            << m_exploit.getFilename(exploitableState->getID()) << '\n';
+    } else {
+        log<WARN>() << "Failed to generate exploit.\n";
+    }
 
     s2e()->getExecutor()->terminateState(*exploitableState, "End of exploit generation");
 }
@@ -174,13 +177,7 @@ void CRAX::onModuleLoad(S2EExecutionState *state,
         mem().getMappedSections().push_back(section);
     }
 
-    // Resolve ELF base.
-    //
-    // Note that onModuleLoad() is triggered by load_elf_binary(),
-    // so libc and other shared libraries have not yet been loaded
-    // by the dynamic loader (ld-linux.so.2) at this point.
-    //
-    // See: github.com/S2E/s2e-linux-kernel: linux-4.9.3/fs/binfmt_elf.c
+    // Resolve ELF base if the target binary has PIE.
     if (md.Name == "target" && m_exploit.getElf().getChecksec().hasPIE) {
         auto mapInfo = mem().getMapInfo();
         m_exploit.getElf().setBase(mapInfo.begin()->start);
@@ -227,13 +224,17 @@ void CRAX::onExecuteInstructionStart(S2EExecutionState *state,
     }
 
     if (m_showInstructions && !m_linuxMonitor->isKernelAddress(pc)) {
-        log<INFO>() << hexval(i->address) << ": " << i->mnemonic << ' ' << i->opStr << '\n';
+        log<INFO>()
+            << hexval(i->address) << ": "
+            << i->mnemonic << ' ' << i->opStr
+            << '\n';
     }
 
     if (i->mnemonic == "syscall") {
         onExecuteSyscallStart(state, pc);
     }
 
+    // XXX: m_scheduledAfterSyscallHooks should be state-specific?
     if (m_scheduledAfterSyscallHooks.size()) {
         auto it = m_scheduledAfterSyscallHooks.find(pc);
         if (it != m_scheduledAfterSyscallHooks.end()) {
@@ -243,7 +244,7 @@ void CRAX::onExecuteInstructionStart(S2EExecutionState *state,
     }
 
     // Execute instruction hooks installed by the user.
-    beforeInstructionHooks.emit(state, *i);
+    beforeInstruction.emit(state, *i);
 }
 
 void CRAX::onExecuteInstructionEnd(S2EExecutionState *state,
@@ -257,7 +258,7 @@ void CRAX::onExecuteInstructionEnd(S2EExecutionState *state,
     }
 
     // Execute instruction hooks installed by the user.
-    afterInstructionHooks.emit(state, *i);
+    afterInstruction.emit(state, *i);
 }
 
 void CRAX::onExecuteSyscallStart(S2EExecutionState *state,
@@ -289,7 +290,7 @@ void CRAX::onExecuteSyscallStart(S2EExecutionState *state,
     m_scheduledAfterSyscallHooks[pc + 2] = syscall;
 
     // Execute syscall hooks installed by the user.
-    beforeSyscallHooks.emit(state, m_scheduledAfterSyscallHooks[pc + 2]);
+    beforeSyscall.emit(state, m_scheduledAfterSyscallHooks[pc + 2]);
 }
 
 void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,
@@ -300,7 +301,7 @@ void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,
     syscall.ret = reg().readConcrete(Register::X64::RAX);
 
     // Execute syscall hooks installed by the user.
-    afterSyscallHooks.emit(state, syscall);
+    afterSyscall.emit(state, syscall);
 }
 
 void CRAX::onStateForkDecide(S2EExecutionState *state,

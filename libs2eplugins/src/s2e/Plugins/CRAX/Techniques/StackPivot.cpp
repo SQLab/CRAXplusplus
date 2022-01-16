@@ -39,10 +39,6 @@ BasicStackPivot::BasicStackPivot(CRAX &ctx)
 }
 
 
-void BasicStackPivot::initialize() {
-
-}
-
 bool BasicStackPivot::checkRequirements() const {
     // XXX: check if ROP gadgets exist.
     return true;
@@ -101,17 +97,13 @@ AdvancedStackPivot::AdvancedStackPivot(CRAX &ctx)
       m_readCallSites() {
     resolveRequiredGadgets();
 
-    ctx.beforeInstructionHooks.connect(
+    ctx.beforeInstruction.connect(
             sigc::mem_fun(*this, &AdvancedStackPivot::maybeInterceptReadCallSites));
 
-    ctx.beforeExploitGenerationHooks.connect(
+    ctx.beforeExploitGeneration.connect(
             sigc::mem_fun(*this, &AdvancedStackPivot::beforeExploitGeneration));
 }
 
-
-void AdvancedStackPivot::initialize() {
-
-}
 
 bool AdvancedStackPivot::checkRequirements() const {
     const auto &sym = m_ctx.getExploit().getElf().symbols();

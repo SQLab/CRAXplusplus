@@ -38,14 +38,14 @@ IOStates::IOStates(CRAX &ctx)
       m_canary(),
       m_leakTargets() {
     // Install input state syscall hook.
-    ctx.beforeSyscallHooks.connect(
+    ctx.beforeSyscall.connect(
             sigc::mem_fun(*this, &IOStates::inputStateHookTopHalf));
 
-    ctx.afterSyscallHooks.connect(
+    ctx.afterSyscall.connect(
             sigc::mem_fun(*this, &IOStates::inputStateHookBottomHalf));
 
     // Install output state syscall hook.
-    ctx.afterSyscallHooks.connect(
+    ctx.afterSyscall.connect(
             sigc::mem_fun(*this, &IOStates::outputStateHook));
 
     // Determine which base address(es) must be leaked
@@ -61,10 +61,10 @@ IOStates::IOStates(CRAX &ctx)
 
     // If stack canary is enabled, install a hook to intercept canary values.
     if (checksec.hasCanary) {
-        ctx.afterInstructionHooks.connect(
+        ctx.afterInstruction.connect(
                 sigc::mem_fun(*this, &IOStates::maybeInterceptStackCanary));
 
-        ctx.beforeInstructionHooks.connect(
+        ctx.beforeInstruction.connect(
                 sigc::mem_fun(*this, &IOStates::onStackChkFailed));
 
         ctx.onStateForkModuleDecide.connect(
@@ -153,7 +153,6 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
         forkedState->regs()->write(CPU_OFFSET(regs[Register::X64::RDX]), value);
 
         auto *forkedModState = m_ctx.getPluginModuleState(forkedState, this);
-        modState->leakableOffset = offset;
         forkedModState->leakableOffset = offset;
     }
 }

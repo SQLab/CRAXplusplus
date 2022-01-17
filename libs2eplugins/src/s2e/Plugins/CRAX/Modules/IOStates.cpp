@@ -106,7 +106,7 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
     for (size_t i = 0; i < bufInfo.size(); i++) {
         os << "[" << IOStates::s_leakTypes[i] << "]: ";
         for (uint64_t offset : bufInfo[i]) {
-            os << klee::hexval(offset) << ' ';
+            os << hexval(offset) << ' ';
         }
         os << '\n';
     }
@@ -143,8 +143,8 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
         S2EExecutionState *forkedState = m_ctx.fork(*inputState);
 
         log<WARN>()
-            << "forked a new state for offset " << hexval(offset)
-            << "(id=" << forkedState->getID() << ")\n";
+            << "Forked a new state for offset " << hexval(offset)
+            << " (id=" << forkedState->getID() << ")\n";
 
         // Hijack sys_read(0, buf, len), setting len to `value`.
         // Note that the forked state is currently in symbolic mode,
@@ -207,10 +207,10 @@ void IOStates::outputStateHook(S2EExecutionState *outputState,
         stateInfo.leakType = outputStateInfoList.front().leakType;
 
         log<WARN>()
-            << "*** WARN *** detected leak: ("
+            << "*** WARN *** Detected leak: ("
             << IOStates::s_leakTypes[stateInfo.leakType] << ", "
-            << klee::hexval(stateInfo.bufIndex) << ", "
-            << klee::hexval(stateInfo.baseOffset) << ")\n";
+            << hexval(stateInfo.bufIndex) << ", "
+            << hexval(stateInfo.baseOffset) << ")\n";
 
         modState->currentLeakTargetIdx++;
     }
@@ -239,8 +239,8 @@ void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
         m_canary = canary;
 
         log<WARN>()
-            << '[' << klee::hexval(i.address) << "] "
-            << "Intercepted canary: " << klee::hexval(canary) << '\n';
+            << '[' << hexval(i.address) << "] "
+            << "Intercepted canary: " << hexval(canary) << '\n';
     }
 }
 
@@ -292,7 +292,7 @@ IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len)
 
     for (uint64_t i = 0; i < len; i += 8) {
         uint64_t value = u64(m_ctx.mem().readConcrete(buf + i, 8, /*concretize=*/false));
-        //log<WARN>() << "addr = " << klee::hexval(buf + i) << " value = " << klee::hexval(value) << '\n';
+        //log<WARN>() << "addr = " << hexval(buf + i) << " value = " << hexval(value) << '\n';
         if (m_ctx.getExploit().getElf().getChecksec().hasCanary && value == canary) {
             bufInfo[LeakType::CANARY].push_back(i);
         } else {
@@ -314,7 +314,7 @@ IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len)
 
     for (uint64_t i = 0; i < len; i += 8) {
         uint64_t value = u64(m_ctx.mem().readConcrete(buf + i, 8, /*concretize=*/false));
-        //log<WARN>() << "addr = " << klee::hexval(buf + i) << " value = " << klee::hexval(value) << '\n';
+        //log<WARN>() << "addr = " << hexval(buf + i) << " value = " << hexval(value) << '\n';
         IOStates::OutputStateInfo info;
         info.valid = true;
 

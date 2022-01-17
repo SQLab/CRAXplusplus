@@ -382,6 +382,10 @@ pluginsConfig.CRAX = {
     -- Disable forking except those performed by CRAXplusplus.
     disableNativeForking = true,
 
+    -- User-specified value (used at exploitation time).
+    canary = CANARY,
+    elfBase = ELF_BASE,
+
     -- Modules of CRAX++ that you wish to load.
     modules = {
         "IOStates",

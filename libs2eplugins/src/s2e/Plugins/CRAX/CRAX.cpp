@@ -30,11 +30,17 @@ using namespace klee;
 
 namespace s2e::plugins::crax {
 
+#define __CRAX_CONFIG_GET_T(Type, key, defaultValue) \
+    (g_s2e->getConfig()->get##Type(getConfigKey() + key, defaultValue))
+
 #define CRAX_CONFIG_GET_BOOL(key, defaultValue) \
-    (g_s2e->getConfig()->getBool(getConfigKey() + key, defaultValue))
+    __CRAX_CONFIG_GET_T(Bool, key, defaultValue)
+
+#define CRAX_CONFIG_GET_INT(key, defaultValue) \
+    __CRAX_CONFIG_GET_T(Int, key, defaultValue)
 
 #define CRAX_CONFIG_GET_STRING(key) \
-    (g_s2e->getConfig()->getString(getConfigKey() + key))
+    __CRAX_CONFIG_GET_T(String, key, "")
 
 S2E_DEFINE_PLUGIN(CRAX, "Modular Exploit Generation System", "", );
 
@@ -54,6 +60,8 @@ CRAX::CRAX(S2E *s2e)
       m_showInstructions(CRAX_CONFIG_GET_BOOL(".showInstructions", false)),
       m_showSyscalls(CRAX_CONFIG_GET_BOOL(".showSyscalls", true)),
       m_disableNativeForking(CRAX_CONFIG_GET_BOOL(".disableNativeForking", false)),
+      m_userSpecifiedCanary(CRAX_CONFIG_GET_INT(".canary", 0)),
+      m_userSpecifiedElfBase(CRAX_CONFIG_GET_INT(".elfBase", 0)),
       m_register(*this),
       m_memory(*this),
       m_disassembler(*this),
@@ -124,21 +132,13 @@ void CRAX::onSymbolicRip(S2EExecutionState *exploitableState,
 
     reg().setRipSymbolic(symbolicRip);
 
-    // Dump CPU registers.
+    // Dump CPU registers and virtual memory mappings.
     reg().showRegInfo();
-
-    // Dump virtual memory mappings.
     mem().showMapInfo();
 
+    // Do whatever that needs to be done, and then generate the exploit.
     beforeExploitGeneration.emit();
-    
-    if (m_exploitGenerator.generateExploit()) {
-        log<WARN>()
-            << "Generated exploit: "
-            << m_exploit.getFilename(exploitableState->getID()) << '\n';
-    } else {
-        log<WARN>() << "Failed to generate exploit.\n";
-    }
+    m_exploitGenerator.run();
 
     s2e()->getExecutor()->terminateState(*exploitableState, "End of exploit generation");
 }
@@ -305,6 +305,7 @@ void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,
 }
 
 void CRAX::onStateForkDecide(S2EExecutionState *state,
+                             const ref<Expr> *condition,
                              bool *allowForking) {
     // At this point, `*allowForking` is true by default.
     if (!m_disableNativeForking) {
@@ -313,7 +314,7 @@ void CRAX::onStateForkDecide(S2EExecutionState *state,
 
     // If the user has explicitly disabled all state forks done by S2E,
     // then we'll let CRAX's modules decide whether this fork should be done.
-    onStateForkModuleDecide.emit(state, allowForking);
+    onStateForkModuleDecide.emit(state, condition, allowForking);
 
     // We'll also check if current state forking was requested by CRAX.
     // If yes, then `state` should be in `m_allowedForkingStates`.

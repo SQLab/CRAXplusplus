@@ -118,6 +118,7 @@ private:
                           const Instruction &i);
 
     void onStateForkModuleDecide(S2EExecutionState *state,
+                                 const klee::ref<klee::Expr> *__condition,
                                  bool *allowForking);
 
 

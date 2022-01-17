@@ -156,6 +156,12 @@ public:
     bool isNativeForkingDisabled() const { return m_disableNativeForking; }
 
     [[nodiscard]]
+    uint64_t getUserSpecifiedCanary() const { return m_userSpecifiedCanary; }
+
+    [[nodiscard]]
+    uint64_t getUserSpecifiedElfBase() const { return m_userSpecifiedElfBase; }
+
+    [[nodiscard]]
     Register &reg() { return m_register; }
 
     [[nodiscard]]
@@ -224,6 +230,7 @@ public:
 
     sigc::signal<void,
                  S2EExecutionState*,
+                 const klee::ref<klee::Expr>*,
                  bool*>
         onStateForkModuleDecide;
 
@@ -279,6 +286,7 @@ private:
                              SyscallCtx &syscall);
 
     void onStateForkDecide(S2EExecutionState *state,
+                           const klee::ref<klee::Expr> *condition,
                            bool *allowForking);
 
 
@@ -290,6 +298,8 @@ private:
     bool m_showInstructions;
     bool m_showSyscalls;
     bool m_disableNativeForking;
+    uint64_t m_userSpecifiedCanary;
+    uint64_t m_userSpecifiedElfBase;
 
     // CRAX's attributes.
     Register m_register;

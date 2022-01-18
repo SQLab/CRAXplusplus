@@ -344,13 +344,13 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
     allowForking &= true;  // don't overwrite the previous decision.
 
     if (uint64_t canary = m_ctx.getUserSpecifiedCanary()) {
-        // Hijack branch condition.
-        assert(__condition);
-        auto &condition = const_cast<ref<Expr> &>(__condition);
-
         log<WARN>()
             << "Constraining canary to " << hexval(canary)
             << " as requested.\n";
+
+        // Hijack branch condition.
+        assert(__condition);
+        auto &condition = const_cast<ref<Expr> &>(__condition);
 
         uint64_t rbp = m_ctx.reg().readConcrete(Register::X64::RBP);
         condition = EqExpr::create(m_ctx.mem().readSymbolic(rbp - 8, Expr::Int64),

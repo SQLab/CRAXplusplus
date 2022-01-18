@@ -93,7 +93,7 @@ public:
     explicit IOStates(CRAX &ctx);
     virtual ~IOStates() = default;
 
-    virtual std::string toString() const override { return "IOState"; }
+    virtual std::string toString() const override { return "IOStates"; }
 
     void print() const;
     uint64_t getCanary() const { return m_canary; }
@@ -101,6 +101,8 @@ public:
     static const std::array<std::string, LeakType::LAST> s_leakTypes;
 
 private:
+    void initUserSpecifiedStateInfoList();
+
     void inputStateHookTopHalf(S2EExecutionState *inputState,
                                SyscallCtx &syscall);
 
@@ -139,6 +141,12 @@ private:
 
     // The targets that must be leaked according to checksec.
     std::vector<LeakType> m_leakTargets;
+
+    // User-specified stateInfoList.
+    // If the user has defined this in s2e-config.lua, then the
+    // "IOStates" module will not fork at input states. Instead,
+    // it will follow the input offsets specified by the user.
+    std::vector<std::variant<InputStateInfo, OutputStateInfo>> m_userSpecifiedStateInfoList;
 };
 
 }  // namespace s2e::plugins::crax

@@ -47,9 +47,9 @@ public:
     virtual std::string toString() const = 0;
 
     ModuleState *getModuleState(CRAXState *state, ModuleStateFactory f) const;
+    std::string getConfigKey() const;
 
     static std::unique_ptr<Module> create(CRAX &ctx, const std::string &name);
-
     static std::map<std::string, Module *> s_mapper;
 
 protected:

@@ -1,16 +1,14 @@
 #!/usr/bin/env bash
 # Copyright 2021-2022 Software Quality Laboratory, NYCU.
 
-canary="0"
-elf_base="0"
-
 function usage() {
     echo "CRAXplusplus, software CRash analysis for Automatic eXploit generation."
     echo "Copyright (c) 2021-2022 Software Quality Laboratory, NYCU"
     echo ""
     echo "usage: $0 [option]"
-    echo "-c, --canary    - The canary value used during exploit time constraint solving."
-    echo "-e, --elf-base  - The elf_base value used during exploit time constraint solving."
+    echo "-c, --canary          - The canary value used during exploit time constraint solving."
+    echo "-e, --elf-base        - The elf_base value used during exploit time constraint solving."
+    echo "-s, --state-info-list - The I/O states info (define it to skip leak detection/verification)."
 }
 
 # $1 - args array
@@ -28,10 +26,16 @@ function has_argument() {
     return 1
 }
 
+
+canary="0"
+elf_base="0"
+state_info_list="\"\""
+
 # Generate s2e-config.lua from s2e-config.template.lua,
 function generate_s2e_config() {
-    sed -e "s/CANARY/$canary/g" \
-        -e "s/ELF_BASE/$elf_base/g" \
+    sed -e "s/__CANARY__/$canary/g" \
+        -e "s/__ELF_BASE__/$elf_base/g" \
+        -e "s/__STATE_INFO_LIST__/$state_info_list/g" \
         s2e-config.template.lua > s2e-config.lua
 }
 
@@ -50,6 +54,11 @@ while [[ $# -gt 0 ]]; do
             ;;
         -e|--elf-base)
             elf_base="$2"
+            shift
+            shift
+            ;;
+        -s|--state-info-list)
+            state_info_list="\"$2\""
             shift
             shift
             ;;

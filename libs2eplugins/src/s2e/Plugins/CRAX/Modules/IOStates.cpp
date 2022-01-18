@@ -20,6 +20,7 @@
 
 #include <s2e/Plugins/CRAX/CRAX.h>
 #include <s2e/Plugins/CRAX/Pwnlib/Util.h>
+#include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
 #include <unistd.h>
 
@@ -33,10 +34,15 @@ const std::array<std::string, IOStates::LeakType::LAST> IOStates::s_leakTypes = 
     "unknown", "code", "libc", "heap", "stack", "canary"
 }};
 
+
 IOStates::IOStates(CRAX &ctx)
     : Module(ctx),
       m_canary(),
-      m_leakTargets() {
+      m_leakTargets(),
+      m_userSpecifiedStateInfoList() {
+    // Try to initialize user-specified state info list from the config.
+    initUserSpecifiedStateInfoList();
+
     // Install input state syscall hook.
     ctx.beforeSyscall.connect(
             sigc::mem_fun(*this, &IOStates::inputStateHookTopHalf));
@@ -69,6 +75,36 @@ IOStates::IOStates(CRAX &ctx)
 
         ctx.onStateForkModuleDecide.connect(
                 sigc::mem_fun(*this, &IOStates::onStateForkModuleDecide));
+    }
+}
+
+void IOStates::initUserSpecifiedStateInfoList() {
+    std::string str = g_s2e->getConfig()->getString(getConfigKey() + ".stateInfoList");
+    log<INFO>() << "User-specified StateInfoList: " << str << '\n';
+
+    if (str.empty()) {
+        return;
+    }
+
+    // Parse the string into state info list.
+    for (const auto &s : split(str, ',')) {
+        if (s[0] == 'i') {
+            assert(s.size() > 1);
+            InputStateInfo stateInfo;
+            stateInfo.offset = std::stoull(s.substr(1));
+            m_userSpecifiedStateInfoList.push_back(std::move(stateInfo));
+
+        } else if (s[0] == 'o') {
+            OutputStateInfo stateInfo;
+            stateInfo.valid = false;
+            if (s.size() > 1) {
+                stateInfo.bufIndex = std::stoull(s.substr(1));
+            }
+            m_userSpecifiedStateInfoList.push_back(std::move(stateInfo));
+
+        } else {
+            pabort("Corrupted stateInfoList provided.");
+        }
     }
 }
 
@@ -128,6 +164,22 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
 
     if (bufInfo[currentLeakType].empty()) {
         log<WARN>() << "No leak targets in current input state.\n";
+        return;
+    }
+
+    // If the user has specified a state info list in s2e-config.lua,
+    // then we'll use the offsets provided by the user instead of
+    // forking states for each possible offsets.
+    if (m_userSpecifiedStateInfoList.size()) {
+        size_t idx = modState->stateInfoList.size();
+        assert(idx < m_userSpecifiedStateInfoList.size() &&
+               "user-specified state info list out-of-bound...");
+
+        InputStateInfo stateInfo
+            = std::get<InputStateInfo>(m_userSpecifiedStateInfoList[idx]);
+
+        ref<Expr> value = ConstantExpr::create(stateInfo.offset, Expr::Int64);
+        inputState->regs()->write(CPU_OFFSET(regs[Register::X64::RDX]), value);
         return;
     }
 
@@ -196,6 +248,23 @@ void IOStates::outputStateHook(S2EExecutionState *outputState,
 
     auto outputStateInfoList = detectLeak(outputState, syscall.arg2, syscall.arg3);
     auto modState = m_ctx.getPluginModuleState(outputState, this);
+
+    // If the user has specified a state info list in s2e-config.lua,
+    // then we should check if the leaked data's offset is really the same
+    // as what user has claimed.
+    if (m_userSpecifiedStateInfoList.size()) {
+        size_t idx = modState->stateInfoList.size();
+        assert(idx < m_userSpecifiedStateInfoList.size() &&
+               "user-specified state info list out-of-bound...");
+
+        OutputStateInfo stateInfo
+            = std::get<OutputStateInfo>(m_userSpecifiedStateInfoList[idx]);
+
+        if (stateInfo.valid) {
+            assert(stateInfo.bufIndex == outputStateInfoList.front().bufIndex &&
+                   "OutputStateInfo bufIndex mismatch!?");
+        }
+    }
 
     OutputStateInfo stateInfo;
     stateInfo.valid = false;
@@ -268,26 +337,24 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
     // Look ahead the next instruction.
     if (!m_ctx.isCallSiteOf(pc + i->size, "__stack_chk_fail")) {
         allowForking = false;
-    } else {
-        log<WARN>() << "Allowing fork before __stack_chk_fail@plt\n";
+        return;
+    }
 
-        if (uint64_t canary = m_ctx.getUserSpecifiedCanary()) {
-            // Hijack branch condition.
-            assert(__condition);
-            auto &condition = const_cast<ref<Expr> &>(__condition);
+    log<WARN>() << "Allowing fork before __stack_chk_fail@plt\n";
+    allowForking &= true;  // don't overwrite the previous decision.
 
-            log<WARN>()
-                << "Constraining canary to " << hexval(canary)
-                << " as requested.\n";
+    if (uint64_t canary = m_ctx.getUserSpecifiedCanary()) {
+        // Hijack branch condition.
+        assert(__condition);
+        auto &condition = const_cast<ref<Expr> &>(__condition);
 
-            uint64_t rbp = m_ctx.reg().readConcrete(Register::X64::RBP);
-            condition = EqExpr::create(m_ctx.mem().readSymbolic(rbp - 8, Expr::Int64),
-                                       ConstantExpr::create(canary, Expr::Int64));
-        }
+        log<WARN>()
+            << "Constraining canary to " << hexval(canary)
+            << " as requested.\n";
 
-        // Allow current state fork.
-        // Note: use &= so that previous result is not overwritten.
-        allowForking &= true;
+        uint64_t rbp = m_ctx.reg().readConcrete(Register::X64::RBP);
+        condition = EqExpr::create(m_ctx.mem().readSymbolic(rbp - 8, Expr::Int64),
+                                   ConstantExpr::create(canary, Expr::Int64));
     }
 }
 

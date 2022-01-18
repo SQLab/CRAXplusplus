@@ -383,12 +383,19 @@ pluginsConfig.CRAX = {
     disableNativeForking = true,
 
     -- User-specified value (used at exploitation time).
-    canary = CANARY,
-    elfBase = ELF_BASE,
+    canary = __CANARY__,
+    elfBase = __ELF_BASE__,
 
     -- Modules of CRAX++ that you wish to load.
     modules = {
         "IOStates",
+    },
+
+    -- Module config
+    modulesConfig = {
+        IOStates = {
+            stateInfoList = __STATE_INFO_LIST__,
+        },
     },
 
     -- The exploitaion techniques that your exploit will use.

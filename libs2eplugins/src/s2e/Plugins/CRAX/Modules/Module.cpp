@@ -34,6 +34,11 @@ ModuleState *Module::getModuleState(CRAXState *s, ModuleStateFactory f) const {
     return s->getModuleState(const_cast<Module *>(this), f);
 }
 
+std::string Module::getConfigKey() const {
+    return m_ctx.getConfigKey() + ".modulesConfig." + toString();
+}
+
+
 std::unique_ptr<Module> Module::create(CRAX &ctx, const std::string &name) {
     std::unique_ptr<Module> ret;
 

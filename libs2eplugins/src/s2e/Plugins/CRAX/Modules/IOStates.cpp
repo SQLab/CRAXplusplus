@@ -245,8 +245,8 @@ void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
 }
 
 void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
-                                       const ref<Expr> *__condition,
-                                       bool *allowForking) {
+                                       const ref<Expr> &__condition,
+                                       bool &allowForking) {
     // If S2E native forking is enabled, then it will automatically fork
     // at canary check.
     if (!m_ctx.isNativeForkingDisabled()) {
@@ -267,27 +267,27 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
 
     // Look ahead the next instruction.
     if (!m_ctx.isCallSiteOf(pc + i->size, "__stack_chk_fail")) {
-        *allowForking = false;
+        allowForking = false;
     } else {
         log<WARN>() << "Allowing fork before __stack_chk_fail@plt\n";
 
         if (uint64_t canary = m_ctx.getUserSpecifiedCanary()) {
             // Hijack branch condition.
             assert(__condition);
-            auto condition = const_cast<ref<Expr> *>(__condition);
+            auto &condition = const_cast<ref<Expr> &>(__condition);
 
             log<WARN>()
                 << "Constraining canary to " << hexval(canary)
                 << " as requested.\n";
 
             uint64_t rbp = m_ctx.reg().readConcrete(Register::X64::RBP);
-            *condition = EqExpr::create(m_ctx.mem().readSymbolic(rbp - 8, Expr::Int64),
-                                        ConstantExpr::create(canary, Expr::Int64));
+            condition = EqExpr::create(m_ctx.mem().readSymbolic(rbp - 8, Expr::Int64),
+                                       ConstantExpr::create(canary, Expr::Int64));
         }
 
         // Allow current state fork.
         // Note: use &= so that previous result is not overwritten.
-        *allowForking &= true;
+        allowForking &= true;
     }
 }
 

@@ -230,8 +230,8 @@ public:
 
     sigc::signal<void,
                  S2EExecutionState*,
-                 const klee::ref<klee::Expr>*,
-                 bool*>
+                 const klee::ref<klee::Expr>&,
+                 bool&>
         onStateForkModuleDecide;
 
     sigc::signal<void> beforeExploitGeneration;
@@ -286,8 +286,8 @@ private:
                              SyscallCtx &syscall);
 
     void onStateForkDecide(S2EExecutionState *state,
-                           const klee::ref<klee::Expr> *condition,
-                           bool *allowForking);
+                           const klee::ref<klee::Expr> &condition,
+                           bool &allowForking);
 
 
     // S2E

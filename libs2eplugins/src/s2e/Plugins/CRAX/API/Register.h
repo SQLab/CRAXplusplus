@@ -57,31 +57,27 @@ public:
     };
 
 
-    explicit Register(CRAX &ctx);
-    void initialize();
+    Register() : m_state(), m_isRipSymbolic(), m_ripExpr() {}
+    void initialize() {}
 
     // Determine if the given register contains symbolic data.
     [[nodiscard]]
     bool isSymbolic(Register::X64 reg);
 
     // Read symbolic data from the register file.
-    [[nodiscard]]
     klee::ref<klee::Expr> readSymbolic(Register::X64 reg,
                                        bool verbose = true);
 
     // Read concrete data from the register file.
-    [[nodiscard]]
     uint64_t readConcrete(Register::X64 reg,
                           bool verbose = true);
 
     // Write symbolic data to the register file.
-    [[nodiscard]]
     bool writeSymbolic(Register::X64 reg,
                        const klee::ref<klee::Expr> &value,
                        bool verbose = true);
 
     // Write concrete data to the register file.
-    [[nodiscard]]
     bool writeConcrete(Register::X64 reg,
                        uint64_t value,
                        bool verbose = true);
@@ -105,18 +101,22 @@ public:
 
     void setRipSymbolic(klee::ref<klee::Expr> ripExpr);
 
+    void setState(S2EExecutionState *state) { m_state = state; }
+
 private:
     static const std::array<std::string, 10> s_regs32;
     static const std::array<std::string, 18> s_regs64;
 
-    // CRAX's attributes.
-    CRAX &m_ctx;
+    S2EExecutionState *m_state;
 
     // libcpu mandates that RIP should never become symbolic,
     // hence we'll maintain an extra flag.
     bool m_isRipSymbolic;
     klee::ref<klee::Expr> m_ripExpr;
 };
+
+
+Register &reg(S2EExecutionState *state = nullptr);
 
 }  // namespace s2e::plugins::crax
 

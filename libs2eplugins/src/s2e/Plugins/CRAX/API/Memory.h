@@ -52,7 +52,7 @@ struct MemoryRegionCmp {
 
 class Memory {
 public:
-    explicit Memory(CRAX &ctx);
+    Memory() : m_state(), m_map(), m_mappedSections() {}
     void initialize();
 
     // Determine if the given memory area contains symbolic data.
@@ -60,19 +60,17 @@ public:
     bool isSymbolic(uint64_t virtAddr, uint64_t size) const;
 
     // Read symbolic data from memory.
-    [[nodiscard]]
     klee::ref<klee::Expr> readSymbolic(uint64_t virtAddr, uint64_t size) const;
 
     // Read concrete data from memory.
-    [[nodiscard]]
-    std::vector<uint8_t> readConcrete(uint64_t virtAddr, uint64_t size, bool concretize = true) const;
+    std::vector<uint8_t> readConcrete(uint64_t virtAddr,
+                                      uint64_t size,
+                                      bool concretize = true) const;
 
     // Write symbolic data to memory.
-    [[nodiscard]]
     bool writeSymbolic(uint64_t virtAddr, const klee::ref<klee::Expr> &value);
 
     // Write concrete data to memory.
-    [[nodiscard]]
     bool writeConcrete(uint64_t virtAddr, uint64_t value);
 
     // Determine if the given virtual memory address is mapped.
@@ -87,7 +85,8 @@ public:
     // Returns the map<addr, size> of symbolic memory.
     // XXX: currently not implemented.
     [[nodiscard]]
-    std::map<uint64_t, uint64_t> getSymbolicMemory(uint64_t start, uint64_t end) const;
+    std::map<uint64_t, uint64_t>
+    getSymbolicMemory(uint64_t start, uint64_t end) const;
 
     // Get all the mapped memory region.
     [[nodiscard]]
@@ -96,16 +95,19 @@ public:
     // Show all the mapped memory region.
     void showMapInfo() const;
 
+    void setState(S2EExecutionState *state) { m_state = state; }
+
     ModuleSections &getMappedSections() { return m_mappedSections; }
 
 private:
-    // S2E built-in Plugins.
-    MemoryMap *m_map;
+    S2EExecutionState *m_state;
 
-    // CRAX's attributes.
-    CRAX &m_ctx;
+    MemoryMap *m_map;
     ModuleSections m_mappedSections;
 };
+
+
+Memory &mem(S2EExecutionState *state = nullptr);
 
 }  // namespace s2e::plugins::crax
 

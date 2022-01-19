@@ -28,7 +28,6 @@
 namespace s2e::plugins::crax {
 
 // Forward declaration
-class CRAX;
 class CRAXState;
 class Module;
 class ModuleState;
@@ -41,7 +40,7 @@ using ModuleStateFactory = ModuleState *(*)(Module *, CRAXState *);
 // Essentially, a module is an S2E-plugin's plugin.
 class Module {
 public:
-    explicit Module(CRAX &ctx) : m_ctx(ctx) {}
+    Module() = default;
     virtual ~Module() = default;
 
     virtual std::string toString() const = 0;
@@ -49,11 +48,8 @@ public:
     ModuleState *getModuleState(CRAXState *state, ModuleStateFactory f) const;
     std::string getConfigKey() const;
 
-    static std::unique_ptr<Module> create(CRAX &ctx, const std::string &name);
+    static std::unique_ptr<Module> create(const std::string &name);
     static std::map<std::string, Module *> s_mapper;
-
-protected:
-    CRAX &m_ctx;
 };
 
 

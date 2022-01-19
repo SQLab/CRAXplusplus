@@ -30,16 +30,13 @@
 
 namespace s2e::plugins::crax {
 
-// Forward declaration
-class CRAX;
-
 // The abstract base class of all concrete exploitation techniques,
 // e.g., stack pivoting, ret2csu, orw, etc.
 class Technique {
 public:
     using RopSubchain = std::vector<klee::ref<klee::Expr>>;
 
-    explicit Technique(CRAX &ctx) : m_ctx(ctx) {}
+    Technique() = default;
     virtual ~Technique() = default;
 
     virtual void initialize() = 0;
@@ -50,11 +47,8 @@ public:
     virtual std::vector<RopSubchain> getRopSubchains() const = 0;
     virtual RopSubchain getExtraRopSubchain() const = 0;
 
-    static std::unique_ptr<Technique> create(CRAX &ctx, const std::string &name);
+    static std::unique_ptr<Technique> create(const std::string &name);
     static std::map<std::string, Technique*> s_mapper;
-
-protected:
-    CRAX &m_ctx;
 };
 
 }  // namespace s2e::plugins::crax

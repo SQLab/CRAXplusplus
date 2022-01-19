@@ -34,10 +34,6 @@
 
 namespace s2e::plugins::crax {
 
-// Forward declaration
-class CRAX;
-
-
 // This is an implementation of "IOState" from balsn's LAEG.
 class IOStates : public Module {
 public:
@@ -92,7 +88,7 @@ public:
         std::vector<std::variant<InputStateInfo, OutputStateInfo>> stateInfoList;
     };
 
-    explicit IOStates(CRAX &ctx);
+    IOStates();
     virtual ~IOStates() = default;
 
     virtual std::string toString() const override { return "IOStates"; }

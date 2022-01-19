@@ -41,8 +41,8 @@ const std::string Ret2csu::s_libcCsuInitGadget1 = "__libc_csu_init_gadget1";
 const std::string Ret2csu::s_libcCsuInitGadget2 = "__libc_csu_init_gadget2";
 const std::string Ret2csu::s_libcCsuInitCallTarget = "__libc_csu_init_call_target";
 
-Ret2csu::Ret2csu(CRAX &ctx)
-    : Technique(ctx),
+Ret2csu::Ret2csu()
+    : Technique(),
       m_retAddr(),
       m_arg1(),
       m_arg2(),
@@ -65,18 +65,18 @@ void Ret2csu::initialize() {
 }
 
 bool Ret2csu::checkRequirements() const {
-   auto symbolMap = m_ctx.getExploit().getElf().symbols();
+   auto symbolMap = g_crax->getExploit().getElf().symbols();
    return symbolMap.find(s_libcCsuInit) != symbolMap.end();
 }
 
 void Ret2csu::resolveRequiredGadgets() {
     // Gadgets
-    m_ctx.getExploit().registerSymbol(s_libcCsuInit, m_libcCsuInit);
-    m_ctx.getExploit().registerSymbol(s_libcCsuInitGadget1, m_libcCsuInitGadget1);
-    m_ctx.getExploit().registerSymbol(s_libcCsuInitGadget2, m_libcCsuInitGadget2);
+    g_crax->getExploit().registerSymbol(s_libcCsuInit, m_libcCsuInit);
+    g_crax->getExploit().registerSymbol(s_libcCsuInitGadget1, m_libcCsuInitGadget1);
+    g_crax->getExploit().registerSymbol(s_libcCsuInitGadget2, m_libcCsuInitGadget2);
 
     // Memory locations
-    m_ctx.getExploit().registerSymbol(s_libcCsuInitCallTarget, m_libcCsuInitCallTarget);
+    g_crax->getExploit().registerSymbol(s_libcCsuInitCallTarget, m_libcCsuInitCallTarget);
 }
 
 
@@ -125,7 +125,7 @@ Ret2csu::getRopSubchains(const ref<Expr> &retAddr,
 
     // If arg1 cannot fit within EDI, chain the gadgets to set RDI.
     if (evaluate<uint64_t>(arg1) >= (static_cast<uint64_t>(1) << 32)) {
-        uint64_t gadgetAddr = m_ctx.getExploit().resolveGadget("pop rdi ; ret");
+        uint64_t gadgetAddr = g_crax->getExploit().resolveGadget("pop rdi ; ret");
         ret.back() = ConstantExpr::create(gadgetAddr, Expr::Int64);
         ret.push_back(arg1);
         ret.push_back(retAddr);
@@ -149,10 +149,10 @@ Ret2csu::getRopSubchains(uint64_t retAddr,
 void Ret2csu::parseLibcCsuInit() {
     // Since there are several variants of __libc_csu_init(),
     // we'll manually disassemble it and parse the offsets of its two gadgets.
-    m_libcCsuInit = m_ctx.getExploit().getElf().symbols()[s_libcCsuInit];
+    m_libcCsuInit = g_crax->getExploit().getElf().symbols()[s_libcCsuInit];
 
     // Convert instruction generator into a list of instructions.
-    std::vector<Instruction> insns = m_ctx.getDisassembler().disasm(s_libcCsuInit);
+    std::vector<Instruction> insns = disas().disasm(s_libcCsuInit);
 
     // Find the offset of gadget1,
     // and save the order of popped registers in gadget1 as a vector.
@@ -162,7 +162,7 @@ void Ret2csu::parseLibcCsuInit() {
         }
 
         m_libcCsuInitGadget1
-            = insns[i + 1].address - m_ctx.getExploit().getElf().getBase();
+            = insns[i + 1].address - g_crax->getExploit().getElf().getBase();
 
         m_gadget1Regs.reserve(7);
         for (int j = i + 1; j < i + 8; j++) {
@@ -192,7 +192,7 @@ void Ret2csu::parseLibcCsuInit() {
         assert(insns[i - 3].mnemonic == "mov");
 
         m_libcCsuInitGadget2
-            = insns[i].address - 3 * X86_64_MOV_INSN_LEN - m_ctx.getExploit().getElf().getBase();
+            = insns[i].address - 3 * X86_64_MOV_INSN_LEN - g_crax->getExploit().getElf().getBase();
 
         for (int j = i - 3; j < i; j++) {
             const std::string &opStr = insns[j].opStr;
@@ -216,9 +216,9 @@ void Ret2csu::parseLibcCsuInit() {
 }
 
 void Ret2csu::searchGadget2CallTarget(std::string funcName) {
-    uint64_t funcAddr = m_ctx.getExploit().getElf().getRuntimeAddress(funcName);
+    uint64_t funcAddr = g_crax->getExploit().getElf().getRuntimeAddress(funcName);
     std::vector<uint8_t> funcAddrBytes = p64(funcAddr);
-    std::vector<uint64_t> candidates = m_ctx.mem().search(funcAddrBytes);
+    std::vector<uint64_t> candidates = mem().search(funcAddrBytes);
 
     if (candidates.empty()) {
         log<WARN>() << "No candidates for " << s_libcCsuInit << "()'s call target\n";
@@ -226,7 +226,7 @@ void Ret2csu::searchGadget2CallTarget(std::string funcName) {
     }
 
     // XXX: this only works for candidates in _DYNAMIC.
-    m_libcCsuInitCallTarget = candidates[0] - m_ctx.getExploit().getElf().getBase();
+    m_libcCsuInitCallTarget = candidates[0] - g_crax->getExploit().getElf().getBase();
 }
 
 void Ret2csu::buildRopSubchainTemplate() const {
@@ -246,7 +246,7 @@ void Ret2csu::buildRopSubchainTemplate() const {
     RopSubchain &rop = m_ropSubchainTemplate[0];
 
     // XXX: gadget1 is not in elf.sym
-    rop.push_back(BaseOffsetExpr::create(m_ctx.getExploit(), "", s_libcCsuInitGadget1));
+    rop.push_back(BaseOffsetExpr::create(g_crax->getExploit(), "", s_libcCsuInitGadget1));
     for (int i = 0; i < 7; i++) {
         std::string content = transform[m_gadget1Regs[i]];
 
@@ -256,10 +256,10 @@ void Ret2csu::buildRopSubchainTemplate() const {
             uint64_t val = std::stoull(content, nullptr, 16);
             rop.push_back(ConstantExpr::create(val, Expr::Int64));
         } else {
-            rop.push_back(BaseOffsetExpr::create(m_ctx.getExploit(), "", content));
+            rop.push_back(BaseOffsetExpr::create(g_crax->getExploit(), "", content));
         }
     }
-    rop.push_back(BaseOffsetExpr::create(m_ctx.getExploit(), "", s_libcCsuInitGadget2));
+    rop.push_back(BaseOffsetExpr::create(g_crax->getExploit(), "", s_libcCsuInitGadget2));
     for (int i = 0; i < 7; i++) {
         rop.push_back(ConstantExpr::create(0x4141414141414141, Expr::Int64));
     }

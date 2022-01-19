@@ -33,9 +33,8 @@ namespace s2e::plugins::crax {
 
 using RopSubchain = Technique::RopSubchain;
 
-RopChainBuilder::RopChainBuilder(CRAX &ctx)
-    : m_ctx(ctx),
-      m_isSymbolicMode(true),
+RopChainBuilder::RopChainBuilder()
+    : m_isSymbolicMode(true),
       m_shouldSkipSavedRbp(),
       m_rspOffset(),
       m_ropChain() {}
@@ -70,7 +69,7 @@ const std::vector<RopSubchain> &RopChainBuilder::build() {
 
 bool RopChainBuilder::doChainSymbolic(const Technique &technique) {
     bool ok;
-    uint64_t rsp = m_ctx.reg().readConcrete(Register::X64::RSP);
+    uint64_t rsp = reg().readConcrete(Register::X64::RSP);
     std::vector<RopSubchain> ropSubchains = technique.getRopSubchains();
 
     // Treat S-Expr trees in ropoSubchains[0] as ROP constraints
@@ -158,25 +157,25 @@ bool RopChainBuilder::buildStage1Payload() {
 }
 
 
-bool RopChainBuilder::addRegisterConstraint(Register::X64 reg,
+bool RopChainBuilder::addRegisterConstraint(Register::X64 r,
                                             const ref<Expr> &e) {
     uint64_t value = evaluate<uint64_t>(e);
-    auto regExpr = m_ctx.reg().readSymbolic(reg);
+    auto regExpr = reg().readSymbolic(r);
     auto constraint = EqExpr::create(regExpr,
                                      ConstantExpr::create(value, Expr::Int64));
 
     log<INFO>()
-        << m_ctx.reg().getName(reg) << " = "
+        << reg().getName(r) << " = "
         << evaluate<std::string>(e)
         << " (concretized=" << klee::hexval(value) << ")\n";
 
-    return m_ctx.getCurrentState()->addConstraint(constraint, true);
+    return g_crax->getCurrentState()->addConstraint(constraint, true);
 }
 
 bool RopChainBuilder::addMemoryConstraint(uint64_t addr,
                                           const ref<Expr> &e) {
     uint64_t value = evaluate<uint64_t>(e);
-    auto memExpr = m_ctx.mem().readSymbolic(addr, klee::Expr::Int64);
+    auto memExpr = mem().readSymbolic(addr, klee::Expr::Int64);
     auto constraint = EqExpr::create(memExpr,
                                      ConstantExpr::create(value, Expr::Int64));
 
@@ -185,12 +184,12 @@ bool RopChainBuilder::addMemoryConstraint(uint64_t addr,
         << evaluate<std::string>(e)
         << " (concretized=" << klee::hexval(value) << ")\n";
 
-    return m_ctx.getCurrentState()->addConstraint(constraint, true);
+    return g_crax->getCurrentState()->addConstraint(constraint, true);
 }
 
 RopChainBuilder::ConcreteInputs RopChainBuilder::getConcreteInputs() {
     ConcreteInputs ret;
-    m_ctx.getCurrentState()->getSymbolicSolution(ret);
+    g_crax->getCurrentState()->getSymbolicSolution(ret);
     return ret;
 }
 

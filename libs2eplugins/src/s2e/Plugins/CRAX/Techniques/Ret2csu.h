@@ -47,7 +47,7 @@ public:
     };
 
 
-    Ret2csu(CRAX &ctx);
+    Ret2csu();
     virtual ~Ret2csu() = default;
 
     virtual void initialize() override;

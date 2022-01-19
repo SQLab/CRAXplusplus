@@ -35,15 +35,15 @@ ModuleState *Module::getModuleState(CRAXState *s, ModuleStateFactory f) const {
 }
 
 std::string Module::getConfigKey() const {
-    return m_ctx.getConfigKey() + ".modulesConfig." + toString();
+    return g_crax->getConfigKey() + ".modulesConfig." + toString();
 }
 
 
-std::unique_ptr<Module> Module::create(CRAX &ctx, const std::string &name) {
+std::unique_ptr<Module> Module::create(const std::string &name) {
     std::unique_ptr<Module> ret;
 
     if (name == "IOStates") {
-        ret = std::make_unique<IOStates>(ctx);
+        ret = std::make_unique<IOStates>();
     }
 
     assert(ret && "Module::create() failed, possibly due to incorrect module name!");

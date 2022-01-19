@@ -54,7 +54,7 @@ class CRAX;
 
 class Disassembler {
 public:
-    explicit Disassembler(CRAX &ctx) : m_ctx(ctx) {}
+    Disassembler() : m_state() {}
 
     // Disassemble one instruction at the specificed address.
     std::optional<Instruction> disasm(uint64_t pc) const;
@@ -67,9 +67,15 @@ public:
     std::vector<Instruction> disasm(const std::vector<uint8_t> &code,
                                     uint64_t virtAddr,
                                     bool warnOnError = true) const;
+
+    void setState(S2EExecutionState *state) { m_state = state; }
+
 private:
-    CRAX &m_ctx;
+    S2EExecutionState *m_state;
 };
+
+
+Disassembler &disas(S2EExecutionState *state = nullptr);
 
 }  // namespace s2e::plugins::crax
 

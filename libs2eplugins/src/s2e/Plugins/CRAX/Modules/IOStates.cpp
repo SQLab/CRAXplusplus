@@ -35,8 +35,8 @@ const std::array<std::string, IOStates::LeakType::LAST> IOStates::s_leakTypes = 
 }};
 
 
-IOStates::IOStates(CRAX &ctx)
-    : Module(ctx),
+IOStates::IOStates()
+    : Module(),
       m_canary(),
       m_leakTargets(),
       m_userSpecifiedStateInfoList() {
@@ -44,19 +44,19 @@ IOStates::IOStates(CRAX &ctx)
     initUserSpecifiedStateInfoList();
 
     // Install input state syscall hook.
-    ctx.beforeSyscall.connect(
+    g_crax->beforeSyscall.connect(
             sigc::mem_fun(*this, &IOStates::inputStateHookTopHalf));
 
-    ctx.afterSyscall.connect(
+    g_crax->afterSyscall.connect(
             sigc::mem_fun(*this, &IOStates::inputStateHookBottomHalf));
 
     // Install output state syscall hook.
-    ctx.afterSyscall.connect(
+    g_crax->afterSyscall.connect(
             sigc::mem_fun(*this, &IOStates::outputStateHook));
 
     // Determine which base address(es) must be leaked
     // according to checksec of the target binary.
-    const auto &checksec = m_ctx.getExploit().getElf().getChecksec();
+    const auto &checksec = g_crax->getExploit().getElf().getChecksec();
     if (checksec.hasCanary) {
         m_leakTargets.push_back(IOStates::LeakType::CANARY);
     }
@@ -67,13 +67,13 @@ IOStates::IOStates(CRAX &ctx)
 
     // If stack canary is enabled, install a hook to intercept canary values.
     if (checksec.hasCanary) {
-        ctx.afterInstruction.connect(
+        g_crax->afterInstruction.connect(
                 sigc::mem_fun(*this, &IOStates::maybeInterceptStackCanary));
 
-        ctx.beforeInstruction.connect(
+        g_crax->beforeInstruction.connect(
                 sigc::mem_fun(*this, &IOStates::onStackChkFailed));
 
-        ctx.onStateForkModuleDecide.connect(
+        g_crax->onStateForkModuleDecide.connect(
                 sigc::mem_fun(*this, &IOStates::onStateForkModuleDecide));
     }
 }
@@ -133,7 +133,7 @@ void IOStates::initUserSpecifiedStateInfoList() {
 
 
 void IOStates::print() const {
-    auto modState = m_ctx.getPluginModuleState(m_ctx.getCurrentState(), this);
+    auto modState = g_crax->getPluginModuleState(g_crax->getCurrentState(), this);
 
     auto &os = log<WARN>();
     os << "Dumping IOStates: [";
@@ -157,7 +157,7 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
         return;
     }
 
-    m_ctx.setCurrentState(inputState);
+    g_crax->setCurrentState(inputState);
     auto bufInfo = analyzeLeak(inputState, syscall.arg2, syscall.arg3);
 
     auto &os = log<WARN>();
@@ -173,7 +173,7 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
 
     // Now we assume that the first offset can help us
     // successfully leak the address we want.
-    auto modState = m_ctx.getPluginModuleState(inputState, this);
+    auto modState = g_crax->getPluginModuleState(inputState, this);
 
     if (modState->currentLeakTargetIdx >= m_leakTargets.size()) {
         log<WARN>() << "No more leak targets :^)\n";
@@ -201,8 +201,8 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
         InputStateInfo stateInfo
             = std::get<InputStateInfo>(m_userSpecifiedStateInfoList[idx]);
 
-        ref<Expr> value = ConstantExpr::create(stateInfo.offset, Expr::Int64);
-        inputState->regs()->write(CPU_OFFSET(regs[Register::X64::RDX]), value);
+        ref<Expr> ce = ConstantExpr::create(stateInfo.offset, Expr::Int64);
+        reg(inputState).writeSymbolic(Register::X64::RDX, ce);
         return;
     }
 
@@ -215,7 +215,7 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
             offset++;
         }
 
-        S2EExecutionState *forkedState = m_ctx.fork(*inputState);
+        S2EExecutionState *forkedState = g_crax->fork(*inputState);
 
         log<WARN>()
             << "Forked a new state for offset " << hexval(offset)
@@ -224,10 +224,10 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
         // Hijack sys_read(0, buf, len), setting len to `value`.
         // Note that the forked state is currently in symbolic mode,
         // so we have to write a klee::ConstantExpr instead of uint64_t.
-        ref<Expr> value = ConstantExpr::create(offset, Expr::Int64);
-        forkedState->regs()->write(CPU_OFFSET(regs[Register::X64::RDX]), value);
+        ref<Expr> ce = ConstantExpr::create(offset, Expr::Int64);
+        reg(forkedState).writeSymbolic(Register::X64::RDX, ce);
 
-        auto *forkedModState = m_ctx.getPluginModuleState(forkedState, this);
+        auto *forkedModState = g_crax->getPluginModuleState(forkedState, this);
         forkedModState->leakableOffset = offset;
     }
 }
@@ -238,12 +238,12 @@ void IOStates::inputStateHookBottomHalf(S2EExecutionState *inputState,
         return;
     }
 
-    m_ctx.setCurrentState(inputState);
+    g_crax->setCurrentState(inputState);
 
     std::vector<uint8_t> buf
-        = m_ctx.mem().readConcrete(syscall.arg2, syscall.arg3, /*concretize=*/false);
+        = mem().readConcrete(syscall.arg2, syscall.arg3, /*concretize=*/false);
 
-    auto modState = m_ctx.getPluginModuleState(inputState, this);
+    auto modState = g_crax->getPluginModuleState(inputState, this);
     InputStateInfo stateInfo;
     stateInfo.buf = std::move(buf);
 
@@ -267,10 +267,10 @@ void IOStates::outputStateHook(S2EExecutionState *outputState,
         return;
     }
 
-    m_ctx.setCurrentState(outputState);
+    g_crax->setCurrentState(outputState);
 
     auto outputStateInfoList = detectLeak(outputState, syscall.arg2, syscall.arg3);
-    auto modState = m_ctx.getPluginModuleState(outputState, this);
+    auto modState = g_crax->getPluginModuleState(outputState, this);
 
     // If the user has specified a state info list in s2e-config.lua,
     // then we should check if the leaked data's offset is really the same
@@ -321,13 +321,13 @@ void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
         return;
     }
 
-    if (i.address == m_ctx.getExploit().getElf().getRuntimeAddress("main")) {
+    if (i.address == g_crax->getExploit().getElf().getRuntimeAddress("main")) {
         hasReachedMain = true;
     }
 
     if (hasReachedMain &&
         i.mnemonic == "mov" && i.opStr == "rax, qword ptr fs:[0x28]") {
-        uint64_t canary = m_ctx.reg().readConcrete(Register::X64::RAX);
+        uint64_t canary = reg().readConcrete(Register::X64::RAX);
         m_canary = canary;
 
         log<WARN>()
@@ -341,11 +341,11 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
                                        bool &allowForking) {
     // If S2E native forking is enabled, then it will automatically fork
     // at canary check.
-    if (!m_ctx.isNativeForkingDisabled()) {
+    if (!g_crax->isNativeForkingDisabled()) {
         return;
     }
 
-    m_ctx.setCurrentState(state);
+    g_crax->setCurrentState(state);
 
     // If the current branch instruction is the one before `call __stack_chk_fail@plt`,
     // then allow it to fork the current state.
@@ -354,11 +354,11 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
     //    40128b:       e8 20 fe ff ff          call   4010b0 <__stack_chk_fail@plt>
     //    401290:       c9                      leave
     uint64_t pc = state->regs()->getPc();
-    std::optional<Instruction> i = m_ctx.getDisassembler().disasm(pc);  
+    std::optional<Instruction> i = disas().disasm(pc);  
     assert(i && "Disassemble failed?");
 
     // Look ahead the next instruction.
-    if (!m_ctx.isCallSiteOf(pc + i->size, "__stack_chk_fail")) {
+    if (!g_crax->isCallSiteOf(pc + i->size, "__stack_chk_fail")) {
         allowForking = false;
         return;
     }
@@ -366,7 +366,7 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
     log<WARN>() << "Allowing fork before __stack_chk_fail@plt\n";
     allowForking &= true;  // don't overwrite the previous decision.
 
-    if (uint64_t canary = m_ctx.getUserSpecifiedCanary()) {
+    if (uint64_t canary = g_crax->getUserSpecifiedCanary()) {
         log<WARN>()
             << "Constraining canary to " << hexval(canary)
             << " as requested.\n";
@@ -375,8 +375,8 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
         assert(__condition);
         auto &condition = const_cast<ref<Expr> &>(__condition);
 
-        uint64_t rbp = m_ctx.reg().readConcrete(Register::X64::RBP);
-        condition = EqExpr::create(m_ctx.mem().readSymbolic(rbp - 8, Expr::Int64),
+        uint64_t rbp = reg().readConcrete(Register::X64::RBP);
+        condition = EqExpr::create(mem().readSymbolic(rbp - 8, Expr::Int64),
                                    ConstantExpr::create(canary, Expr::Int64));
     }
 }
@@ -384,7 +384,7 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
 void IOStates::onStackChkFailed(S2EExecutionState *state,
                                 const Instruction &i) {
     const uint64_t stackChkFailPlt
-        = m_ctx.getExploit().getElf().getRuntimeAddress("__stack_chk_fail");
+        = g_crax->getExploit().getElf().getRuntimeAddress("__stack_chk_fail");
 
     if (i.address == stackChkFailPlt) {
         // The program has reached __stack_chk_fail and
@@ -396,14 +396,14 @@ void IOStates::onStackChkFailed(S2EExecutionState *state,
 
 std::array<std::vector<uint64_t>, IOStates::LeakType::LAST>
 IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len) {
-    auto mapInfo = m_ctx.mem().getMapInfo();
+    auto mapInfo = mem().getMapInfo();
     uint64_t canary = m_canary;
     std::array<std::vector<uint64_t>, IOStates::LeakType::LAST> bufInfo;
 
     for (uint64_t i = 0; i < len; i += 8) {
-        uint64_t value = u64(m_ctx.mem().readConcrete(buf + i, 8, /*concretize=*/false));
+        uint64_t value = u64(mem().readConcrete(buf + i, 8, /*concretize=*/false));
         //log<WARN>() << "addr = " << hexval(buf + i) << " value = " << hexval(value) << '\n';
-        if (m_ctx.getExploit().getElf().getChecksec().hasCanary && value == canary) {
+        if (g_crax->getExploit().getElf().getChecksec().hasCanary && value == canary) {
             bufInfo[LeakType::CANARY].push_back(i);
         } else {
             for (const auto &region : mapInfo) {
@@ -418,17 +418,17 @@ IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len)
 
 std::vector<IOStates::OutputStateInfo>
 IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len) {
-    auto mapInfo = m_ctx.mem().getMapInfo();
+    auto mapInfo = mem().getMapInfo();
     uint64_t canary = m_canary;
     std::vector<IOStates::OutputStateInfo> leakInfo;
 
     for (uint64_t i = 0; i < len; i += 8) {
-        uint64_t value = u64(m_ctx.mem().readConcrete(buf + i, 8, /*concretize=*/false));
+        uint64_t value = u64(mem().readConcrete(buf + i, 8, /*concretize=*/false));
         //log<WARN>() << "addr = " << hexval(buf + i) << " value = " << hexval(value) << '\n';
         IOStates::OutputStateInfo info;
         info.valid = true;
 
-        if (m_ctx.getExploit().getElf().getChecksec().hasCanary && (value & ~0xff) == canary) {
+        if (g_crax->getExploit().getElf().getChecksec().hasCanary && (value & ~0xff) == canary) {
             info.bufIndex = i + 1;
             info.baseOffset = 0;
             info.leakType = LeakType::CANARY;
@@ -448,7 +448,7 @@ IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len)
 }
 
 IOStates::LeakType IOStates::getLeakType(const std::string &image) const {
-    if (image == m_ctx.getExploit().getElfFilename()) {
+    if (image == g_crax->getExploit().getElfFilename()) {
         return IOStates::LeakType::CODE;
     } else if (image == "[shared library]") {
         return IOStates::LeakType::LIBC;

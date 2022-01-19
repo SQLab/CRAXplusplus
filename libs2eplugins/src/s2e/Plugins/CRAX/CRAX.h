@@ -162,13 +162,22 @@ public:
     uint64_t getUserSpecifiedElfBase() const { return m_userSpecifiedElfBase; }
 
     [[nodiscard]]
-    Register &reg() { return m_register; }
+    Register &reg(S2EExecutionState *state = nullptr) {
+        m_register.setState(state ? state : m_currentState);
+        return m_register;
+    }
 
     [[nodiscard]]
-    Memory &mem() { return m_memory; }
+    Memory &mem(S2EExecutionState *state = nullptr) {
+        m_memory.setState(state ? state : m_currentState);
+        return m_memory;
+    }
 
     [[nodiscard]]
-    Disassembler &getDisassembler() { return m_disassembler; }
+    Disassembler &disas(S2EExecutionState *state = nullptr) {
+        m_disassembler.setState(state ? state : m_currentState);
+        return m_disassembler;
+    }
 
     [[nodiscard]]
     Exploit &getExploit() { return m_exploit; }

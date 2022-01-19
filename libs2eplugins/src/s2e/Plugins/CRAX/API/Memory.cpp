@@ -29,11 +29,6 @@ using namespace klee;
 
 namespace s2e::plugins::crax {
 
-Memory::Memory(CRAX &ctx)
-    : m_map(),
-      m_ctx(ctx),
-      m_mappedSections() {}
-
 void Memory::initialize() {
     m_map = g_s2e->getPlugin<MemoryMap>();
 
@@ -44,21 +39,23 @@ void Memory::initialize() {
 
 
 bool Memory::isSymbolic(uint64_t virtAddr, uint64_t size) const {
-    return m_ctx.getCurrentState()->mem()->symbolic(virtAddr, size);
+    return m_state->mem()->symbolic(virtAddr, size);
 }
 
 ref<Expr> Memory::readSymbolic(uint64_t virtAddr, uint64_t size) const {
     // XXX: check `size`.
     // See: klee/include/klee/Expr.h
-    return m_ctx.getCurrentState()->mem()->read(virtAddr, size);
+    return m_state->mem()->read(virtAddr, size);
 }
 
-std::vector<uint8_t> Memory::readConcrete(uint64_t virtAddr, uint64_t size, bool concretize) const {
+std::vector<uint8_t> Memory::readConcrete(uint64_t virtAddr,
+                                          uint64_t size,
+                                          bool concretize) const {
     std::vector<uint8_t> ret(size);
 
     if (concretize) {
-        if (!m_ctx.getCurrentState()->mem()->read(virtAddr, ret.data(), size)) {
-            log<WARN>() << "Cannot read concrete data from memory: " << hexval(virtAddr) << "\n";
+        if (!m_state->mem()->read(virtAddr, ret.data(), size)) {
+            log<WARN>() << "Cannot read concrete data from memory: " << hexval(virtAddr) << '\n';
             ret.clear();
         }
     } else {
@@ -67,16 +64,22 @@ std::vector<uint8_t> Memory::readConcrete(uint64_t virtAddr, uint64_t size, bool
         for (uint64_t i = 0; i < size; i++) {
             // Read the underlying concrete bytes, but don't concretize them.
             if (isSymbolic(virtAddr + i, 1)) {
-                if (!m_ctx.getCurrentState()->mem()->read(virtAddr + i, &ret[i], VirtualAddress, false)) {
-                    log<WARN>() << "Non-concretizing read() from memory failed: " << hexval(virtAddr + i) << "\n";
+                if (!m_state->mem()->read(virtAddr + i, &ret[i], VirtualAddress, false)) {
                     ret.clear();
+                    log<WARN>()
+                        << "Non-concretizing read() from memory failed: "
+                        << hexval(virtAddr + i)
+                        << "\n";
                     break;
                 }
                 continue;
             }
-            if (!m_ctx.getCurrentState()->mem()->read(virtAddr + i, &ret[i], 1)) {
-                log<WARN>() << "Cannot read concrete data from memory: " << hexval(virtAddr + i) << "\n";
+            if (!m_state->mem()->read(virtAddr + i, &ret[i], 1)) {
                 ret.clear();
+                log<WARN>()
+                    << "Cannot read concrete data from memory: "
+                    << hexval(virtAddr + i)
+                    << '\n';
                 break;
             }
          }
@@ -86,23 +89,23 @@ std::vector<uint8_t> Memory::readConcrete(uint64_t virtAddr, uint64_t size, bool
 }
 
 bool Memory::writeSymbolic(uint64_t virtAddr, const klee::ref<klee::Expr> &value) {
-    bool success = m_ctx.getCurrentState()->mem()->write(virtAddr, value);
+    bool success = m_state->mem()->write(virtAddr, value);
     if (!success) {
-        log<WARN>() << "Cannot write symbolic data to memory: " << hexval(virtAddr) << "\n";
+        log<WARN>() << "Cannot write symbolic data to memory: " << hexval(virtAddr) << '\n';
     }
     return success;
 }
 
 bool Memory::writeConcrete(uint64_t virtAddr, uint64_t value) {
-    bool success = m_ctx.getCurrentState()->mem()->write(virtAddr, &value, sizeof(value));
+    bool success = m_state->mem()->write(virtAddr, &value, sizeof(value));
     if (!success) {
-        log<WARN>() << "Cannot write concrete data to memory: " << hexval(virtAddr) << "\n";
+        log<WARN>() << "Cannot write concrete data to memory: " << hexval(virtAddr) << '\n';
     }
     return success;
 }
 
 bool Memory::isMapped(uint64_t virtAddr) const {
-    return m_ctx.getCurrentState()->mem()->getHostAddress(virtAddr) != -1;
+    return m_state->mem()->getHostAddress(virtAddr) != -1;
 }
 
 std::vector<uint64_t> Memory::search(const std::vector<uint8_t> &needle) const {
@@ -126,7 +129,10 @@ std::vector<uint64_t> Memory::search(const std::vector<uint8_t> &needle) const {
 
         // Read the region concretely into `haystack`,
         // and use kmp algorithm to search all the occurences of `needle`.
-        std::vector<uint8_t> haystack = readConcrete(region.start, region.end - region.start, /*concretize=*/false);
+        std::vector<uint8_t> haystack = readConcrete(region.start,
+                                                     region.end - region.start,
+                                                     /*concretize=*/false);
+
         std::vector<uint64_t> localResult = kmp(haystack, needle);
 
         // `localResult` contains the offset within `haystack`, so adding
@@ -177,7 +183,7 @@ std::set<MemoryRegion, MemoryRegionCmp> Memory::getMapInfo() const {
         return true;
     };
     
-    m_map->iterateRegions(m_ctx.getCurrentState(), m_ctx.getTargetProcessPid(), callback);
+    m_map->iterateRegions(m_state, g_crax->getTargetProcessPid(), callback);
 
     // XXX: This workaround should be overhauled!!!
     //
@@ -227,7 +233,7 @@ std::set<MemoryRegion, MemoryRegionCmp> Memory::getMapInfo() const {
 
     // The MemoryMap plugin cannot keep track of the stack mapping,
     // so we have to find it by ourselves.
-    uint64_t rsp = m_ctx.reg().readConcrete(Register::X64::RSP);
+    uint64_t rsp = reg(m_state).readConcrete(Register::X64::RSP);
     uint64_t page_mask = ~(TARGET_PAGE_SIZE - 1);
     uint64_t stackBegin = 0;
     uint64_t stackEnd = 0;
@@ -263,6 +269,11 @@ void Memory::showMapInfo() const {
             << (region.prot & MM_EXEC ? 'x' : '-') << '\t'
             << region.image << '\n';
     }
+}
+
+
+Memory &mem(S2EExecutionState *state) {
+    return g_crax->mem(state);
 }
 
 }  // namespace s2e::plugins::crax

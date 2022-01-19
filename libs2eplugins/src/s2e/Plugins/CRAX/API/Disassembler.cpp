@@ -32,7 +32,7 @@
 namespace s2e::plugins::crax {
 
 std::optional<Instruction> Disassembler::disasm(uint64_t pc) const {
-    std::vector<uint8_t> code = m_ctx.mem().readConcrete(pc, X86_64_INSN_MAX_NR_BYTES);
+    std::vector<uint8_t> code = mem().readConcrete(pc, X86_64_INSN_MAX_NR_BYTES);
     std::vector<Instruction> insns = disasm(code, pc);
 
     if (insns.empty()) {
@@ -45,9 +45,9 @@ std::optional<Instruction> Disassembler::disasm(uint64_t pc) const {
 std::vector<Instruction> Disassembler::disasm(const std::string &symbol) const {
     // The object `f` holds the information about the function `symbol`,
     // e.g., offset within ELF, size, etc.
-    const auto &elf = m_ctx.getExploit().getElf();
+    const auto &elf = g_crax->getExploit().getElf();
     Function f = elf.functions()[symbol];
-    std::vector<uint8_t> code = m_ctx.mem().readConcrete(elf.getBase() + f.address, f.size);
+    std::vector<uint8_t> code = mem().readConcrete(elf.getBase() + f.address, f.size);
     std::vector<Instruction> insns = disasm(code, elf.getBase() + f.address);
 
     assert(insns.size());
@@ -98,6 +98,11 @@ std::vector<Instruction> Disassembler::disasm(const std::vector<uint8_t> &code,
 
     cs_close(&handle);
     return ret;
+}
+
+
+Disassembler &disas(S2EExecutionState *state) {
+    return g_crax->disas(state);
 }
 
 }  // namespace s2e::plugins::crax

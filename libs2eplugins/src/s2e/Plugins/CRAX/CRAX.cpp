@@ -65,12 +65,12 @@ CRAX::CRAX(S2E *s2e)
       m_disableNativeForking(CRAX_CONFIG_GET_BOOL(".disableNativeForking", false)),
       m_userSpecifiedCanary(CRAX_CONFIG_GET_INT(".canary", 0)),
       m_userSpecifiedElfBase(CRAX_CONFIG_GET_INT(".elfBase", 0)),
-      m_register(*this),
-      m_memory(*this),
-      m_disassembler(*this),
+      m_register(),
+      m_memory(),
+      m_disassembler(),
       m_exploit(CRAX_CONFIG_GET_STRING(".elfFilename"),
                 CRAX_CONFIG_GET_STRING(".libcFilename")),
-      m_exploitGenerator(*this),
+      m_exploitGenerator(),
       m_modules(),
       m_techniques(),
       m_targetProcessPid(),
@@ -102,7 +102,7 @@ void CRAX::initialize() {
 
     foreach2 (it, moduleNames.begin(), moduleNames.end()) {
         log<INFO>() << "Creating module: " << *it << '\n';
-        m_modules.push_back(Module::create(*this, *it));
+        m_modules.push_back(Module::create(*it));
     }
 
     // Initialize techniques.
@@ -110,7 +110,7 @@ void CRAX::initialize() {
 
     foreach2 (it, techniqueNames.begin(), techniqueNames.end()) {
         log<INFO>() << "Creating technique: " << *it << '\n';
-        m_techniques.push_back(Technique::create(*this, *it));
+        m_techniques.push_back(Technique::create(*it));
     }
 }
 

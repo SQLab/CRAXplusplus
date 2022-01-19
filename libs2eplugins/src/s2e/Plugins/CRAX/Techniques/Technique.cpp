@@ -31,17 +31,17 @@ namespace s2e::plugins::crax {
 std::map<std::string, Technique*> Technique::s_mapper;
 
 
-std::unique_ptr<Technique> Technique::create(CRAX &ctx, const std::string &name) {
+std::unique_ptr<Technique> Technique::create(const std::string &name) {
     std::unique_ptr<Technique> ret;
 
     if (name == "Ret2csu") {
-        ret = std::make_unique<Ret2csu>(ctx);
+        ret = std::make_unique<Ret2csu>();
     } else if (name == "BasicStackPivot") {
-        ret = std::make_unique<BasicStackPivot>(ctx);
+        ret = std::make_unique<BasicStackPivot>();
     } else if (name == "AdvancedStackPivot") {
-        ret = std::make_unique<AdvancedStackPivot>(ctx);
+        ret = std::make_unique<AdvancedStackPivot>();
     } else if (name == "GotPartialOverwrite") {
-        ret = std::make_unique<GotPartialOverwrite>(ctx);
+        ret = std::make_unique<GotPartialOverwrite>();
     }
 
     assert(ret &&

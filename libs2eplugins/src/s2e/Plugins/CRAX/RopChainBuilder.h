@@ -49,8 +49,8 @@ class RopChainBuilder {
     using RopSubchain = Technique::RopSubchain;
 
 public:
-    explicit RopChainBuilder(CRAX &ctx);
-    virtual ~RopChainBuilder() = default;
+    RopChainBuilder();
+    ~RopChainBuilder() = default;
 
     void reset();
 
@@ -74,7 +74,7 @@ private:
 
 
     [[nodiscard]]
-    bool addRegisterConstraint(Register::X64 reg,
+    bool addRegisterConstraint(Register::X64 r,
                                const klee::ref<klee::Expr> &e);
 
     [[nodiscard]]
@@ -88,7 +88,6 @@ private:
     ConcreteInput getFirstConcreteInput();
 
 
-    CRAX &m_ctx;
     bool m_isSymbolicMode;  // true: symbolic, false: direct
     bool m_shouldSkipSavedRbp;
     uint32_t m_rspOffset;

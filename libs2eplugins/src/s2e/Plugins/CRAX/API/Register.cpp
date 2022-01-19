@@ -38,14 +38,6 @@ const std::array<std::string, 18> Register::s_regs64 = {{
 }};
 
 
-Register::Register(CRAX &ctx)
-    : m_ctx(ctx),
-      m_isRipSymbolic(),
-      m_ripExpr() {}
-
-void Register::initialize() {}
-
-
 bool Register::isSymbolic(Register::X64 reg) {
     return !isa<klee::ConstantExpr>(readSymbolic(reg, /*verbose=*/false));
 }
@@ -56,7 +48,7 @@ ref<Expr> Register::readSymbolic(Register::X64 reg, bool verbose) {
     if (reg == Register::X64::RIP && m_isRipSymbolic) {
         ret = m_ripExpr;
     } else {
-        ret = m_ctx.getCurrentState()->regs()->read(getOffset(reg), klee::Expr::Int64);
+        ret = m_state->regs()->read(getOffset(reg), klee::Expr::Int64);
     }
 
     if (verbose && isa<klee::ConstantExpr>(ret)) {
@@ -69,14 +61,14 @@ uint64_t Register::readConcrete(Register::X64 reg, bool verbose) {
     uint64_t ret = 0;
 
     if (verbose &&
-        !m_ctx.getCurrentState()->regs()->read(getOffset(reg), &ret, sizeof(ret), /*concretize=*/false)) {
+        !m_state->regs()->read(getOffset(reg), &ret, sizeof(ret), /*concretize=*/false)) {
         log<WARN>() << "Cannot read concrete data from register: " << getName(reg) << "\n";
     }
     return ret;
 }
 
 bool Register::writeSymbolic(Register::X64 reg, const klee::ref<klee::Expr> &value, bool verbose) {
-    bool success = m_ctx.getCurrentState()->regs()->write(getOffset(reg), value);
+    bool success = m_state->regs()->write(getOffset(reg), value);
     if (verbose && !success) {
         log<WARN>() << "Cannot write symbolic data to register: " << getName(reg) << "\n";
     }
@@ -84,7 +76,7 @@ bool Register::writeSymbolic(Register::X64 reg, const klee::ref<klee::Expr> &val
 }
 
 bool Register::writeConcrete(Register::X64 reg, uint64_t value, bool verbose) {
-    bool success = m_ctx.getCurrentState()->regs()->write(getOffset(reg), &value, sizeof(value));
+    bool success = m_state->regs()->write(getOffset(reg), &value, sizeof(value));
     if (verbose && !success) {
         log<WARN>() << "Cannot write concrete data to register: " << getName(reg) << "\n";
     }
@@ -113,7 +105,7 @@ void Register::showRegInfo() {
     if (m_isRipSymbolic) {
         os << "(symbolic)";
     } else {
-        os << hexval(m_ctx.getCurrentState()->regs()->getPc());
+        os << hexval(m_state->regs()->getPc());
     }
     os << "\n";
 }
@@ -121,6 +113,11 @@ void Register::showRegInfo() {
 void Register::setRipSymbolic(klee::ref<klee::Expr> ripExpr) {
     m_isRipSymbolic = true;
     m_ripExpr = ripExpr;
+}
+
+
+Register& reg(S2EExecutionState *state) {
+    return g_crax->reg(state);
 }
 
 }  // namespace s2e::plugins::crax

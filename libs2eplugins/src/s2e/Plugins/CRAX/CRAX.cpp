@@ -325,7 +325,7 @@ void CRAX::onStateForkDecide(S2EExecutionState *state,
 bool CRAX::isCallSiteOf(uint64_t instructionAddr,
                         const std::string &symbol) const {
     std::optional<Instruction> i = m_disassembler.disasm(instructionAddr);
-    assert(i && "isCallSiteOf(): Unable to disassemble the instruction");
+    assert(i && "Unable to disassemble the instruction");
 
     if (i->mnemonic != "call") {
         return false;

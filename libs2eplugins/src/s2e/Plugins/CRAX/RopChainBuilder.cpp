@@ -59,7 +59,11 @@ bool RopChainBuilder::chain(const Technique &technique) {
                             : doChainDirect(technique);
 }
 
-const std::vector<RopSubchain> &RopChainBuilder::build() const {
+const std::vector<RopSubchain> &RopChainBuilder::build() {
+    if (m_isSymbolicMode) {
+        buildStage1Payload();
+    }
+
     return m_ropChain;
 }
 
@@ -93,30 +97,7 @@ bool RopChainBuilder::doChainSymbolic(const Technique &technique) {
 
     log<INFO>() << "Switching to direct mode...\n";
     m_isSymbolicMode = false;
-
-    ConcreteInput payload = getFirstConcreteInput();
-    if (payload.size()) {
-        m_ropChain.push_back({ ByteVectorExpr::create(payload) });
-        m_ropChain.push_back({});
-    } else {
-        log<WARN>() << "Sorry, the ROP constraints are unsatisfiable :(\n";
-        return false;
-    }
-
-    if (ropSubchains.size() > 1) {
-        m_ropChain.push_back({});
-    }
-
-    for (size_t i = 1; i < ropSubchains.size(); i++) {
-        for (const ref<Expr> &e : ropSubchains[i]) {
-            m_ropChain.back().push_back(e);
-        }
-        if (i != ropSubchains.size() - 1) {
-            m_ropChain.push_back({});
-        }
-    }
-
-    return true;
+    return buildStage1Payload();
 }
 
 bool RopChainBuilder::doChainDirect(const Technique &technique) {
@@ -161,6 +142,19 @@ bool RopChainBuilder::shouldSwitchToDirectMode(const Technique *t) const {
     // so after stack pivoting our rop chain can be built without
     // solving ROP constraints.
     return dynamic_cast<const StackPivot *>(t);
+}
+
+bool RopChainBuilder::buildStage1Payload() {
+    ConcreteInput payload = getFirstConcreteInput();
+
+    if (payload.empty()) {
+        log<WARN>() << "Sorry, the ROP constraints are unsatisfiable :(\n";
+        return false;
+    }
+
+    m_ropChain.push_back({ ByteVectorExpr::create(payload) });
+    m_ropChain.push_back({});
+    return true;
 }
 
 

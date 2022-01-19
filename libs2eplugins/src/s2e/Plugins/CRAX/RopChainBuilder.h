@@ -58,7 +58,7 @@ public:
     bool chain(const Technique &technique);
 
     [[nodiscard]]
-    const std::vector<RopSubchain> &build() const;
+    const std::vector<RopSubchain> &build();
 
 private:
     [[nodiscard]]
@@ -69,6 +69,8 @@ private:
 
     [[nodiscard]]
     bool shouldSwitchToDirectMode(const Technique *t) const;
+
+    bool buildStage1Payload();
 
 
     [[nodiscard]]

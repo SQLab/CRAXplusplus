@@ -315,6 +315,9 @@ private:
     std::unordered_set<S2EExecutionState *> m_allowedForkingStates;
 };
 
+
+extern CRAX *g_crax;
+
 }  // namespace s2e::plugins::crax
 
 #endif  // S2E_PLUGINS_CRAX_H

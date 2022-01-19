@@ -26,10 +26,6 @@
 
 #include "CRAX.h"
 
-using namespace klee;
-
-namespace s2e::plugins::crax {
-
 #define __CRAX_CONFIG_GET_T(Type, key, defaultValue) \
     (g_s2e->getConfig()->get##Type(getConfigKey() + key, defaultValue))
 
@@ -41,6 +37,13 @@ namespace s2e::plugins::crax {
 
 #define CRAX_CONFIG_GET_STRING(key) \
     __CRAX_CONFIG_GET_T(String, key, "")
+
+using namespace klee;
+
+
+namespace s2e::plugins::crax {
+
+CRAX *g_crax = nullptr;
 
 S2E_DEFINE_PLUGIN(CRAX, "Modular Exploit Generation System", "", );
 
@@ -76,8 +79,8 @@ CRAX::CRAX(S2E *s2e)
 
 
 void CRAX::initialize() {
-    // Initialize CRAX++'s logging module.
-    initCRAXLogging(this);
+    g_crax = this;
+
     m_register.initialize();
     m_memory.initialize();
 

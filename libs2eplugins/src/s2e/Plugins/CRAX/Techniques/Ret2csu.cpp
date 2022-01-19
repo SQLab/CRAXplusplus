@@ -62,7 +62,6 @@ void Ret2csu::initialize() {
     parseLibcCsuInit();
     searchGadget2CallTarget();
     resolveRequiredGadgets();
-    buildRopSubchainTemplate();
 }
 
 bool Ret2csu::checkRequirements() const {
@@ -97,37 +96,42 @@ Ret2csu::getRopSubchains(const ref<Expr> &retAddr,
                          const ref<Expr> &arg1,
                          const ref<Expr> &arg2,
                          const ref<Expr> &arg3) const {
-    RopSubchain rop;
+    RopSubchain ret;
+
+    // If the template hasn't been built, do it now.
+    if (m_ropSubchainTemplate.empty()) {
+        buildRopSubchainTemplate();
+    }
 
     for (const ref<Expr> &e : m_ropSubchainTemplate[0]) {
         if (auto phe = dyn_cast<PlaceholderExpr>(e)) {
             // If this expr is a placeholder, replace it now.
             if (phe->hasTag("arg1")) {
-                rop.push_back(arg1);
+                ret.push_back(arg1);
             } else if (phe->hasTag("arg2")) {
-                rop.push_back(arg2);
+                ret.push_back(arg2);
             } else if (phe->hasTag("arg3")) {
-                rop.push_back(arg3);
+                ret.push_back(arg3);
             } else if (phe->hasTag("retAddr")) {
-                rop.push_back(retAddr);
+                ret.push_back(retAddr);
             } else {
                 throw UnhandledPlaceholderException();
             }
         } else {
             // Otherwise, just leave it as it is.
-            rop.push_back(e);
+            ret.push_back(e);
         }
     }
 
     // If arg1 cannot fit within EDI, chain the gadgets to set RDI.
     if (evaluate<uint64_t>(arg1) >= (static_cast<uint64_t>(1) << 32)) {
         uint64_t gadgetAddr = m_ctx.getExploit().resolveGadget("pop rdi ; ret");
-        rop.back() = ConstantExpr::create(gadgetAddr, Expr::Int64);
-        rop.push_back(arg1);
-        rop.push_back(retAddr);
+        ret.back() = ConstantExpr::create(gadgetAddr, Expr::Int64);
+        ret.push_back(arg1);
+        ret.push_back(retAddr);
     }
 
-    return {rop};
+    return { ret };
 }
 
 std::vector<RopSubchain>
@@ -225,14 +229,14 @@ void Ret2csu::searchGadget2CallTarget(std::string funcName) {
     m_libcCsuInitCallTarget = candidates[0] - m_ctx.getExploit().getElf().getBase();
 }
 
-void Ret2csu::buildRopSubchainTemplate() {
+void Ret2csu::buildRopSubchainTemplate() const {
     std::map<std::string, std::string> transform = {
         {"rsp", "4141414141414141"},
         {"rbx", "0"},
         {"rbp", "1"},
-        {slice(m_gadget2Regs["edi"], 0, 3), "arg1"},
-        {slice(m_gadget2Regs["rsi"], 0, 3), "arg2"},
-        {slice(m_gadget2Regs["rdx"], 0, 3), "arg3"},
+        {slice(m_gadget2Regs.at("edi"), 0, 3), "arg1"},
+        {slice(m_gadget2Regs.at("rsi"), 0, 3), "arg2"},
+        {slice(m_gadget2Regs.at("rdx"), 0, 3), "arg3"},
         {m_gadget2CallReg1, s_libcCsuInitCallTarget}
     };
 

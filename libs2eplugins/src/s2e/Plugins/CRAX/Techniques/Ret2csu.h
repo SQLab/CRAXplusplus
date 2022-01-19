@@ -78,7 +78,7 @@ public:
 private:
     void parseLibcCsuInit();
     void searchGadget2CallTarget(std::string funcName = "_fini");
-    void buildRopSubchainTemplate();
+    void buildRopSubchainTemplate() const;
 
     uint64_t m_retAddr;
     uint64_t m_arg1;
@@ -97,7 +97,9 @@ private:
     std::string m_gadget2CallReg1;
     std::string m_gadget2CallReg2;
 
-    std::vector<RopSubchain> m_ropSubchainTemplate;
+    // Rebuilding the entire ROP chain from scratch is expensive,
+    // so we'll use a template as a cache, thereby declaring it mutable.
+    mutable std::vector<RopSubchain> m_ropSubchainTemplate;
 };
 
 }  // namespace s2e::plugins::crax

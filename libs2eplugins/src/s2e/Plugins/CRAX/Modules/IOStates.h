@@ -83,6 +83,8 @@ public:
             return new State(*this);
         }
 
+        std::string toString() const;
+
         // XXX: maybe make these data members private?
         uint64_t leakableOffset;
         uint32_t lastInputStateInfoIdx;

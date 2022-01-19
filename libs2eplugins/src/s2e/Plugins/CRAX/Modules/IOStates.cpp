@@ -78,6 +78,29 @@ IOStates::IOStates(CRAX &ctx)
     }
 }
 
+std::string IOStates::State::toString() const {
+    std::string ret;
+
+    for (size_t i = 0; i < stateInfoList.size(); i++) {
+        const auto &info = stateInfoList[i];
+
+        if (const auto stateInfo = std::get_if<InputStateInfo>(&info)) {
+            ret += 'i';
+            ret += std::to_string(stateInfo->offset);
+        } else if (const auto stateInfo = std::get_if<OutputStateInfo>(&info)) {
+            ret += 'o';
+            if (stateInfo->valid) {
+                ret += std::to_string(stateInfo->bufIndex);
+            }
+        }
+
+        if (i != stateInfoList.size() - 1) {
+            ret += ',';
+        }
+    }
+    return ret;
+}
+
 void IOStates::initUserSpecifiedStateInfoList() {
     std::string str = g_s2e->getConfig()->getString(getConfigKey() + ".stateInfoList");
     log<INFO>() << "User-specified StateInfoList: " << str << '\n';

@@ -29,19 +29,13 @@ class S2EExecutionState;
 
 namespace s2e::plugins::crax {
 
-// Forward declaration.
-class CRAX;
-
+// This logging module provides straightforward logging APIs with
+// C++-style streams. There are three severity levels: INFO, DEBUG and WARN.
 enum LogLevel {
     INFO,
     DEBUG,
     WARN
 };
-
-
-// This logging module provides straightforward logging APIs with
-// C++-style streams. There are three severity levels: INFO, DEBUG and WARN.
-void initCRAXLogging(CRAX *crax);
 
 template <enum LogLevel T>
 llvm::raw_ostream &log(S2EExecutionState *state = nullptr);

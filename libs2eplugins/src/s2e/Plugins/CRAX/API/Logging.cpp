@@ -26,31 +26,19 @@
 
 namespace s2e::plugins::crax {
 
-namespace {
-bool _isInitialized = false;
-CRAX *_crax = nullptr;
-}  // namespace 
-
-
-void initCRAXLogging(CRAX *crax) {
-    assert(!_isInitialized && crax);
-    _isInitialized = true;
-    _crax = crax;
-}
-
 template <>
 llvm::raw_ostream &log<LogLevel::INFO>(S2EExecutionState *state) {
-    return _crax->getInfoStream(state ? state : _crax->getCurrentState());
+    return g_crax->getInfoStream(state ? state : g_crax->getCurrentState());
 }
 
 template <>
 llvm::raw_ostream &log<LogLevel::DEBUG>(S2EExecutionState *state) {
-    return _crax->getDebugStream(state ? state : _crax->getCurrentState());
+    return g_crax->getDebugStream(state ? state : g_crax->getCurrentState());
 }
 
 template <>
 llvm::raw_ostream &log<LogLevel::WARN>(S2EExecutionState *state) {
-    return _crax->getWarningsStream(state ? state : _crax->getCurrentState());
+    return g_crax->getWarningsStream(state ? state : g_crax->getCurrentState());
 }
 
 }  // namespace s2e::plugins::crax

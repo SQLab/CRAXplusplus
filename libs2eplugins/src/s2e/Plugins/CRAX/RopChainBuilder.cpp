@@ -31,8 +31,6 @@ using namespace klee;
 
 namespace s2e::plugins::crax {
 
-using RopSubchain = Technique::RopSubchain;
-
 RopChainBuilder::RopChainBuilder()
     : m_isSymbolicMode(true),
       m_shouldSkipSavedRbp(),

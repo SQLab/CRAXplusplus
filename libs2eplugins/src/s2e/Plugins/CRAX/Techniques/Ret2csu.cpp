@@ -34,8 +34,6 @@ using namespace klee;
 
 namespace s2e::plugins::crax {
 
-using RopSubchain = Technique::RopSubchain;
-
 const std::string Ret2csu::s_libcCsuInit = "__libc_csu_init";
 const std::string Ret2csu::s_libcCsuInitGadget1 = "__libc_csu_init_gadget1";
 const std::string Ret2csu::s_libcCsuInitGadget2 = "__libc_csu_init_gadget2";

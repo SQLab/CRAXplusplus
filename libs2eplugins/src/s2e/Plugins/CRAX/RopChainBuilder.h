@@ -46,7 +46,6 @@ class RopChainBuilder {
     using ConcreteInput = std::vector<uint8_t>;
     using VarValuePair = std::pair<std::string, ConcreteInput>;
     using ConcreteInputs = std::vector<VarValuePair>;
-    using RopSubchain = Technique::RopSubchain;
 
 public:
     RopChainBuilder();

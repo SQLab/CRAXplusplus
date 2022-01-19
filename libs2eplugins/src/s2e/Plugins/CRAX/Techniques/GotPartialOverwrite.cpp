@@ -29,8 +29,6 @@
 
 namespace s2e::plugins::crax {
 
-using RopSubchain = Technique::RopSubchain;
-
 GotPartialOverwrite::GotPartialOverwrite()
     : Technique() {
     resolveRequiredGadgets();

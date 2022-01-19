@@ -31,8 +31,6 @@ using namespace klee;
 
 namespace s2e::plugins::crax {
 
-using RopSubchain = Technique::RopSubchain;
-
 BasicStackPivot::BasicStackPivot()
     : StackPivot() {
     resolveRequiredGadgets();
@@ -88,7 +86,7 @@ std::vector<RopSubchain> BasicStackPivot::getRopSubchains() const {
     ret.insert(ret.end(), part1.begin(), part1.end());
     ret.insert(ret.end(), part2.begin(), part2.end());
     ret.insert(ret.end(), part3.begin(), part3.end());
-    return {ret};
+    return { ret };
 }
 
 RopSubchain BasicStackPivot::getExtraRopSubchain() const {
@@ -141,7 +139,7 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
 
     // Return to a previous call site of read@libc.
     RopSubchain part1 = {
-        ByteVectorExpr::create(std::vector<uint8_t>(m_offsetToRetAddr, 'A')),
+        //ByteVectorExpr::create(std::vector<uint8_t>(m_offsetToRetAddr, 'A')),
         BaseOffsetExpr::create(g_crax->getExploit(), "", "pivot_dest"),
         BaseOffsetExpr::create(g_crax->getExploit(), "", std::to_string(ret2LeaRbp))};
 

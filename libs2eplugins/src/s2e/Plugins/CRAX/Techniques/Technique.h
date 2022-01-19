@@ -30,12 +30,12 @@
 
 namespace s2e::plugins::crax {
 
+using RopSubchain = std::vector<klee::ref<klee::Expr>>;
+
 // The abstract base class of all concrete exploitation techniques,
 // e.g., stack pivoting, ret2csu, orw, etc.
 class Technique {
 public:
-    using RopSubchain = std::vector<klee::ref<klee::Expr>>;
-
     Technique() = default;
     virtual ~Technique() = default;
 

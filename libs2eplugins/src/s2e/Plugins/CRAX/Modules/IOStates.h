@@ -99,6 +99,7 @@ public:
 
     void print() const;
     uint64_t getCanary() const { return m_canary; }
+    const std::vector<LeakType> &getLeakTargets() const { return m_leakTargets; }
 
     static const std::array<std::string, LeakType::LAST> s_leakTypes;
 

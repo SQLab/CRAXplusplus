@@ -23,8 +23,6 @@
 #include <s2e/Plugins/CRAX/Techniques/Technique.h>
 #include <s2e/Plugins/CRAX/Techniques/StackPivot.h>
 
-#include <cassert>
-
 #include "RopChainBuilder.h"
 
 using namespace klee;
@@ -165,7 +163,7 @@ bool RopChainBuilder::addRegisterConstraint(Register::X64 r,
     log<INFO>()
         << reg().getName(r) << " = "
         << evaluate<std::string>(e)
-        << " (concretized=" << klee::hexval(value) << ")\n";
+        << " (concretized=" << hexval(value) << ")\n";
 
     return g_crax->getCurrentState()->addConstraint(constraint, true);
 }
@@ -180,7 +178,7 @@ bool RopChainBuilder::addMemoryConstraint(uint64_t addr,
     log<INFO>()
         << "[RSP + " << m_rspOffset << "] = "
         << evaluate<std::string>(e)
-        << " (concretized=" << klee::hexval(value) << ")\n";
+        << " (concretized=" << hexval(value) << ")\n";
 
     return g_crax->getCurrentState()->addConstraint(constraint, true);
 }

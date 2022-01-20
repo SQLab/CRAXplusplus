@@ -29,7 +29,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define POC_BUF_SIZE 1024
+#define POC_BUF_SIZE 4096
 #define LD_PRELOAD_PATH_MAX_SIZE 64
 
 void usage(const char *prog_name) {

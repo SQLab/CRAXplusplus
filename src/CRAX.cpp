@@ -314,6 +314,10 @@ void CRAX::onStateForkDecide(S2EExecutionState *state,
         return;
     }
 
+    // The user has explicitly disabled S2E's native forking,
+    // so we'll set allowForking to false by default.
+    allowForking = false;
+
     // If the user has explicitly disabled all state forks done by S2E,
     // then we'll let CRAX's modules decide whether this fork should be done.
     onStateForkModuleDecide.emit(state, condition, allowForking);

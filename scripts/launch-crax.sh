@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Copyright 2021-2022 Software Quality Laboratory, NYCU.
 
+CANARY="0"
+ELF_BASE="0"
+STATE_INFO_LIST="\"\""
+
 function usage() {
     echo "CRAXplusplus, software CRash analysis for Automatic eXploit generation."
     echo "Copyright (c) 2021-2022 Software Quality Laboratory, NYCU"
@@ -11,31 +15,11 @@ function usage() {
     echo "-s, --state-info-list - The I/O states info (define it to skip leak detection/verification)."
 }
 
-# $1 - args array
-# $2 - the target argument to match
-function has_argument() {
-    args=("$@")
-    target=${args[${#args[@]}-1]} # extract target argument
-    unset 'args[${#args[@]}-1]' # remove last element
-
-    for arg in "${args[@]}"; do
-        if [ "$arg" == "$target" ]; then
-            return 0
-        fi
-    done
-    return 1
-}
-
-
-canary="0"
-elf_base="0"
-state_info_list="\"\""
-
 # Generate s2e-config.lua from s2e-config.template.lua,
 function generate_s2e_config() {
-    sed -e "s/__CANARY__/$canary/g" \
-        -e "s/__ELF_BASE__/$elf_base/g" \
-        -e "s/__STATE_INFO_LIST__/$state_info_list/g" \
+    sed -e "s/__CANARY__/$CANARY/g" \
+        -e "s/__ELF_BASE__/$ELF_BASE/g" \
+        -e "s/__STATE_INFO_LIST__/$STATE_INFO_LIST/g" \
         s2e-config.template.lua > s2e-config.lua
 }
 
@@ -48,17 +32,17 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         -c|--canary)
-            canary="$2"
+            CANARY="$2"
             shift
             shift
             ;;
         -e|--elf-base)
-            elf_base="$2"
+            ELF_BASE="$2"
             shift
             shift
             ;;
         -s|--state-info-list)
-            state_info_list="\"$2\""
+            STATE_INFO_LIST="\"$2\""
             shift
             shift
             ;;
@@ -73,6 +57,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+
 generate_s2e_config
 chmod u+x ./s2e-config.lua
-./launch-s2e.sh
+exec ./launch-s2e.sh

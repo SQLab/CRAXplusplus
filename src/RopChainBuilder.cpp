@@ -45,33 +45,49 @@ void RopChainBuilder::reset() {
 
 
 bool RopChainBuilder::addRegisterConstraint(Register::X64 r,
-                                            const ref<Expr> &e) const {
+                                            const ref<Expr> &e,
+                                            bool rewriteSymbolic) const {
+    // Concretize the given expression.
     uint64_t value = evaluate<uint64_t>(e);
-    auto regExpr = reg().readSymbolic(r);
-    auto constraint = EqExpr::create(regExpr,
-                                     ConstantExpr::create(value, Expr::Int64));
+    ref<ConstantExpr> ce = ConstantExpr::create(value, Expr::Int64);
+
+    // Build the constraint.
+    auto constraint = EqExpr::create(reg().readSymbolic(r), ce);
 
     log<INFO>()
         << "Constraining " << reg().getName(r)
         << " to " << evaluate<std::string>(e)
         << " (concretized=" << hexval(value) << ")\n";
 
-    return g_crax->getCurrentState()->addConstraint(constraint, true);
+    bool ret = g_crax->getCurrentState()->addConstraint(constraint, true);
+
+    if (ret && rewriteSymbolic) {
+        reg().writeSymbolic(r, ce);
+    }
+    return ret;
 }
 
 bool RopChainBuilder::addMemoryConstraint(uint64_t addr,
-                                          const ref<Expr> &e) const {
+                                          const ref<Expr> &e,
+                                          bool rewriteSymbolic) const {
+    // Concretize the given expression.
     uint64_t value = evaluate<uint64_t>(e);
-    auto memExpr = mem().readSymbolic(addr, klee::Expr::Int64);
-    auto constraint = EqExpr::create(memExpr,
-                                     ConstantExpr::create(value, Expr::Int64));
+    ref<ConstantExpr> ce = ConstantExpr::create(value, Expr::Int64);
+
+    // Build the constraint.
+    auto constraint = EqExpr::create(mem().readSymbolic(addr, Expr::Int64), ce);
 
     log<INFO>()
         << "Constraining "<< "[RSP + " << m_rspOffset << ']'
         << " to " << evaluate<std::string>(e)
         << " (concretized=" << hexval(value) << ")\n";
 
-    return g_crax->getCurrentState()->addConstraint(constraint, true);
+    bool ret = g_crax->getCurrentState()->addConstraint(constraint, true);
+
+    if (ret && rewriteSymbolic) {
+        mem().writeSymbolic(addr, ce);
+    }
+    return ret;
 }
 
 bool RopChainBuilder::chain(const Technique &technique) {

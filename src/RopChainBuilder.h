@@ -55,11 +55,13 @@ public:
 
     [[nodiscard]]
     bool addRegisterConstraint(Register::X64 r,
-                               const klee::ref<klee::Expr> &e) const;
+                               const klee::ref<klee::Expr> &e,
+                               bool rewriteSymbolic = false) const;
 
     [[nodiscard]]
     bool addMemoryConstraint(uint64_t addr,
-                             const klee::ref<klee::Expr> &e) const;
+                             const klee::ref<klee::Expr> &e,
+                             bool rewriteSymbolic = false) const;
 
     [[nodiscard]]
     bool chain(const Technique &technique);

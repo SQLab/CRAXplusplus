@@ -5,6 +5,5 @@ if [ $# -lt 1 ]; then
   exit 0
 fi
 
-rm target poc
-ln -s "../../examples/$1/$1" target
-ln -s "../../examples/$1/poc" poc
+ln -sf "../../examples/$1/$1" target
+ln -sf "../../examples/$1/poc" poc

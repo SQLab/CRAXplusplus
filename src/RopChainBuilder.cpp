@@ -43,6 +43,37 @@ void RopChainBuilder::reset() {
     m_ropChain.clear();
 }
 
+
+bool RopChainBuilder::addRegisterConstraint(Register::X64 r,
+                                            const ref<Expr> &e) const {
+    uint64_t value = evaluate<uint64_t>(e);
+    auto regExpr = reg().readSymbolic(r);
+    auto constraint = EqExpr::create(regExpr,
+                                     ConstantExpr::create(value, Expr::Int64));
+
+    log<INFO>()
+        << "Constraining " << reg().getName(r)
+        << " to " << evaluate<std::string>(e)
+        << " (concretized=" << hexval(value) << ")\n";
+
+    return g_crax->getCurrentState()->addConstraint(constraint, true);
+}
+
+bool RopChainBuilder::addMemoryConstraint(uint64_t addr,
+                                          const ref<Expr> &e) const {
+    uint64_t value = evaluate<uint64_t>(e);
+    auto memExpr = mem().readSymbolic(addr, klee::Expr::Int64);
+    auto constraint = EqExpr::create(memExpr,
+                                     ConstantExpr::create(value, Expr::Int64));
+
+    log<INFO>()
+        << "Constraining "<< "[RSP + " << m_rspOffset << ']'
+        << " to " << evaluate<std::string>(e)
+        << " (concretized=" << hexval(value) << ")\n";
+
+    return g_crax->getCurrentState()->addConstraint(constraint, true);
+}
+
 bool RopChainBuilder::chain(const Technique &technique) {
     // Not all exploitation techniques have a ROP formula,
     // so we'll return true here.
@@ -153,43 +184,13 @@ bool RopChainBuilder::buildStage1Payload() {
 }
 
 
-bool RopChainBuilder::addRegisterConstraint(Register::X64 r,
-                                            const ref<Expr> &e) {
-    uint64_t value = evaluate<uint64_t>(e);
-    auto regExpr = reg().readSymbolic(r);
-    auto constraint = EqExpr::create(regExpr,
-                                     ConstantExpr::create(value, Expr::Int64));
-
-    log<INFO>()
-        << reg().getName(r) << " = "
-        << evaluate<std::string>(e)
-        << " (concretized=" << hexval(value) << ")\n";
-
-    return g_crax->getCurrentState()->addConstraint(constraint, true);
-}
-
-bool RopChainBuilder::addMemoryConstraint(uint64_t addr,
-                                          const ref<Expr> &e) {
-    uint64_t value = evaluate<uint64_t>(e);
-    auto memExpr = mem().readSymbolic(addr, klee::Expr::Int64);
-    auto constraint = EqExpr::create(memExpr,
-                                     ConstantExpr::create(value, Expr::Int64));
-
-    log<INFO>()
-        << "[RSP + " << m_rspOffset << "] = "
-        << evaluate<std::string>(e)
-        << " (concretized=" << hexval(value) << ")\n";
-
-    return g_crax->getCurrentState()->addConstraint(constraint, true);
-}
-
-RopChainBuilder::ConcreteInputs RopChainBuilder::getConcreteInputs() {
+RopChainBuilder::ConcreteInputs RopChainBuilder::getConcreteInputs() const {
     ConcreteInputs ret;
     g_crax->getCurrentState()->getSymbolicSolution(ret);
     return ret;
 }
 
-RopChainBuilder::ConcreteInput RopChainBuilder::getFirstConcreteInput() {
+RopChainBuilder::ConcreteInput RopChainBuilder::getFirstConcreteInput() const {
     ConcreteInputs inputs = getConcreteInputs();
     return inputs.size() ? inputs[0].second : ConcreteInput {};
 }

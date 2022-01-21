@@ -54,6 +54,14 @@ public:
     void reset();
 
     [[nodiscard]]
+    bool addRegisterConstraint(Register::X64 r,
+                               const klee::ref<klee::Expr> &e) const;
+
+    [[nodiscard]]
+    bool addMemoryConstraint(uint64_t addr,
+                             const klee::ref<klee::Expr> &e) const;
+
+    [[nodiscard]]
     bool chain(const Technique &technique);
 
     [[nodiscard]]
@@ -71,20 +79,11 @@ private:
 
     bool buildStage1Payload();
 
+    [[nodiscard]]
+    ConcreteInputs getConcreteInputs() const;
 
     [[nodiscard]]
-    bool addRegisterConstraint(Register::X64 r,
-                               const klee::ref<klee::Expr> &e);
-
-    [[nodiscard]]
-    bool addMemoryConstraint(uint64_t addr,
-                             const klee::ref<klee::Expr> &e);
-
-    [[nodiscard]]
-    ConcreteInputs getConcreteInputs();
-
-    [[nodiscard]]
-    ConcreteInput getFirstConcreteInput();
+    ConcreteInput getFirstConcreteInput() const;
 
 
     bool m_isSymbolicMode;  // true: symbolic, false: direct

@@ -88,7 +88,7 @@ std::vector<uint8_t> Memory::readConcrete(uint64_t virtAddr,
     return ret;
 }
 
-bool Memory::writeSymbolic(uint64_t virtAddr, const klee::ref<klee::Expr> &value) {
+bool Memory::writeSymbolic(uint64_t virtAddr, const ref<Expr> &value) {
     bool success = m_state->mem()->write(virtAddr, value);
     if (!success) {
         log<WARN>() << "Cannot write symbolic data to memory: " << hexval(virtAddr) << '\n';

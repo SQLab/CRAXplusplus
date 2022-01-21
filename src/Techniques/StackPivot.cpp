@@ -216,7 +216,7 @@ void AdvancedStackPivot::maybeInterceptReadCallSites(S2EExecutionState *state,
     }
 }
 
-void AdvancedStackPivot::beforeExploitGeneration() {
+void AdvancedStackPivot::beforeExploitGeneration(S2EExecutionState *state) {
     const auto &readCallSiteInfo = *m_readCallSites.rbegin();
     uint64_t rsp = reg().readConcrete(Register::X64::RSP);
     m_offsetToRetAddr = rsp - readCallSiteInfo.buf - 16;

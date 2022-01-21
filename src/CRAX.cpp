@@ -115,7 +115,7 @@ void CRAX::initialize() {
 }
 
 
-void CRAX::onSymbolicRip(S2EExecutionState *exploitableState,
+void CRAX::onSymbolicRip(S2EExecutionState *state,
                          ref<Expr> symbolicRip,
                          uint64_t concreteRip,
                          bool &concretize,
@@ -124,13 +124,13 @@ void CRAX::onSymbolicRip(S2EExecutionState *exploitableState,
         return;
     }
 
-    // Set m_currentState to exploitableState.
+    // Set m_currentState to state.
     // All subsequent calls to reg() and mem() will operate on m_currentState.
-    setCurrentState(exploitableState);
+    setCurrentState(state);
 
     log<WARN>()
         << "Detected symbolic RIP: " << hexval(concreteRip)
-        << ", original value is: " << hexval(reg().readConcrete(Register::X64::RIP))
+        << ", original value was: " << hexval(reg().readConcrete(Register::X64::RIP))
         << '\n';
 
     reg().setRipSymbolic(symbolicRip);
@@ -139,11 +139,12 @@ void CRAX::onSymbolicRip(S2EExecutionState *exploitableState,
     reg().showRegInfo();
     mem().showMapInfo();
 
-    // Do whatever that needs to be done, and then generate the exploit.
-    beforeExploitGeneration.emit();
-    m_exploitGenerator.run();
+    // Let the modules do whatever that needs to be done.
+    beforeExploitGeneration.emit(state);
 
-    s2e()->getExecutor()->terminateState(*exploitableState, "End of exploit generation");
+    // Generate the exploit.
+    m_exploitGenerator.run();
+    s2e()->getExecutor()->terminateState(*state, "End of exploit generation");
 }
 
 void CRAX::onProcessLoad(S2EExecutionState *state,
@@ -231,6 +232,7 @@ void CRAX::onExecuteInstructionStart(S2EExecutionState *state,
         auto it = m_pendingOnExecuteSyscallEnd.find(pc);
         if (it != m_pendingOnExecuteSyscallEnd.end()) {
             onExecuteSyscallEnd(state, pc, it->second);
+            m_pendingOnExecuteSyscallEnd.erase(pc);
         }
     }
 
@@ -276,14 +278,14 @@ void CRAX::onExecuteSyscallStart(S2EExecutionState *state,
     syscall.arg6 = reg().readConcrete(Register::X64::R9);
 
     if (m_showSyscalls) {
-        log<INFO>()
-            << "syscall: " << hexval(syscall.nr) << " ("
+        log<INFO>() << "syscall: "
+            << hexval(syscall.nr) << " ("
             << hexval(syscall.arg1) << ", "
             << hexval(syscall.arg2) << ", "
             << hexval(syscall.arg3) << ", "
             << hexval(syscall.arg4) << ", "
             << hexval(syscall.arg5) << ", "
-            << hexval(syscall.arg6) << '\n';
+            << hexval(syscall.arg6) << ")\n";
     }
 
     // Schedule the syscall hook to be called

@@ -19,7 +19,8 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
-#include <s2e/Plugins/CRAX/Modules/IOStates.h>
+#include <s2e/Plugins/CRAX/Modules/DynamicRop/DynamicRop.h>
+#include <s2e/Plugins/CRAX/Modules/IOStates/IOStates.h>
 
 #include <cassert>
 
@@ -42,7 +43,9 @@ std::string Module::getConfigKey() const {
 std::unique_ptr<Module> Module::create(const std::string &name) {
     std::unique_ptr<Module> ret;
 
-    if (name == "IOStates") {
+    if (name == "DynamicRop") {
+        ret = std::make_unique<DynamicRop>();
+    } else if (name == "IOStates") {
         ret = std::make_unique<IOStates>();
     }
 

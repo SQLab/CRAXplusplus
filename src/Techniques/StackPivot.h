@@ -86,7 +86,7 @@ private:
     void maybeInterceptReadCallSites(S2EExecutionState *state,
                                      const Instruction &i);
 
-    void beforeExploitGeneration();
+    void beforeExploitGeneration(S2EExecutionState *state);
 
     uint64_t determineRetAddr(uint64_t readCallSiteAddr) const;
 

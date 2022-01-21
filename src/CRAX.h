@@ -144,7 +144,7 @@ public:
 
 
     [[nodiscard]]
-    S2EExecutionState *getCurrentState() { return m_currentState; }
+    S2EExecutionState *getCurrentState() const { return m_currentState; }
 
     void setCurrentState(S2EExecutionState *state) { m_currentState = state; }
 
@@ -181,6 +181,9 @@ public:
 
     [[nodiscard]]
     Exploit &getExploit() { return m_exploit; }
+
+    [[nodiscard]]
+    const ExploitGenerator &getExploitGenerator() const { return m_exploitGenerator; }
 
     [[nodiscard]]
     std::vector<Technique *> getTechniques() {
@@ -243,7 +246,9 @@ public:
                  bool&>
         onStateForkModuleDecide;
 
-    sigc::signal<void> beforeExploitGeneration;
+    sigc::signal<void,
+                 S2EExecutionState*>
+        beforeExploitGeneration;
     // clang-format on
 
 

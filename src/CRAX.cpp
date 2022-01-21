@@ -74,7 +74,7 @@ CRAX::CRAX(S2E *s2e)
       m_modules(),
       m_techniques(),
       m_targetProcessPid(),
-      m_scheduledAfterSyscallHooks(),
+      m_pendingOnExecuteSyscallEnd(),
       m_allowedForkingStates() {}
 
 
@@ -226,6 +226,14 @@ void CRAX::onExecuteInstructionStart(S2EExecutionState *state,
         return;
     }
 
+    // XXX: m_pendingOnExecuteSyscallEnd should be state-specific?
+    if (m_pendingOnExecuteSyscallEnd.size()) {
+        auto it = m_pendingOnExecuteSyscallEnd.find(pc);
+        if (it != m_pendingOnExecuteSyscallEnd.end()) {
+            onExecuteSyscallEnd(state, pc, it->second);
+        }
+    }
+
     if (m_showInstructions && !m_linuxMonitor->isKernelAddress(pc)) {
         log<INFO>()
             << hexval(i->address) << ": "
@@ -235,15 +243,6 @@ void CRAX::onExecuteInstructionStart(S2EExecutionState *state,
 
     if (i->mnemonic == "syscall") {
         onExecuteSyscallStart(state, pc);
-    }
-
-    // XXX: m_scheduledAfterSyscallHooks should be state-specific?
-    if (m_scheduledAfterSyscallHooks.size()) {
-        auto it = m_scheduledAfterSyscallHooks.find(pc);
-        if (it != m_scheduledAfterSyscallHooks.end()) {
-            onExecuteSyscallEnd(state, pc, it->second);
-            //m_scheduledAfterSyscallHooks.erase(pc);
-        }
     }
 
     // Execute instruction hooks installed by the user.
@@ -290,10 +289,10 @@ void CRAX::onExecuteSyscallStart(S2EExecutionState *state,
     // Schedule the syscall hook to be called
     // after the instruction at `pc + 2` is executed.
     // Note: pc == state->regs()->getPc().
-    m_scheduledAfterSyscallHooks[pc + 2] = syscall;
+    m_pendingOnExecuteSyscallEnd[pc + 2] = syscall;
 
     // Execute syscall hooks installed by the user.
-    beforeSyscall.emit(state, m_scheduledAfterSyscallHooks[pc + 2]);
+    beforeSyscall.emit(state, m_pendingOnExecuteSyscallEnd[pc + 2]);
 }
 
 void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,

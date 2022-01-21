@@ -320,7 +320,7 @@ private:
     std::vector<std::unique_ptr<Technique>> m_techniques;
 
     uint64_t m_targetProcessPid;
-    std::map<uint64_t, SyscallCtx> m_scheduledAfterSyscallHooks;  // <pc, SyscallCtx>
+    std::map<uint64_t, SyscallCtx> m_pendingOnExecuteSyscallEnd;  // <pc, SyscallCtx>
     std::unordered_set<S2EExecutionState *> m_allowedForkingStates;
 };
 

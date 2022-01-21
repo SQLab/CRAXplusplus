@@ -39,7 +39,7 @@ const std::array<std::string, 18> Register::s_regs64 = {{
 
 
 bool Register::isSymbolic(Register::X64 reg) {
-    return !isa<klee::ConstantExpr>(readSymbolic(reg, /*verbose=*/false));
+    return !isa<ConstantExpr>(readSymbolic(reg, /*verbose=*/false));
 }
 
 ref<Expr> Register::readSymbolic(Register::X64 reg, bool verbose) {
@@ -48,10 +48,10 @@ ref<Expr> Register::readSymbolic(Register::X64 reg, bool verbose) {
     if (reg == Register::X64::RIP && m_isRipSymbolic) {
         ret = m_ripExpr;
     } else {
-        ret = m_state->regs()->read(getOffset(reg), klee::Expr::Int64);
+        ret = m_state->regs()->read(getOffset(reg), Expr::Int64);
     }
 
-    if (verbose && isa<klee::ConstantExpr>(ret)) {
+    if (verbose && isa<ConstantExpr>(ret)) {
         log<WARN>() << "readSymbolic(" << getName(reg) << "), but register isn't symbolic.\n";
     }
     return ret;
@@ -67,7 +67,7 @@ uint64_t Register::readConcrete(Register::X64 reg, bool verbose) {
     return ret;
 }
 
-bool Register::writeSymbolic(Register::X64 reg, const klee::ref<klee::Expr> &value, bool verbose) {
+bool Register::writeSymbolic(Register::X64 reg, const ref<Expr> &value, bool verbose) {
     bool success = m_state->regs()->write(getOffset(reg), value);
     if (verbose && !success) {
         log<WARN>() << "Cannot write symbolic data to register: " << getName(reg) << "\n";
@@ -110,8 +110,8 @@ void Register::showRegInfo() {
     os << "\n";
 }
 
-void Register::setRipSymbolic(klee::ref<klee::Expr> ripExpr) {
-    m_isRipSymbolic = true;
+void Register::setRipSymbolic(const ref<Expr> &ripExpr) {
+    m_isRipSymbolic = static_cast<bool>(ripExpr);
     m_ripExpr = ripExpr;
 }
 

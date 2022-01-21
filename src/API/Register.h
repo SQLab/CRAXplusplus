@@ -99,7 +99,7 @@ public:
     // Dump all register values.
     void showRegInfo();
 
-    void setRipSymbolic(klee::ref<klee::Expr> ripExpr);
+    void setRipSymbolic(const klee::ref<klee::Expr> &ripExpr);
 
     void setState(S2EExecutionState *state) { m_state = state; }
 

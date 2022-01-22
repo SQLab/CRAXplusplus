@@ -96,6 +96,18 @@ bool RopChainBuilder::addMemoryConstraint(uint64_t addr,
     return ret;
 }
 
+RopChainBuilder::ConcreteInputs RopChainBuilder::getConcreteInputs() const {
+    ConcreteInputs ret;
+    g_crax->getCurrentState()->getSymbolicSolution(ret);
+    return ret;
+}
+
+RopChainBuilder::ConcreteInput RopChainBuilder::getOneConcreteInput() const {
+    ConcreteInputs inputs = getConcreteInputs();
+    return inputs.size() ? inputs[0].second : ConcreteInput {};
+}
+
+
 bool RopChainBuilder::chain(const Technique &technique) {
     // Not all exploitation techniques have a ROP formula,
     // so we'll return true here.
@@ -103,8 +115,9 @@ bool RopChainBuilder::chain(const Technique &technique) {
         return true;
     }
 
-    return m_isSymbolicMode ? doChainSymbolic(technique)
-                            : doChainDirect(technique);
+
+    return m_isSymbolicMode ? chainSymbolic(technique)
+                            : chainDirect(technique);
 }
 
 const std::vector<RopSubchain> &RopChainBuilder::build() {
@@ -116,14 +129,16 @@ const std::vector<RopSubchain> &RopChainBuilder::build() {
 }
 
 
-bool RopChainBuilder::doChainSymbolic(const Technique &technique) {
+bool RopChainBuilder::chainSymbolic(const Technique &technique) {
+    std::vector<RopSubchain> ropSubchains = technique.getRopSubchains();
+    RopSubchain extraRopSubchain = technique.getExtraRopSubchain();
+
     bool ok;
     uint64_t rsp = reg().readConcrete(Register::X64::RSP);
-    std::vector<RopSubchain> ropSubchains = technique.getRopSubchains();
 
     // Treat S-Expr trees in ropoSubchains[0] as ROP constraints
     // and add them to the exploitable S2EExecutionState.
-    log<INFO>() << "Building ROP constraints...\n";
+    log<INFO>() << "Adding ROP constraints...\n";
     for (size_t i = 0; i < ropSubchains[0].size(); i++) {
         if (i == 0) {
             ok = addRegisterConstraint(Register::X64::RBP, ropSubchains[0][i]);
@@ -139,49 +154,70 @@ bool RopChainBuilder::doChainSymbolic(const Technique &technique) {
         }
     }
 
+    if (ropSubchains[0].empty()) {
+        m_ropChain.push_back({});
+    } else if (!buildStage1Payload()) {
+        return false;
+    }
+
     if (!shouldSwitchToDirectMode(&technique)) {
         return true;
     }
 
     log<INFO>() << "Switching to direct mode...\n";
     m_isSymbolicMode = false;
-    return buildStage1Payload();
+
+    // Chain the rest (i.e. ropSubchains[1..last]).
+    if (ropSubchains.size() > 1) {
+        m_ropChain.push_back({});
+        doChainDirect(ropSubchains, extraRopSubchain, 1);
+    }
+
+    return true;
 }
 
-bool RopChainBuilder::doChainDirect(const Technique &technique) {
-    std::vector<RopSubchain> ropSubchains = technique.getRopSubchains();
+bool RopChainBuilder::chainDirect(const Technique &technique) {
+    doChainDirect(technique.getRopSubchains(), technique.getExtraRopSubchain());
+    return true;
+}
+
+void RopChainBuilder::doChainDirect(const std::vector<RopSubchain> &ropSubchains,
+                                    const RopSubchain &extraRopSubchain,
+                                    size_t ropSubchainsBegin) {
+    size_t i = ropSubchainsBegin;
+    size_t j = m_shouldSkipSavedRbp;
 
     // The first expr in ropSubchains[0] is saved RBP.
     // It should only be used for constructing the very first ROP subchain.
-    size_t j = 1;
     if (!m_shouldSkipSavedRbp) {
         m_shouldSkipSavedRbp = true;
-        j = 0;
     }
 
     if (m_ropChain.empty()) {
         m_ropChain.push_back({});
     }
 
-    for (size_t i = 0; i < ropSubchains.size(); i++, j = 0) {
+    for (; i < ropSubchains.size(); i++, j = 0) {
+        if (ropSubchains[i].empty()) {
+            continue;
+        }
+
         for (; j < ropSubchains[i].size(); j++) {
             m_ropChain.back().push_back(ropSubchains[i][j]);
         }
+
         if (i != ropSubchains.size() - 1) {
             m_ropChain.push_back({});
         }
     }
 
-    if (technique.getExtraRopSubchain().size()) {
+    if (extraRopSubchain.size()) {
         m_ropChain.push_back({});
     }
 
-    for (const ref<Expr> &e : technique.getExtraRopSubchain()) {
-        log<INFO>() << evaluate<std::string>(e) << '\n';
+    for (const ref<Expr> &e : extraRopSubchain) {
         m_ropChain.back().push_back(e);
     }
-
-    return true;
 }
 
 bool RopChainBuilder::shouldSwitchToDirectMode(const Technique *t) const {
@@ -193,7 +229,7 @@ bool RopChainBuilder::shouldSwitchToDirectMode(const Technique *t) const {
 }
 
 bool RopChainBuilder::buildStage1Payload() {
-    ConcreteInput payload = getFirstConcreteInput();
+    ConcreteInput payload = getOneConcreteInput();
 
     if (payload.empty()) {
         log<WARN>() << "Sorry, the ROP constraints are unsatisfiable :(\n";
@@ -203,18 +239,6 @@ bool RopChainBuilder::buildStage1Payload() {
     m_ropChain.push_back({ ByteVectorExpr::create(payload) });
     m_ropChain.push_back({});
     return true;
-}
-
-
-RopChainBuilder::ConcreteInputs RopChainBuilder::getConcreteInputs() const {
-    ConcreteInputs ret;
-    g_crax->getCurrentState()->getSymbolicSolution(ret);
-    return ret;
-}
-
-RopChainBuilder::ConcreteInput RopChainBuilder::getFirstConcreteInput() const {
-    ConcreteInputs inputs = getConcreteInputs();
-    return inputs.size() ? inputs[0].second : ConcreteInput {};
 }
 
 }  // namespace s2e::plugins::crax

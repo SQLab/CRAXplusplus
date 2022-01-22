@@ -64,6 +64,13 @@ public:
                              bool rewriteSymbolic = false) const;
 
     [[nodiscard]]
+    ConcreteInputs getConcreteInputs() const;
+
+    [[nodiscard]]
+    ConcreteInput getOneConcreteInput() const;
+
+
+    [[nodiscard]]
     bool chain(const Technique &technique);
 
     [[nodiscard]]
@@ -71,21 +78,19 @@ public:
 
 private:
     [[nodiscard]]
-    bool doChainSymbolic(const Technique &technique);
+    bool chainSymbolic(const Technique &technique);
 
     [[nodiscard]]
-    bool doChainDirect(const Technique &technique);
+    bool chainDirect(const Technique &technique);
+
+    void doChainDirect(const std::vector<RopSubchain> &ropSubchains,
+                       const RopSubchain &extraRopSubchain,
+                       size_t ropSubchainsBegin = 0);
 
     [[nodiscard]]
     bool shouldSwitchToDirectMode(const Technique *t) const;
 
     bool buildStage1Payload();
-
-    [[nodiscard]]
-    ConcreteInputs getConcreteInputs() const;
-
-    [[nodiscard]]
-    ConcreteInput getFirstConcreteInput() const;
 
 
     bool m_isSymbolicMode;  // true: symbolic, false: direct

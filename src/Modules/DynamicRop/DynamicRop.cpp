@@ -26,7 +26,9 @@ using namespace klee;
 
 namespace s2e::plugins::crax {
 
-DynamicRop::DynamicRop() : m_constraints() {
+DynamicRop::DynamicRop()
+    : Module(),
+      m_constraints() {
     g_crax->beforeExploitGeneration.connect(
             sigc::mem_fun(*this, &DynamicRop::beforeExploitGeneration));
 }
@@ -43,10 +45,12 @@ void DynamicRop::scheduleConstraints() {
 }
 
 
-void DynamicRop::beforeExploitGeneration(S2EExecutionState *state) {
-    auto modState = g_crax->getPluginModuleState(g_crax->getCurrentState(), this);
+void DynamicRop::applyNextConstraint() {
+    S2EExecutionState *state = g_crax->getCurrentState();
+    auto modState = g_crax->getPluginModuleState(state, this);
 
     if (modState->constraintsQueue.empty()) {
+        log<WARN>() << "modState->constraintsQueue empty...\n";
         return;
     }
 
@@ -54,6 +58,7 @@ void DynamicRop::beforeExploitGeneration(S2EExecutionState *state) {
     bool hasControlFlowChanged = false;
     const auto &rop = g_crax->getExploitGenerator().getRopChainBuilder();
 
+    log<WARN>() << "adding constraints from modState->constraintsQueue...\n";
     for (const auto &c : modState->constraintsQueue.front()) {
         if (const auto rc = std::get_if<RegisterConstraint>(&c)) {
             ok = rop.addRegisterConstraint(rc->reg, rc->e, /*rewriteSymbolic=*/true);
@@ -73,6 +78,10 @@ void DynamicRop::beforeExploitGeneration(S2EExecutionState *state) {
     if (hasControlFlowChanged) {
         throw CpuExitException();
     }
+}
+
+void DynamicRop::beforeExploitGeneration(S2EExecutionState *state) {
+    applyNextConstraint();
 }
 
 }  // namespace s2e::plugins::crax

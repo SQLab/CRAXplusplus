@@ -65,7 +65,8 @@ public:
 
     public:
         State()
-            : leakableOffset(),
+            : ModuleState(),
+              leakableOffset(),
               lastInputStateInfoIdx(),
               currentLeakTargetIdx(),
               stateInfoList() {}

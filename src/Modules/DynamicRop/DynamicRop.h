@@ -53,7 +53,9 @@ public:
 
     class State : public ModuleState {
     public:
-        State() : constraintsQueue() {}
+        State()
+            : ModuleState(),
+              constraintsQueue() {}
         virtual ~State() = default;
 
         static ModuleState *factory(Module *, CRAXState *) {
@@ -73,9 +75,11 @@ public:
 
     virtual std::string toString() const override { return "DynamicRop"; }
 
-    // Constraint builder API
+    // Dynamic ROP constraint builder API
     DynamicRop &addConstraint(const Constraint &c);
     void scheduleConstraints();
+
+    void applyNextConstraint();
 
 private:
     void beforeExploitGeneration(S2EExecutionState *state);

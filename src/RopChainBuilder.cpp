@@ -23,6 +23,8 @@
 #include <s2e/Plugins/CRAX/Techniques/Technique.h>
 #include <s2e/Plugins/CRAX/Techniques/StackPivot.h>
 
+#include <cassert>
+
 #include "RopChainBuilder.h"
 
 using namespace klee;
@@ -47,6 +49,8 @@ void RopChainBuilder::reset() {
 bool RopChainBuilder::addRegisterConstraint(Register::X64 r,
                                             const ref<Expr> &e,
                                             bool rewriteSymbolic) const {
+    assert(e);
+
     // Concretize the given expression.
     uint64_t value = evaluate<uint64_t>(e);
     ref<ConstantExpr> ce = ConstantExpr::create(value, Expr::Int64);
@@ -70,6 +74,8 @@ bool RopChainBuilder::addRegisterConstraint(Register::X64 r,
 bool RopChainBuilder::addMemoryConstraint(uint64_t addr,
                                           const ref<Expr> &e,
                                           bool rewriteSymbolic) const {
+    assert(e);
+
     // Concretize the given expression.
     uint64_t value = evaluate<uint64_t>(e);
     ref<ConstantExpr> ce = ConstantExpr::create(value, Expr::Int64);

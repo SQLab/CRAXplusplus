@@ -388,6 +388,7 @@ pluginsConfig.CRAX = {
 
     -- Modules of CRAX++ that you wish to load.
     modules = {
+        "DynamicRop",
         "IOStates",
     },
 
@@ -401,8 +402,8 @@ pluginsConfig.CRAX = {
     -- The exploitaion techniques that your exploit will use.
     techniques = {
         "Ret2csu",
-        "BasicStackPivot",
-        --"AdvancedStackPivot",
+        --"BasicStackPivot",
+        "AdvancedStackPivot",
         "GotPartialOverwrite",
     },
 }

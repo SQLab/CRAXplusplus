@@ -88,7 +88,8 @@ private:
 
     void beforeExploitGeneration(S2EExecutionState *state);
 
-    uint64_t determineRetAddr(uint64_t readCallSiteAddr) const;
+    uint64_t determineRetAddr(uint64_t readCallSiteAddr,
+                              int &rbpOffset) const;
 
 
     uint32_t m_offsetToRetAddr;

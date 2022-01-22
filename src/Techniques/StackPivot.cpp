@@ -165,7 +165,7 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
     assert(m_readCallSites.size() &&
            "AdvancedStackPivot requires at least one call site of read@libc");
 
-    Ret2csu *ret2csu = dynamic_cast<Ret2csu *>(Technique::s_mapper["Ret2csu"]);
+    auto *ret2csu = dynamic_cast<Ret2csu *>(g_crax->getTechnique("Ret2csu"));
     assert(ret2csu && "Ret2csu object not found");
 
     // At this point, a stack-buffer overflow should take place inside libc,

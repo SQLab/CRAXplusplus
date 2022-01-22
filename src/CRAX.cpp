@@ -232,7 +232,7 @@ void CRAX::onExecuteInstructionStart(S2EExecutionState *state,
         auto it = m_pendingOnExecuteSyscallEnd.find(pc);
         if (it != m_pendingOnExecuteSyscallEnd.end()) {
             onExecuteSyscallEnd(state, pc, it->second);
-            m_pendingOnExecuteSyscallEnd.erase(pc);
+            //m_pendingOnExecuteSyscallEnd.erase(pc);
         }
     }
 

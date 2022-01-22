@@ -364,7 +364,7 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
     }
 
     log<WARN>() << "Allowing fork before __stack_chk_fail@plt\n";
-    allowForking &= true;  // don't overwrite the previous decision.
+    allowForking &= true;
 
     if (uint64_t canary = g_crax->getUserSpecifiedCanary()) {
         log<WARN>()

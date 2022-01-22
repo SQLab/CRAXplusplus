@@ -59,10 +59,10 @@ public:
         LeakType leakType;
     };
 
-    class State : public ModuleState {
-        using InputStateInfo = IOStates::InputStateInfo;
-        using OutputStateInfo = IOStates::OutputStateInfo;
+    using StateInfo = std::variant<InputStateInfo, OutputStateInfo>;
 
+
+    class State : public ModuleState {
     public:
         State()
             : ModuleState(),
@@ -86,8 +86,9 @@ public:
         uint64_t leakableOffset;
         uint32_t lastInputStateInfoIdx;
         uint32_t currentLeakTargetIdx;
-        std::vector<std::variant<InputStateInfo, OutputStateInfo>> stateInfoList;
+        std::vector<StateInfo> stateInfoList;
     };
+
 
     IOStates();
     virtual ~IOStates() = default;
@@ -146,7 +147,7 @@ private:
     // If the user has defined this in s2e-config.lua, then the
     // "IOStates" module will not fork at input states. Instead,
     // it will follow the input offsets specified by the user.
-    std::vector<std::variant<InputStateInfo, OutputStateInfo>> m_userSpecifiedStateInfoList;
+    std::vector<StateInfo> m_userSpecifiedStateInfoList;
 };
 
 }  // namespace s2e::plugins::crax

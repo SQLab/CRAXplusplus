@@ -347,7 +347,10 @@ bool CRAX::isCallSiteOf(uint64_t instructionAddr,
 }
 
 std::string CRAX::getBelongingSymbol(uint64_t instructionAddr) const {
-    ELF::SymbolMap __s = m_exploit.getElf().symbols();
+    const ELF &elf = m_exploit.getElf();
+    instructionAddr -= elf.getBase();
+
+    ELF::SymbolMap __s = elf.symbols();
     std::vector<std::pair<std::string, uint64_t>> syms(__s.begin(), __s.end());
 
     std::sort(syms.begin(),

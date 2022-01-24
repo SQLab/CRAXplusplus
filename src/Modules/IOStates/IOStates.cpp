@@ -72,7 +72,11 @@ IOStates::IOStates()
 
         g_crax->beforeInstruction.connect(
                 sigc::mem_fun(*this, &IOStates::onStackChkFailed));
+    }
 
+    // If either stack canary or PIE is enabled, install a hook
+    // to suppress native S2E state forks in order to avoid state explosion.
+    if (checksec.hasCanary || checksec.hasPIE) {
         g_crax->onStateForkModuleDecide.connect(
                 sigc::mem_fun(*this, &IOStates::onStateForkModuleDecide));
     }

@@ -49,9 +49,6 @@ struct SyscallCtx {
 };
 
 
-// Forward declaration
-class CRAX;
-
 class Disassembler {
 public:
     Disassembler() : m_state() {}

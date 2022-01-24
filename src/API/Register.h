@@ -25,12 +25,8 @@
 #include <s2e/S2EExecutionState.h>
 
 #include <array>
-#include <vector>
 
 namespace s2e::plugins::crax {
-
-// Forward declaration.
-class CRAX;
 
 class Register {
 public:

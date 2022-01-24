@@ -31,9 +31,6 @@
 
 namespace s2e::plugins::crax {
 
-// Forward declaration
-class CRAX;
-
 // XXX: The MemoryMap plugin also has a similar structure
 // called "MemoryMapRegion" (an interval map),
 // and maybe we can use that structure instead.

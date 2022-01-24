@@ -29,6 +29,8 @@
 namespace s2e::plugins::crax {
 
 class Register {
+    friend class CRAX;
+
 public:
     // libcpu/include/cpu/i386/defs.h
     enum X64 {
@@ -54,6 +56,7 @@ public:
 
 
     Register() : m_state(), m_isRipSymbolic(), m_ripExpr() {}
+
     void initialize() {}
 
     // Determine if the given register contains symbolic data.
@@ -96,8 +99,6 @@ public:
     void showRegInfo();
 
     void setRipSymbolic(const klee::ref<klee::Expr> &ripExpr);
-
-    void setState(S2EExecutionState *state) { m_state = state; }
 
 private:
     static const std::array<std::string, 10> s_regs32;

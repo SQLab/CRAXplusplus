@@ -20,8 +20,6 @@
 
 #include <s2e/Plugins/CRAX/CRAX.h>
 
-#include <cassert>
-
 #include "Logging.h"
 
 namespace s2e::plugins::crax {

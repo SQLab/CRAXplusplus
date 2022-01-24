@@ -80,7 +80,6 @@ CRAX::CRAX(S2E *s2e)
 
 void CRAX::initialize() {
     g_crax = this;
-
     m_register.initialize();
     m_memory.initialize();
 
@@ -173,13 +172,7 @@ void CRAX::onModuleLoad(S2EExecutionState *state,
                         const ModuleDescriptor &md) {
     setCurrentState(state);
 
-    auto &os = log<WARN>();
-    os << "onModuleLoad: " << md.Name << '\n';
-
-    for (auto section : md.Sections) {
-        section.name = md.Name;
-        mem().getMappedSections().push_back(section);
-    }
+    log<WARN>() << "onModuleLoad: " << md.Name << '\n';
 
     // Resolve ELF base if the target binary has PIE.
     if (md.Name == "target" && m_exploit.getElf().getChecksec().hasPIE) {
@@ -315,6 +308,8 @@ void CRAX::onStateForkDecide(S2EExecutionState *state,
     if (!m_disableNativeForking) {
         return;
     }
+
+    setCurrentState(state);
 
     // If the user has explicitly disabled all state forks done by S2E,
     // then we'll let CRAX's modules decide whether this fork should be done.

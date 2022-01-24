@@ -22,35 +22,20 @@
 #define S2E_PLUGINS_CRAX_MEMORY_H
 
 #include <s2e/S2EExecutionState.h>
-#include <s2e/Plugins/OSMonitors/ModuleDescriptor.h>
-#include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
+#include <s2e/Plugins/CRAX/API/VirtualMemoryMap.h>
 
 #include <map>
 #include <set>
-#include <string>
 
 namespace s2e::plugins::crax {
 
-// XXX: The MemoryMap plugin also has a similar structure
-// called "MemoryMapRegion" (an interval map),
-// and maybe we can use that structure instead.
-struct MemoryRegion {
-    uint64_t start;
-    uint64_t end;
-    MemoryMapRegionType prot;
-    std::string image;
-};
-
-struct MemoryRegionCmp {
-    bool operator ()(const MemoryRegion &r1, const MemoryRegion &r2) const {
-        return r1.start < r2.start;
-    }
-};
-
 class Memory {
+    friend class CRAX;
+
 public:
-    Memory() : m_state(), m_map(), m_mappedSections() {}
-    void initialize();
+    Memory() : m_state(), m_vmmap() {}
+
+    void initialize() { m_vmmap.initialize(); }
 
     // Determine if the given memory area contains symbolic data.
     [[nodiscard]]
@@ -87,20 +72,18 @@ public:
 
     // Get all the mapped memory region.
     [[nodiscard]]
-    std::set<MemoryRegion, MemoryRegionCmp> getMapInfo() const;
+    std::set<MemoryRegion, MemoryRegionCmp>
+    getMapInfo() const { return m_vmmap.getMapInfo(m_state); }
 
     // Show all the mapped memory region.
-    void showMapInfo() const;
+    void showMapInfo() const { m_vmmap.dump(m_state); }
 
-    void setState(S2EExecutionState *state) { m_state = state; }
-
-    ModuleSections &getMappedSections() { return m_mappedSections; }
+    [[nodiscard]]
+    VirtualMemoryMap &vmmap() { return m_vmmap; }
 
 private:
     S2EExecutionState *m_state;
-
-    MemoryMap *m_map;
-    ModuleSections m_mappedSections;
+    mutable VirtualMemoryMap m_vmmap;
 };
 
 

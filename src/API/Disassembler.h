@@ -50,6 +50,8 @@ struct SyscallCtx {
 
 
 class Disassembler {
+    friend class CRAX;
+
 public:
     Disassembler() : m_state() {}
 
@@ -64,8 +66,6 @@ public:
     std::vector<Instruction> disasm(const std::vector<uint8_t> &code,
                                     uint64_t virtAddr,
                                     bool warnOnError = true) const;
-
-    void setState(S2EExecutionState *state) { m_state = state; }
 
 private:
     S2EExecutionState *m_state;

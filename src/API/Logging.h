@@ -21,11 +21,8 @@
 #ifndef S2E_PLUGINS_CRAX_LOGGING_H
 #define S2E_PLUGINS_CRAX_LOGGING_H
 
-// Forward declaration.
-namespace s2e {
-class S2EExecutionState;
-}  // namespace s2e
-
+#include <llvm/Support/raw_ostream.h>
+#include <s2e/S2EExecutionState.h>
 
 namespace s2e::plugins::crax {
 

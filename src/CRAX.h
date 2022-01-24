@@ -97,6 +97,7 @@ class CRAX : public Plugin, IPluginInvoker {
 
 public:
     CRAX(S2E *s2e);
+
     void initialize();
 
 
@@ -163,19 +164,19 @@ public:
 
     [[nodiscard]]
     Register &reg(S2EExecutionState *state = nullptr) {
-        m_register.setState(state ? state : m_currentState);
+        m_register.m_state = state ? state : m_currentState;
         return m_register;
     }
 
     [[nodiscard]]
     Memory &mem(S2EExecutionState *state = nullptr) {
-        m_memory.setState(state ? state : m_currentState);
+        m_memory.m_state = state ? state : m_currentState;
         return m_memory;
     }
 
     [[nodiscard]]
     Disassembler &disas(S2EExecutionState *state = nullptr) {
-        m_disassembler.setState(state ? state : m_currentState);
+        m_disassembler.m_state = state ? state : m_currentState;
         return m_disassembler;
     }
 

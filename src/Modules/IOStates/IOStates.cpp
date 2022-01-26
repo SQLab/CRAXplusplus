@@ -231,7 +231,7 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
         ref<Expr> ce = ConstantExpr::create(offset, Expr::Int64);
         reg(forkedState).writeSymbolic(Register::X64::RDX, ce);
 
-        auto *forkedModState = g_crax->getPluginModuleState(forkedState, this);
+        auto forkedModState = g_crax->getPluginModuleState(forkedState, this);
         forkedModState->leakableOffset = offset;
     }
 }

@@ -40,12 +40,12 @@ class DynamicRop : public Module {
 public:
     struct RegisterConstraint {
         Register::X64 reg;
-        klee::ref<klee::Expr> e;
+        klee::ref<klee::Expr> expr;
     };
 
     struct MemoryConstraint {
         uint64_t addr;
-        klee::ref<klee::Expr> e;
+        klee::ref<klee::Expr> expr;
     };
 
     using Constraint = std::variant<RegisterConstraint, MemoryConstraint>;
@@ -86,6 +86,9 @@ public:
 
 private:
     void beforeExploitGeneration(S2EExecutionState *state);
+
+    // XXX: This is temporary because current vmmap API is lame.
+    bool doesAddrBelongToElf(const ELF &elf, uint64_t addr) const;
 
     std::vector<Constraint> m_constraints;
 };

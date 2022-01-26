@@ -56,15 +56,31 @@ void DynamicRop::applyNextConstraint() {
 
     bool ok;
     bool hasControlFlowChanged = false;
+    const auto &elf = g_crax->getExploit().getElf();
     const auto &rop = g_crax->getExploitGenerator().getRopChainBuilder();
 
-    log<WARN>() << "adding constraints from modState->constraintsQueue...\n";
+    log<WARN>() << "Adding constraints from modState->constraintsQueue...\n";
     for (const auto &c : modState->constraintsQueue.front()) {
         if (const auto rc = std::get_if<RegisterConstraint>(&c)) {
-            ok = rop.addRegisterConstraint(rc->reg, rc->e, /*rewriteSymbolic=*/true);
             hasControlFlowChanged |= rc->reg == Register::X64::RIP;
+
+            auto ce = dyn_cast<ConstantExpr>(rc->expr);
+            ref<Expr> e1 = rc->expr;
+            ref<Expr> e2 = rc->expr;
+
+            if (g_crax->getUserSpecifiedElfBase() &&
+                doesAddrBelongToElf(elf, ce->getZExtValue())) {
+                uint64_t userElfBase = g_crax->getUserSpecifiedElfBase();
+                uint64_t relocatedAddr = elf.convertAddrToNewBase(ce->getZExtValue(), userElfBase);
+                e1 = ConstantExpr::create(relocatedAddr, Expr::Int64);
+            }
+
+            ok = rop.addRegisterConstraint(rc->reg, e1);
+            reg().writeSymbolic(rc->reg, e2);
+
         } else if (const auto mc = std::get_if<MemoryConstraint>(&c)) {
-            ok = rop.addMemoryConstraint(mc->addr, mc->e, /*rewriteSymbolic=*/true);
+            ok = rop.addMemoryConstraint(mc->addr, mc->expr);
+            mem().writeSymbolic(mc->addr, mc->expr);
         }
 
         if (!ok) {
@@ -82,6 +98,12 @@ void DynamicRop::applyNextConstraint() {
 
 void DynamicRop::beforeExploitGeneration(S2EExecutionState *state) {
     applyNextConstraint();
+}
+
+
+// XXX: This is temporary fuck it
+bool DynamicRop::doesAddrBelongToElf(const ELF &elf, uint64_t addr) const {
+    return addr >= elf.getBase() && addr <= elf.getBase() + 0x5000;
 }
 
 }  // namespace s2e::plugins::crax

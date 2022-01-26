@@ -87,56 +87,57 @@ public:
         return alloc(lce, rce, strBase, strOffset);
     }
 
-    // For expr such as:
-    // 1. "elf_base + __libc_csu_init_gadget1"
-    // 2. "elf_base + 0x666"
-    // 3. "elf_base + elf.sym['read']"
-    // 4. "elf_base + elf.got['read']"
-    // 5. "elf_base + elf.bss()"
-    //
-    // XXX: Add support for libc base/offset
-    static ref<Expr> create(const Exploit &exploit,
-                            const std::string &attr,
-                            std::string symbol = "") {
-        uint64_t base = exploit.getElf().getBase();
-        uint64_t offset = 0;
+    // Create a BaseOffsetExpr that represents an offset from elf_base,
+    // E.g. "elf_base + 0x666"
+    static ref<Expr> create(const ELF &elf, uint64_t offset) {
+        return create(elf.getBase(), offset, "elf_base", std::to_string(offset));
+    }
 
-        std::string strBase = "elf_base";
+    // Create a BaseOffsetExpr that represents an offset from elf_base,
+    // where the offset is a variable declared in the exploit script's symbol table.
+    // E.g., "elf_base + __libc_csu_init_gadget1"
+    // XXX: The base is hardcoded to elf_base for now...
+    static ref<Expr> create(const Exploit &exploit, std::string var = "") {
+        auto it = exploit.getSymtab().find(var);
+        assert(it != exploit.getSymtab().end() && "Var doesn't exist in script's symtab");
+
+        return create(exploit.getElf().getBase(), it->second, "elf_base", var);
+    }
+
+    // Create a BaseOffsetExpr that represents one of the following:
+    // 1. "elf_base + elf.sym['read']"  <- `BaseOffsetExpr::create(elf, "sym", "read")`
+    // 2. "elf_base + elf.got['read']"  <- `BaseOffsetExpr::create(elf, "got", "read")`
+    // 3. "elf_base + elf.bss()"        <- `BaseOffsetExpr::create(elf, "bss")`
+    // XXX: Add support for libc base/offset
+    static ref<Expr> create(const ELF &elf,
+                            const std::string &base,
+                            const std::string &symbol = "") {
+        uint64_t offset = 0;
         std::string strOffset;
 
-        if (attr.empty()) {
-            const auto &symtab = exploit.getSymtab();
-            auto it = symtab.find(symbol);
-
-            if (it != symtab.end()) {
-                offset = it->second;
-                strOffset = symbol;
-            } else {
-                offset = std::stoull(symbol);
-                strOffset = symbol;
-            }
-
-        } else if (attr == "sym") {
-            // The symbol exists in elf.sym, so it's relative to elf_base.
-            const auto &symbolMap = exploit.getElf().symbols();
+        if (base == "sym") {
+            const auto &symbolMap = elf.symbols();
             auto it = symbolMap.find(symbol);
             assert(it != symbolMap.end() && "Symbol doesn't exist in elf.sym");
             offset = it->second;
             strOffset = format("elf.sym['%s']", symbol.c_str());
 
-        } else if (attr == "got") {
-            const auto &gotMap = exploit.getElf().got();
+        } else if (base == "got") {
+            const auto &gotMap = elf.got();
             auto it = gotMap.find(symbol);
             assert(it != gotMap.end() && "Symbol doesn't exist in elf.got");
             offset = it->second;
             strOffset = format("elf.got['%s']", symbol.c_str());
 
-        } else if (attr == "bss") {
-            offset = exploit.getElf().bss();
+        } else if (base == "bss") {
+            offset = elf.bss();
             strOffset = "elf.bss()";
+
+        } else {
+            pabort("Unsupported type of `base`");
         }
 
-        return create(base, offset, std::move(strBase), std::move(strOffset));
+        return create(elf.getBase(), offset, "elf_base", std::move(strOffset));
     }
 
     // For the symbol (identifier) of the exploit script.

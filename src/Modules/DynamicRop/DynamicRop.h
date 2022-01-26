@@ -55,7 +55,9 @@ public:
     public:
         State()
             : ModuleState(),
+              initialized(),
               constraintsQueue() {}
+
         virtual ~State() = default;
 
         static ModuleState *factory(Module *, CRAXState *) {
@@ -66,6 +68,7 @@ public:
             return new State(*this);
         }
 
+        bool initialized;
         std::queue<std::vector<Constraint>> constraintsQueue;
     };
 

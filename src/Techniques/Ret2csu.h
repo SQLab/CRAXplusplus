@@ -70,6 +70,11 @@ public:
                     uint64_t arg2,
                     uint64_t arg3) const;
 
+    // User-provided call target.
+    void setGadget2CallTarget(uint64_t libcCsuInitCallTarget) {
+        m_libcCsuInitCallTarget = libcCsuInitCallTarget;
+    }
+
     static const std::string s_libcCsuInit;
     static const std::string s_libcCsuInitGadget1;
     static const std::string s_libcCsuInitGadget2;

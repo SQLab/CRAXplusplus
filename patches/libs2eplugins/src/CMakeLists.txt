@@ -24,10 +24,11 @@ add_library(
     s2eplugins
 
     # Exploit generation
-    s2e/Plugins/CRAX/API/Register.cpp
-    s2e/Plugins/CRAX/API/Memory.cpp
     s2e/Plugins/CRAX/API/Disassembler.cpp
     s2e/Plugins/CRAX/API/Logging.cpp
+    s2e/Plugins/CRAX/API/Memory.cpp
+    s2e/Plugins/CRAX/API/Register.cpp
+    s2e/Plugins/CRAX/API/VirtualMemoryMap.cpp
     s2e/Plugins/CRAX/Expr/BinaryExprEvaluator.cpp
     s2e/Plugins/CRAX/Modules/Module.cpp
     s2e/Plugins/CRAX/Modules/DynamicRop/DynamicRop.cpp

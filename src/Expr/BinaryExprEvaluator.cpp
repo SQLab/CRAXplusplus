@@ -20,6 +20,7 @@
 
 #include <s2e/Plugins/CRAX/Expr/BinaryExprIterator.h>
 #include <s2e/Plugins/CRAX/Pwnlib/Util.h>
+#include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
 #include <stack>
 
@@ -114,9 +115,7 @@ std::string evaluate(const ref<Expr> &e) {
         if (auto boe = dyn_cast<BaseOffsetExpr>(node)) {
             ret += boe->toString();
         } else if (auto ce = dyn_cast<ConstantExpr>(node)) {
-            std::string s;
-            ce->toString(s, /*Base=*/16);
-            ret += "0x" + s;
+            ret += format("0x%llx", ce->getZExtValue());
         } else {
             switch (node->getKind()) {
                 case Expr::Kind::Add:

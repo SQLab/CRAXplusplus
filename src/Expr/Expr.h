@@ -21,11 +21,10 @@
 #ifndef S2E_PLUGINS_CRAX_EXPR_H
 #define S2E_PLUGINS_CRAX_EXPR_H
 
+#include <klee/Expr.h>
 #include <s2e/Plugins/CRAX/Exploit.h>
 #include <s2e/Plugins/CRAX/Pwnlib/ELF.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
-
-#include <klee/Expr.h>
 
 #include <cassert>
 #include <cstdlib>
@@ -35,12 +34,10 @@
 
 using s2e::plugins::crax::format;
 
-
 namespace klee {
 
 // This is CRAX's extension to klee.
-
-
+//
 // In a generated exploit script, each line contains a statement such as:
 //
 // 1. payload = p64(0x401060)
@@ -90,7 +87,7 @@ public:
     // Create a BaseOffsetExpr that represents an offset from elf_base,
     // E.g. "elf_base + 0x666"
     static ref<Expr> create(const ELF &elf, uint64_t offset) {
-        return create(elf.getBase(), offset, "elf_base", std::to_string(offset));
+        return create(elf.getBase(), offset, "elf_base", "");
     }
 
     // Create a BaseOffsetExpr that represents an offset from elf_base,
@@ -140,11 +137,6 @@ public:
         return create(elf.getBase(), offset, "elf_base", std::move(strOffset));
     }
 
-    // For the symbol (identifier) of the exploit script.
-    static ref<Expr> create(const std::string &symbol, uint64_t value) {
-        return create(0, value, "", symbol);
-    }
-
     // Method for support type inquiry through isa, cast, and dyn_cast.
     static bool classof(const Expr *E) {
         // XXX: The normal way of implementing BaseOffsetExpr::classof() is
@@ -168,10 +160,16 @@ public:
     }
 
     std::string toString() const {
-        if (m_strBase.size() && m_strOffset.size()) {
-            return m_strBase + " + " + m_strOffset;
+        std::string strLeft = m_strBase;
+        std::string strRight;
+
+        if (m_strOffset.size()) {
+            strRight = m_strOffset;
+        } else {
+            auto rce = dyn_cast<ConstantExpr>(right);
+            strRight = format("0x%llx", rce->getZExtValue());
         }
-        return (m_strBase.size()) ? m_strBase : m_strOffset;
+        return strLeft + " + " + strRight;
     }
  
     uint64_t getZExtValue() const {

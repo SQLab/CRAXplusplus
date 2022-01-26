@@ -86,6 +86,11 @@ uint64_t ELF::getRuntimeAddress(const std::string &symbol) const {
     return (!m_checksec.hasPIE) ? offset : m_base + offset;
 }
 
+uint64_t ELF::convertAddrToNewBase(uint64_t addr, uint64_t newBase) const {
+    assert(addr >= m_base);
+    return newBase + addr - m_base;
+}
+
 
 ELF::Checksec::Checksec(const std::string &filename)
     : hasCanary(),

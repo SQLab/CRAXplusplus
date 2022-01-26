@@ -51,6 +51,7 @@ public:
     FunctionMap functions(bool refetch = false) const;
     uint64_t bss() const;
     uint64_t getRuntimeAddress(const std::string &symbol) const;
+    uint64_t convertAddrToNewBase(uint64_t addr, uint64_t newBase) const;
 
     const ELF::Checksec &getChecksec() const { return m_checksec; }
     uint64_t getBase() const { return m_base; }

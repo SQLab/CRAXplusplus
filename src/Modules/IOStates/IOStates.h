@@ -68,8 +68,10 @@ public:
             : ModuleState(),
               leakableOffset(),
               lastInputStateInfoIdx(),
+              lastInputStateInfoIdxBeforeFirstSymbolicRip(-1),
               currentLeakTargetIdx(),
               stateInfoList() {}
+
         virtual ~State() = default;
 
         static ModuleState *factory(Module *, CRAXState *) {
@@ -85,6 +87,7 @@ public:
         // XXX: maybe make these data members private?
         uint64_t leakableOffset;
         uint32_t lastInputStateInfoIdx;
+        uint32_t lastInputStateInfoIdxBeforeFirstSymbolicRip;
         uint32_t currentLeakTargetIdx;
         std::vector<StateInfo> stateInfoList;
     };
@@ -123,6 +126,8 @@ private:
     void onStateForkModuleDecide(S2EExecutionState *state,
                                  const klee::ref<klee::Expr> &__condition,
                                  bool &allowForking);
+
+    void beforeExploitGeneration(S2EExecutionState *state);
 
 
     // Called at input states.

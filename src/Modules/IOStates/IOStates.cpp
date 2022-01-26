@@ -80,6 +80,9 @@ IOStates::IOStates()
         g_crax->onStateForkModuleDecide.connect(
                 sigc::mem_fun(*this, &IOStates::onStateForkModuleDecide));
     }
+
+    g_crax->beforeExploitGeneration.connect(
+            sigc::mem_fun(*this, &IOStates::beforeExploitGeneration));
 }
 
 std::string IOStates::State::toString() const {
@@ -175,8 +178,6 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
     }
 
 
-    // Now we assume that the first offset can help us
-    // successfully leak the address we want.
     auto modState = g_crax->getPluginModuleState(inputState, this);
 
     if (modState->currentLeakTargetIdx >= m_leakTargets.size()) {
@@ -206,7 +207,7 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
             = std::get<InputStateInfo>(m_userSpecifiedStateInfoList[idx]);
 
         ref<Expr> ce = ConstantExpr::create(stateInfo.offset, Expr::Int64);
-        reg(inputState).writeSymbolic(Register::X64::RDX, ce);
+        reg().writeSymbolic(Register::X64::RDX, ce);
         return;
     }
 
@@ -248,6 +249,7 @@ void IOStates::inputStateHookBottomHalf(S2EExecutionState *inputState,
         = mem().readConcrete(syscall.arg2, syscall.arg3, /*concretize=*/false);
 
     auto modState = g_crax->getPluginModuleState(inputState, this);
+
     InputStateInfo stateInfo;
     stateInfo.buf = std::move(buf);
 
@@ -340,6 +342,18 @@ void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
     }
 }
 
+void IOStates::onStackChkFailed(S2EExecutionState *state,
+                                const Instruction &i) {
+    const uint64_t stackChkFailPlt
+        = g_crax->getExploit().getElf().getRuntimeAddress("__stack_chk_fail");
+
+    if (i.address == stackChkFailPlt) {
+        // The program has reached __stack_chk_fail and
+        // there's no return, so kill it.
+        g_s2e->getExecutor()->terminateState(*state, "reached __stack_chk_fail@plt");
+    }
+}
+
 void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
                                        const ref<Expr> &__condition,
                                        bool &allowForking) {
@@ -385,15 +399,17 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
     }
 }
 
-void IOStates::onStackChkFailed(S2EExecutionState *state,
-                                const Instruction &i) {
-    const uint64_t stackChkFailPlt
-        = g_crax->getExploit().getElf().getRuntimeAddress("__stack_chk_fail");
+void IOStates::beforeExploitGeneration(S2EExecutionState *state) {
+    auto modState = g_crax->getPluginModuleState(state, this);
 
-    if (i.address == stackChkFailPlt) {
-        // The program has reached __stack_chk_fail and
-        // there's no return, so kill it.
-        g_s2e->getExecutor()->terminateState(*state, "reached __stack_chk_fail@plt");
+    if (modState->lastInputStateInfoIdxBeforeFirstSymbolicRip == -1) {
+        for (int i = modState->stateInfoList.size() - 1; i >= 0; i--) {
+            const auto& info = modState->stateInfoList[i];
+            if (const auto inputStateInfo = std::get_if<InputStateInfo>(&info)) {
+                modState->lastInputStateInfoIdxBeforeFirstSymbolicRip = i;
+                break;
+            }
+        }
     }
 }
 

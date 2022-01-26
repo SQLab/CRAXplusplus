@@ -214,7 +214,7 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
         auto &exploit = g_crax->getExploit();
         uint64_t elfBase = exploit.getElf().getBase();
         uint64_t pivotDest = elfBase + exploit.getSymbolValue("pivot_dest");
-        ret2csu->setGadget2CallTarget(pivotDest + 8 + 0x30);
+        ret2csu->setGadget2CallTarget(pivotDest + 8 + 0x30 - elf.getBase());
         part1[6] = BaseOffsetExpr::create(elf, "sym", "_fini");
     }
 

@@ -53,6 +53,7 @@ Ret2csu::Ret2csu()
       m_gadget2Regs(),
       m_gadget2CallReg1(),
       m_gadget2CallReg2(),
+      m_isTemplateValid(),
       m_ropSubchainTemplate() {}
 
 
@@ -96,8 +97,9 @@ Ret2csu::getRopSubchains(const ref<Expr> &retAddr,
                          const ref<Expr> &arg3) const {
     RopSubchain ret;
 
-    // If the template hasn't been built, do it now.
-    if (m_ropSubchainTemplate.empty()) {
+    // If the template is invalid, rebuild it now.
+    if (!m_isTemplateValid) {
+        m_isTemplateValid = true;
         buildRopSubchainTemplate();
     }
 

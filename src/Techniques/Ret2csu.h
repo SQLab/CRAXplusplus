@@ -73,6 +73,7 @@ public:
     // User-provided call target.
     void setGadget2CallTarget(uint64_t libcCsuInitCallTarget) {
         m_libcCsuInitCallTarget = libcCsuInitCallTarget;
+        invalidate();
     }
 
     static const std::string s_libcCsuInit;
@@ -84,6 +85,7 @@ private:
     void parseLibcCsuInit();
     void searchGadget2CallTarget(std::string funcName = "_fini");
     void buildRopSubchainTemplate() const;
+    void invalidate() { m_isTemplateValid = false; }
 
     uint64_t m_retAddr;
     uint64_t m_arg1;
@@ -104,6 +106,7 @@ private:
 
     // Rebuilding the entire ROP chain from scratch is expensive,
     // so we'll use a template as a cache, thereby declaring it mutable.
+    mutable bool m_isTemplateValid;
     mutable std::vector<RopSubchain> m_ropSubchainTemplate;
 };
 

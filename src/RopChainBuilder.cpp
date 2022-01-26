@@ -46,9 +46,7 @@ void RopChainBuilder::reset() {
 }
 
 
-bool RopChainBuilder::addRegisterConstraint(Register::X64 r,
-                                            const ref<Expr> &e,
-                                            bool rewriteSymbolic) const {
+bool RopChainBuilder::addRegisterConstraint(Register::X64 r, const ref<Expr> &e) const {
     assert(e);
 
     // Concretize the given expression.
@@ -63,17 +61,10 @@ bool RopChainBuilder::addRegisterConstraint(Register::X64 r,
         << " to " << evaluate<std::string>(e)
         << " (concretized=" << hexval(value) << ")\n";
 
-    bool ret = g_crax->getCurrentState()->addConstraint(constraint, true);
-
-    if (ret && rewriteSymbolic) {
-        reg().writeSymbolic(r, ce);
-    }
-    return ret;
+    return g_crax->getCurrentState()->addConstraint(constraint, true);
 }
 
-bool RopChainBuilder::addMemoryConstraint(uint64_t addr,
-                                          const ref<Expr> &e,
-                                          bool rewriteSymbolic) const {
+bool RopChainBuilder::addMemoryConstraint(uint64_t addr, const ref<Expr> &e) const {
     assert(e);
 
     // Concretize the given expression.
@@ -88,12 +79,7 @@ bool RopChainBuilder::addMemoryConstraint(uint64_t addr,
         << " to " << evaluate<std::string>(e)
         << " (concretized=" << hexval(value) << ")\n";
 
-    bool ret = g_crax->getCurrentState()->addConstraint(constraint, true);
-
-    if (ret && rewriteSymbolic) {
-        mem().writeSymbolic(addr, ce);
-    }
-    return ret;
+    return g_crax->getCurrentState()->addConstraint(constraint, true);
 }
 
 RopChainBuilder::ConcreteInputs RopChainBuilder::getConcreteInputs() const {
@@ -114,7 +100,6 @@ bool RopChainBuilder::chain(const Technique &technique) {
     if (technique.getRopSubchains().empty()) {
         return true;
     }
-
 
     return m_isSymbolicMode ? chainSymbolic(technique)
                             : chainDirect(technique);

@@ -54,14 +54,10 @@ public:
     void reset();
 
     [[nodiscard]]
-    bool addRegisterConstraint(Register::X64 r,
-                               const klee::ref<klee::Expr> &e,
-                               bool rewriteSymbolic = false) const;
+    bool addRegisterConstraint(Register::X64 r, const klee::ref<klee::Expr> &e) const;
 
     [[nodiscard]]
-    bool addMemoryConstraint(uint64_t addr,
-                             const klee::ref<klee::Expr> &e,
-                             bool rewriteSymbolic = false) const;
+    bool addMemoryConstraint(uint64_t addr, const klee::ref<klee::Expr> &e) const;
 
     [[nodiscard]]
     ConcreteInputs getConcreteInputs() const;

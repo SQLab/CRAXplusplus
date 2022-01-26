@@ -53,6 +53,10 @@ struct MemoryRegionCmp {
 // the interface to do the following for the target (vulnerable) process:
 // 1. enumerate the mapped memory regions, including [stack].
 // 2. associate the mapped memory regions with various ELF files and permissions.
+//
+// XXX: Current implementation is fragile, but I don't have time for an
+// elagant implementation. It needs to be reimplemented at some point.
+// Maybe see: https://github.com/pwndbg/pwndbg/blob/dev/pwndbg/vmmap.py
 class VirtualMemoryMap {
 public:
     VirtualMemoryMap()
@@ -69,18 +73,6 @@ public:
 private:
     void onModuleLoad(S2EExecutionState *state,
                       const ModuleDescriptor &md);
-
-    // Rounds down address to the nearest page boundary, rounds up
-    // address + size to the nearest page boundary.
-    // e.g., address==1 and size==2 => start==0 and end == 0x1000;
-    static void computeStartEndAddress(uint64_t address,
-                                       uint64_t size,
-                                       uint64_t &start,
-                                       uint64_t &end) {
-        start = address & TARGET_PAGE_MASK;
-        end = (address + size + (TARGET_PAGE_SIZE - 1)) & TARGET_PAGE_MASK;
-    }
-
 
     MemoryMap *m_memoryMap;
     ModuleSections m_mappedSections;

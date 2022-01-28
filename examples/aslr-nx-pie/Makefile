@@ -1,7 +1,7 @@
 CXX=gcc
-CXXFLAGS=-g -Wall -no-pie -fno-stack-protector
+CXXFLAGS=-g -fno-stack-protector
 SRC=main.c
-BIN=rop
+BIN=aslr-nx-pie
 
 all:
 	$(CXX) -o $(BIN) $(SRC) $(CXXFLAGS)

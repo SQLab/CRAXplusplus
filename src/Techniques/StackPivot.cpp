@@ -272,15 +272,20 @@ void AdvancedStackPivot::beforeExploitGeneration(S2EExecutionState *state) {
 uint64_t AdvancedStackPivot::determineRetAddr(uint64_t readCallSiteAddr,
                                               int &rbpOffset) const {
     std::string symbol = g_crax->getBelongingSymbol(readCallSiteAddr);
-    log<WARN>() << hexval(readCallSiteAddr) << " is within " << symbol << "\n";
+    uint64_t symbolAddr = g_crax->getExploit().getElf().getRuntimeAddress(symbol);
+    assert(symbolAddr <= readCallSiteAddr);
 
-    std::vector<Instruction> insns = disas().disasm(symbol);
+    log<WARN>() << hexval(readCallSiteAddr) << " is within " << symbol << "(" << hexval(symbolAddr) << ")\n";
+
+    // Disassemble the instructions between symbolAddr and readCallSiteAddr.
+    std::vector<uint8_t> code = mem().readConcrete(symbolAddr, readCallSiteAddr - symbolAddr);
+    std::vector<Instruction> insns = disas().disasm(code, symbolAddr);
     uint64_t ret = 0;
 
     // Look for any instruction like lea rax, [rbp - 0x20]
     // If we can find one, return the instruction's offset
     // (relative to ELF base), and copy 0x20 into the `rbpOffset` argument.
-    for (int i = insns.size() - 2; i >= 0; i--) {
+    for (int i = insns.size() - 1; i >= 0; i--) {
         static const std::string keyword = "[rbp - ";
         const std::string &target = insns[i].opStr;
         size_t j = 0;

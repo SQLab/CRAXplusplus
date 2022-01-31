@@ -72,14 +72,19 @@ public:
 
     // Get all the mapped memory region.
     [[nodiscard]]
-    std::set<MemoryRegion, MemoryRegionCmp>
-    getMapInfo() const { return m_vmmap.getMapInfo(m_state); }
+    const VirtualMemoryMap &getMapInfo() const;
 
     // Show all the mapped memory region.
-    void showMapInfo() const { m_vmmap.dump(m_state); }
+    void showMapInfo() const;
 
-    [[nodiscard]]
-    VirtualMemoryMap &vmmap() { return m_vmmap; }
+
+    static constexpr uint64_t roundDownToPageBoundary(uint64_t address) {
+        return address & TARGET_PAGE_MASK;
+    }
+
+    static constexpr uint64_t roundUpToPageBoundary(uint64_t address) {
+        return (address + (TARGET_PAGE_SIZE - 1)) & TARGET_PAGE_MASK;
+    }
 
 private:
     S2EExecutionState *m_state;

@@ -416,7 +416,7 @@ void IOStates::beforeExploitGeneration(S2EExecutionState *state) {
 
 std::array<std::vector<uint64_t>, IOStates::LeakType::LAST>
 IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len) {
-    auto mapInfo = mem().getMapInfo();
+    const auto &mapInfo = mem().getMapInfo();
     uint64_t canary = m_canary;
     std::array<std::vector<uint64_t>, IOStates::LeakType::LAST> bufInfo;
 
@@ -426,9 +426,10 @@ IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len)
         if (g_crax->getExploit().getElf().getChecksec().hasCanary && value == canary) {
             bufInfo[LeakType::CANARY].push_back(i);
         } else {
-            for (const auto &region : mapInfo) {
-                if (value >= region.start && value <= region.end) {
-                    bufInfo[getLeakType(region.image)].push_back(i);
+            foreach2 (it, mapInfo.begin(), mapInfo.end()) {
+                if (value >= it.start() && value <= it.stop()) {
+                    RegionDescriptorPtr region = *it;
+                    bufInfo[getLeakType(region->moduleName)].push_back(i);
                 }
             }
         }
@@ -438,7 +439,7 @@ IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len)
 
 std::vector<IOStates::OutputStateInfo>
 IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len) {
-    auto mapInfo = mem().getMapInfo();
+    const auto &mapInfo = mem().getMapInfo();
     uint64_t canary = m_canary;
     std::vector<IOStates::OutputStateInfo> leakInfo;
 
@@ -454,11 +455,12 @@ IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len)
             info.leakType = LeakType::CANARY;
             leakInfo.push_back(info);
         } else {
-            for (const auto &region : mapInfo) {
-                if (value >= region.start && value <= region.end) {
+            foreach2 (it, mapInfo.begin(), mapInfo.end()) {
+                if (value >= it.start() && value <= it.stop()) {
+                    RegionDescriptorPtr region = *it;
                     info.bufIndex = i;
-                    info.baseOffset = value - region.start;
-                    info.leakType = getLeakType(region.image);
+                    info.baseOffset = value - it.start();
+                    info.leakType = getLeakType(region->moduleName);
                     leakInfo.push_back(info);
                 }
             }

@@ -98,36 +98,38 @@ bool Memory::isMapped(uint64_t virtAddr) const {
 }
 
 std::vector<uint64_t> Memory::search(const std::vector<uint8_t> &needle) const {
+    const auto &mapInfo = getMapInfo();
     std::vector<uint64_t> ret;
 
     // Iterate over all the mapped memory regions.
-    for (auto region : getMapInfo()) {
+    foreach2 (it, mapInfo.begin(), mapInfo.end()) {
         // XXX: Some regions might be unaccessible even though it's mapped,
         // which I believe this is a bug in S2E. Just in case this happens,
         // we'll use `Memory::isMapped()` to scan through every address
         // within this region until an accessible address is found.
-        while (!isMapped(region.start) && region.start < region.end) {
-            ++region.start;
+        uint64_t start = it.start();
+        uint64_t end = it.stop();
+
+        while (!isMapped(start) && start < end) {
+            ++start;
         }
 
         // If the entire region is not accessible, then
         // we don't have to do anything with this region.
-        if (region.start >= region.end) {
+        if (start >= end) {
             continue;
         }
 
         // Read the region concretely into `haystack`,
         // and use kmp algorithm to search all the occurences of `needle`.
-        std::vector<uint8_t> haystack = readConcrete(region.start,
-                                                     region.end - region.start,
-                                                     /*concretize=*/false);
+        std::vector<uint8_t> haystack = readConcrete(start, end - start, /*concretize=*/false);
 
         std::vector<uint64_t> localResult = kmp(haystack, needle);
 
         // `localResult` contains the offset within `haystack`, so adding
         // `region.start` to each element will turn them into valid virtual addresses.
         for (auto &r : localResult) {
-            r += region.start;
+            r += start;
         }
 
         // Append `localResult` to `ret`.
@@ -140,6 +142,16 @@ std::vector<uint64_t> Memory::search(const std::vector<uint8_t> &needle) const {
 std::map<uint64_t, uint64_t>
 Memory::getSymbolicMemory(uint64_t start, uint64_t end) const {
     return {};
+}
+
+const VirtualMemoryMap &Memory::getMapInfo() const {
+    m_vmmap.rebuild(m_state);
+    return m_vmmap;
+}
+
+void Memory::showMapInfo() const {
+    m_vmmap.rebuild(m_state);
+    m_vmmap.dump(m_state);
 }
 
 

@@ -18,7 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <s2e/Plugins/OSMonitors/Linux/LinuxMonitor.h>
 #include <s2e/Plugins/CRAX/CRAX.h>
 
 #include <cassert>
@@ -30,107 +29,100 @@ using namespace klee;
 
 namespace s2e::plugins::crax {
 
+VirtualMemoryMap::Allocator VirtualMemoryMap::s_alloc;
+
 void VirtualMemoryMap::initialize() {
     m_memoryMap = g_s2e->getPlugin<MemoryMap>();
     assert(m_memoryMap);
 
-    auto linuxMonitor = g_s2e->getPlugin<LinuxMonitor>();
-    assert(linuxMonitor);
-    linuxMonitor->onModuleLoad.connect(
-            sigc::mem_fun(*this, &VirtualMemoryMap::onModuleLoad));
+    m_moduleMap = g_s2e->getPlugin<ModuleMap>();
+    assert(m_moduleMap);
 }
 
 
-void VirtualMemoryMap::onModuleLoad(S2EExecutionState *state,
-                                    const ModuleDescriptor &md) {
-    // Don't do anything if the target process hasn't been loaded yet.
-    if (!g_crax->getTargetProcessPid()) {
-        return;
-    }
+void VirtualMemoryMap::rebuild(S2EExecutionState *state) {
+    uint64_t pid = g_crax->getTargetProcessPid();
+    assert(pid && "You're probably trying to rebuild vmmap too early");
 
-    for (auto section : md.Sections) {
-        section.name = md.Name;
-        m_mappedSections.push_back(section);
-    }
-}
+    // Rebuild vmmap using the information from MemoryMap and ModuleMap.
+    auto memoryMapCb = [this, state, pid](uint64_t start,
+                                          uint64_t end,
+                                          MemoryMapRegionType type) -> bool {
+        auto region = std::make_shared<RegionDescriptor>();
 
-std::set<MemoryRegion, MemoryRegionCmp> VirtualMemoryMap::getMapInfo(S2EExecutionState *state) {
-    std::set<MemoryRegion, MemoryRegionCmp> ret;
+        // Update region's permission.
+        region->r = type & MM_READ;
+        region->w = type & MM_WRITE;
+        region->x = type & MM_EXEC;
 
-    auto callback = [this, &ret](uint64_t start,
-                                 uint64_t end,
-                                 const MemoryMapRegionType &prot) -> bool {
-        std::string image = "unknown";
+        // Check if this memory region has a module loaded.
+        ModuleDescriptorConstPtr m0 = m_moduleMap->getModule(state, pid, start);
+        ModuleDescriptorConstPtr m1 = m_moduleMap->getModule(state, pid, end);
 
-        // XXX: This workaround should be overhauled!!!
-        //
-        // Currently, we use LinuxMonitor::onModuleLoad to keep track of
-        // which binaries are loaded by linux kernel's load_elf_binary().
-        // However, since libc is loaded by ld.so, we will never be able
-        // to know where libc resides in the (guest) virtual address space
-        // of the target process.
-        //
-        // Maybe we should modify s2e linux kernel (mm/util.c:vm_mmap_pgoff())
-        // and return the image pathname of each mapped region from the guest kernel.
-        for (const auto &section : m_mappedSections) {
-            uint64_t addr = section.runtimeLoadBase + section.size;
-            if (addr >= start && addr <= end) {
-                image = section.name;
-            }
+        // Maybe update region's associated module.
+        if (m0 || m1) {
+            assert(!(m0 && m1) || m0->Name == m1->Name);
+            ModuleDescriptorConstPtr module = m0 ? m0 : m1;
+            region->moduleName = module->Name;
         }
 
-        ret.insert({start, end, prot, image});
+        insert(start, end, std::move(region));
         return true;
     };
 
-    m_memoryMap->iterateRegions(state, g_crax->getTargetProcessPid(), callback);
+    clear();
+    m_memoryMap->iterateRegions(state, pid, memoryMapCb);
 
-    // XXX: This workaround should be overhauled!!!
-    //
-    // --------------- [VMMAP] ---------------
-    // Start           End             Perm    Image
-    // 0x400000        0x400fff        r--     target
-    // 0x401000        0x401fff        r-x     target
-    // 0x402000        0x403fff        r--     target
-    // 0x404000        0x404fff        rw-     target
-    // 0x7fe232d7c000  0x7fe232f10fff  r-x     unknown
-    // 0x7fe232f11000  0x7fe233110fff  ---     unknown
-    // 0x7fe233111000  0x7fe233114fff  r--     unknown
-    // 0x7fe233115000  0x7fe23311afff  rw-     unknown
-    // 0x7fe23311b000  0x7fe23313dfff  r-x     ld-linux-x86-64.so.2
-    // 0x7fe233334000  0x7fe233335fff  rw-     unknown              <--
-    // 0x7fe23333e000  0x7fe23333efff  r--     unknown              <--
-    // 0x7fe23333f000  0x7fe23333ffff  rw-     ld-linux-x86-64.so.2
-    // 0x7ffe0939e000  0x7ffe093a0000  rw-     [stack]
+    // XXX: Currently, vmmap is built by merging S2E's MemoryMap and ModuleMap.
+    // ModuleMap tracks where binaries are loaded
+    // However, since libc is loaded by ld.so instead of load_elf_binary(),
+    // we won't be able  to know where libc resides in the (guest)
+    // virtual address space of the target process, so we need to do it ourselves.
+    probeDynamicLoaderRegions(state);
+    probeLibcRegions(state);
+    probeRemainingSharedLibsRegions(state);
+    probeStackRegion(state);
+}
+
+
+void VirtualMemoryMap::probeDynamicLoaderRegions(S2EExecutionState *state) {
     const std::string ld = "ld-linux-x86-64.so.2";
 
-    auto it1 = std::find_if(ret.begin(),
-                            ret.end(),
-                            [&ld](const MemoryRegion &r) { return r.image == ld; });
-    assert(it1 != ret.end() && "Cannot find the first ld-linux-x86-64.so.2 in vmmap.");
+    auto it1 = std::find_if(begin(),
+                            end(),
+                            [&ld](const auto &r) { return r->moduleName == ld; });
 
-    auto rit2 = std::find_if(ret.rbegin(),
-                             ret.rend(),
-                             [&ld](const MemoryRegion &r) { return r.image == ld; });
-    assert(rit2 != ret.rend() && "Cannot find the last ld-linux-x86-64.so.2 in vmmap.");
+    auto rit2 = std::find_if(rbegin(),
+                             rend(),
+                             [&ld](const auto &r) { return r->moduleName == ld; });
+
+    assert(it1 != end() && "Cannot find the first ld-linux-x86-64.so.2 in vmmap.");
+    assert(rit2 != rend() && "Cannot find the last ld-linux-x86-64.so.2 in vmmap.");
 
     auto it2 = std::next(rit2).base();
     assert(it1 != it2 && "Only one ld-linux-x86-64.so.2 is present in vmmap.");
 
     for (auto it = ++it1; it != it2; it++) {
-        MemoryRegion &region = const_cast<MemoryRegion &>(*it);
-        assert(region.image == "unknown");
-        region.image = ld;
+        RegionDescriptorPtr region = *it;
+        region->moduleName = ld;
     }
+}
 
-    // Mark the rest of the unknown images as libc.
-    for (auto &region : ret) {
-        if (region.image == "unknown") {
-            MemoryRegion &__region = const_cast<MemoryRegion &>(region);
-            __region.image = "[shared library]";
+void VirtualMemoryMap::probeLibcRegions(S2EExecutionState *state) {
+
+}
+
+void VirtualMemoryMap::probeRemainingSharedLibsRegions(S2EExecutionState *state) {
+    // XXX: Is it possible to identify the associtated ELF file from memory?
+    foreach2 (it, begin(), end()) {
+        RegionDescriptorPtr region = *it;
+        if (region->moduleName.empty()) {
+            region->moduleName = "[shared library]";
         }
     }
+}
 
+void VirtualMemoryMap::probeStackRegion(S2EExecutionState *state) {
     // The MemoryMap plugin cannot keep track of the stack mapping,
     // so we have to find it by ourselves.
     uint64_t rsp = reg(state).readConcrete(Register::X64::RSP);
@@ -139,36 +131,50 @@ std::set<MemoryRegion, MemoryRegionCmp> VirtualMemoryMap::getMapInfo(S2EExecutio
     uint64_t stackEnd = 0;
 
     stackBegin = rsp & page_mask;
-    while (mem().isMapped(stackBegin)) {
+    while (mem(state).isMapped(stackBegin)) {
         stackBegin -= TARGET_PAGE_SIZE;
     }
     stackBegin += TARGET_PAGE_SIZE;
 
     stackEnd = rsp & page_mask;
-    while (mem().isMapped(stackEnd)) {
+    while (mem(state).isMapped(stackEnd)) {
         stackEnd += TARGET_PAGE_SIZE;
     }
     stackEnd -= TARGET_PAGE_SIZE;
 
-    ret.insert({stackBegin, stackEnd, MM_READ | MM_WRITE, "[stack]"});
-    return ret;
+    auto region = std::make_shared<RegionDescriptor>();
+    region->r = true;
+    region->w = true;
+    region->x = false;  // XXX: inaccurate, we should parse ELF
+    region->moduleName = "[stack]";
+
+    insert(stackBegin, stackEnd, std::move(region));
 }
 
 void VirtualMemoryMap::dump(S2EExecutionState *state) {
-    auto &os = log<WARN>();
+    auto &os = log<WARN>(state);
 
     os << "Dummping memory map...\n"
         << "--------------- [VMMAP] ---------------\n"
-        << "Start\t\tEnd\t\tPerm\tImage\n";
+        << "Start\t\tEnd\t\tPerm\tModule\n";
 
-    for (const auto &region : getMapInfo(state)) {
-        os << hexval(region.start) << '\t'
-            << hexval(region.end) << '\t'
-            << (region.prot & MM_READ ? 'r' : '-')
-            << (region.prot & MM_WRITE ? 'w' : '-')
-            << (region.prot & MM_EXEC ? 'x' : '-') << '\t'
-            << region.image << '\n';
+    foreach2 (it, begin(), end()) {
+        uint64_t start = it.start();
+        uint64_t end = it.stop() + 1;
+        RegionDescriptorPtr region = *it;
+
+        os << hexval(start) << '\t'
+            << hexval(end) << '\t'
+            << (region->r ? 'r' : '-')
+            << (region->w ? 'w' : '-')
+            << (region->x ? 'x' : '-') << '\t'
+            << region->moduleName
+            << '\n';
     }
+}
+
+uint64_t VirtualMemoryMap::getModuleBaseAddress(uint64_t address) const {
+    return 0;
 }
 
 }  // namespace s2e::plugins::crax

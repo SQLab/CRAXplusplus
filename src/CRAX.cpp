@@ -20,9 +20,6 @@
 
 #include <s2e/S2E.h>
 #include <s2e/ConfigFile.h>
-#include <s2e/Plugins/OSMonitors/Support/ProcessExecutionDetector.h>
-#include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
-#include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
 #include "CRAX.h"
 
@@ -176,9 +173,9 @@ void CRAX::onModuleLoad(S2EExecutionState *state,
 
     // Resolve ELF base if the target binary has PIE.
     if (md.Name == "target" && m_exploit.getElf().getChecksec().hasPIE) {
-        auto mapInfo = mem().getMapInfo();
-        m_exploit.getElf().setBase(mapInfo.begin()->start);
-        log<WARN>() << "ELF loaded at: " << hexval(mapInfo.begin()->start) << '\n';
+        const auto &mapInfo = mem().getMapInfo();
+        m_exploit.getElf().setBase(mapInfo.begin().start());
+        log<WARN>() << "ELF loaded at: " << hexval(mapInfo.begin().start()) << '\n';
     }
 }
 

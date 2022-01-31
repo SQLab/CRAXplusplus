@@ -21,63 +21,109 @@
 #ifndef S2E_PLUGINS_CRAX_VIRTUAL_MEMORY_MAP_H
 #define S2E_PLUGINS_CRAX_VIRTUAL_MEMORY_MAP_H
 
+#include <llvm/ADT/IntervalMap.h>
 #include <s2e/S2EExecutionState.h>
-#include <s2e/Plugins/OSMonitors/ModuleDescriptor.h>
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
+#include <s2e/Plugins/OSMonitors/Support/ModuleMap.h>
 
-#include <set>
+#include <functional>
+#include <iterator>
+#include <memory>
 #include <string>
-#include <vector>
 
 namespace s2e::plugins::crax {
 
-// XXX: The MemoryMap plugin also has a similar structure
-// called "MemoryMapRegion" (an interval map),
-// and maybe we can use that structure instead.
-struct MemoryRegion {
-    uint64_t start;
-    uint64_t end;
-    MemoryMapRegionType prot;
-    std::string image;
+struct RegionDescriptor {
+    bool r, w, x;
+    std::string moduleName;
 };
 
-struct MemoryRegionCmp {
-    bool operator ()(const MemoryRegion &r1, const MemoryRegion &r2) const {
-        return r1.start < r2.start;
-    }
-};
+// Using pointers to RegionDescriptors as the values of IntervalMap
+// saves us from defining RegionDescriptor::operator{==,!=}().
+using RegionDescriptorPtr = std::shared_ptr<RegionDescriptor>;
 
-// An enhanced version of MemoryMapRegionManager from libs2eplugins.
-//
 // VirtualMemoryMap, abbreviated as "VMMap" or "vmmap", provides
-// the interface to do the following for the target (vulnerable) process:
-// 1. enumerate the mapped memory regions, including [stack].
-// 2. associate the mapped memory regions with various ELF files and permissions.
-//
-// XXX: Current implementation is fragile, but I don't have time for an
-// elagant implementation. It needs to be reimplemented at some point.
-// Maybe see: https://github.com/pwndbg/pwndbg/blob/dev/pwndbg/vmmap.py
-class VirtualMemoryMap {
+// the interface to enumerate the mapped memory regions including [stack],
+// as well as associate the mapped memory regions with loaded modules.
+class VirtualMemoryMap : public llvm::IntervalMap<uint64_t, RegionDescriptorPtr> {
 public:
+    // LLVM's IntervalMap supports bidirectional iterators: begin(), end(),
+    // but strangely, it doesn't support reverse iterators, so we'll do it ourselves.
+    using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+    using reverse_iterator = std::reverse_iterator<iterator>;
+
     VirtualMemoryMap()
-        : m_memoryMap(),
-          m_mappedSections() {}
+        : IntervalMap(s_alloc),
+          m_memoryMap(),
+          m_moduleMap() {}
+
+    const_reverse_iterator rbegin() const { return const_reverse_iterator(end()); }
+    const_reverse_iterator rend() const { return const_reverse_iterator(begin()); }
+    reverse_iterator rbegin() { return reverse_iterator(end()); }
+    reverse_iterator rend() { return reverse_iterator(begin()); }
 
     void initialize();
-
-    [[nodiscard]]
-    std::set<MemoryRegion, MemoryRegionCmp> getMapInfo(S2EExecutionState *state);
-
+    void rebuild(S2EExecutionState *state);
     void dump(S2EExecutionState *state);
 
+    uint64_t getModuleBaseAddress(uint64_t address) const;
+
 private:
-    void onModuleLoad(S2EExecutionState *state,
-                      const ModuleDescriptor &md);
+    void probeDynamicLoaderRegions(S2EExecutionState *state);
+    void probeLibcRegions(S2EExecutionState *state);
+    void probeRemainingSharedLibsRegions(S2EExecutionState *state);
+    void probeStackRegion(S2EExecutionState *state);
+
+    // This cannot be a non-static variable because it's used by the
+    // parent class but would be destroyed first, causing corruptions.
+    static Allocator s_alloc;
 
     MemoryMap *m_memoryMap;
-    ModuleSections m_mappedSections;
+    ModuleMap *m_moduleMap;
 };
 
 }  // namespace s2e::plugins::crax
+
+
+namespace std {
+
+// In VirtualMemoryMap (which inherits from llvm::IntervalMap), we've added
+// support for reverse iterators, but the code won't compile if we use them
+// with std::find_if(). The problem is that if we pass std::reverse_iterator
+// to std::find_if(), std::find_if() dereferences the reverse iterator, obtains
+// a non-const reference to a RegionDescriptorPtr, and then tests it against
+// the given unary predicate. However, both llvm::IntervalMap::{,const_}iterator
+// only support the const version of operator*(), and when stl tries to bind
+// a non-const reference to a const object, a compilation error will be emitted.
+//
+// There are two possible solutions:
+//
+// 1. Derive a new iterator (VirtualMemoryMap::iterator) and add
+//    a non-const version of operator*().
+//
+// 2. Add a partial template specialization to std::find()
+//    for VirtualMemoryMap::reverse_iterator.
+//
+// I'll use the second solution here since it's easier (and probably safer).
+
+template <class UnaryPredicate>
+::s2e::plugins::crax::VirtualMemoryMap::reverse_iterator
+find_if(::s2e::plugins::crax::VirtualMemoryMap::reverse_iterator first,
+        ::s2e::plugins::crax::VirtualMemoryMap::reverse_iterator last,
+        UnaryPredicate p) {
+    for (; first != last; ++first) {
+        // Dereferencing VirtualMemoryMap::reverse_iterator will cause
+        // reference binding problem at compile time. To avoid that,
+        // convert it to a forward iterator first, and then we're safe to
+        // dereference it.
+        auto it = std::next(first).base();
+        if (p(*it)) {
+            return first;
+        }
+    }
+    return last;
+}
+
+}  // namespace std
 
 #endif  // S2E_PLUGINS_CRAX_VIRTUAL_MEMORY_MAP_H

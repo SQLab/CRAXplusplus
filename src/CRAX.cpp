@@ -173,9 +173,13 @@ void CRAX::onModuleLoad(S2EExecutionState *state,
 
     // Resolve ELF base if the target binary has PIE.
     if (md.Name == "target" && m_exploit.getElf().getChecksec().hasPIE) {
-        const auto &mapInfo = mem().getMapInfo();
-        m_exploit.getElf().setBase(mapInfo.begin().start());
-        log<WARN>() << "ELF loaded at: " << hexval(mapInfo.begin().start()) << '\n';
+        assert(md.Sections.size());
+
+        uint64_t elfBase = md.Sections.front().runtimeLoadBase;
+        elfBase = Memory::roundDownToPageBoundary(elfBase);
+
+        log<WARN>() << "ELF loaded at: " << hexval(elfBase) << '\n';
+        m_exploit.getElf().setBase(elfBase);
     }
 }
 

@@ -459,7 +459,7 @@ IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len)
                 if (value >= it.start() && value <= it.stop()) {
                     RegionDescriptorPtr region = *it;
                     info.bufIndex = i;
-                    info.baseOffset = value - it.start();
+                    info.baseOffset = value - mapInfo.getModuleBaseAddress(value);
                     info.leakType = getLeakType(region->moduleName);
                     leakInfo.push_back(info);
                 }

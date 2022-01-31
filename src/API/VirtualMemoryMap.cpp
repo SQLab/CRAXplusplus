@@ -73,19 +73,44 @@ void VirtualMemoryMap::rebuild(S2EExecutionState *state) {
     clear();
     m_memoryMap->iterateRegions(state, pid, memoryMapCb);
 
+    // Probe the stack region only once.
+    probeStackRegion(state);
+
     // XXX: Currently, vmmap is built by merging S2E's MemoryMap and ModuleMap.
     // ModuleMap tracks where binaries are loaded
     // However, since libc is loaded by ld.so instead of load_elf_binary(),
     // we won't be able  to know where libc resides in the (guest)
     // virtual address space of the target process, so we need to do it ourselves.
-    probeDynamicLoaderRegions(state);
-    probeLibcRegions(state);
-    probeRemainingSharedLibsRegions(state);
-    probeStackRegion(state);
+    fillDynamicLoaderRegions(state);
+    fillLibcRegions(state);
+    fillRemainingSharedLibsRegions(state);
+    fillStackRegion(state);
 }
 
 
-void VirtualMemoryMap::probeDynamicLoaderRegions(S2EExecutionState *state) {
+void VirtualMemoryMap::probeStackRegion(S2EExecutionState *state) {
+    if (m_stackRegionBegin) {
+        return;
+    }
+
+    // XXX: Potentially inaccurate...
+    uint64_t rsp = reg(state).readConcrete(Register::X64::RSP);
+    uint64_t rspPage = Memory::roundDownToPageBoundary(rsp);
+
+    m_stackRegionBegin = rspPage;
+    while (mem(state).isMapped(m_stackRegionBegin)) {
+        m_stackRegionBegin -= TARGET_PAGE_SIZE;
+    }
+    m_stackRegionBegin += TARGET_PAGE_SIZE;
+
+    m_stackRegionEnd = rspPage;
+    while (mem(state).isMapped(m_stackRegionEnd)) {
+        m_stackRegionEnd += TARGET_PAGE_SIZE;
+    }
+    m_stackRegionEnd -= 1;
+}
+
+void VirtualMemoryMap::fillDynamicLoaderRegions(S2EExecutionState *state) {
     const std::string ld = "ld-linux-x86-64.so.2";
 
     auto it1 = std::find_if(begin(),
@@ -108,11 +133,11 @@ void VirtualMemoryMap::probeDynamicLoaderRegions(S2EExecutionState *state) {
     }
 }
 
-void VirtualMemoryMap::probeLibcRegions(S2EExecutionState *state) {
+void VirtualMemoryMap::fillLibcRegions(S2EExecutionState *state) {
 
 }
 
-void VirtualMemoryMap::probeRemainingSharedLibsRegions(S2EExecutionState *state) {
+void VirtualMemoryMap::fillRemainingSharedLibsRegions(S2EExecutionState *state) {
     // XXX: Is it possible to identify the associtated ELF file from memory?
     foreach2 (it, begin(), end()) {
         RegionDescriptorPtr region = *it;
@@ -122,25 +147,8 @@ void VirtualMemoryMap::probeRemainingSharedLibsRegions(S2EExecutionState *state)
     }
 }
 
-void VirtualMemoryMap::probeStackRegion(S2EExecutionState *state) {
-    // The MemoryMap plugin cannot keep track of the stack mapping,
-    // so we have to find it by ourselves.
-    uint64_t rsp = reg(state).readConcrete(Register::X64::RSP);
-    uint64_t page_mask = ~(TARGET_PAGE_SIZE - 1);
-    uint64_t stackBegin = 0;
-    uint64_t stackEnd = 0;
-
-    stackBegin = rsp & page_mask;
-    while (mem(state).isMapped(stackBegin)) {
-        stackBegin -= TARGET_PAGE_SIZE;
-    }
-    stackBegin += TARGET_PAGE_SIZE;
-
-    stackEnd = rsp & page_mask;
-    while (mem(state).isMapped(stackEnd)) {
-        stackEnd += TARGET_PAGE_SIZE;
-    }
-    stackEnd -= TARGET_PAGE_SIZE;
+void VirtualMemoryMap::fillStackRegion(S2EExecutionState *state) {
+    assert(m_stackRegionBegin && m_stackRegionEnd);
 
     auto region = std::make_shared<RegionDescriptor>();
     region->r = true;
@@ -148,7 +156,7 @@ void VirtualMemoryMap::probeStackRegion(S2EExecutionState *state) {
     region->x = false;  // XXX: inaccurate, we should parse ELF
     region->moduleName = "[stack]";
 
-    insert(stackBegin, stackEnd, std::move(region));
+    insert(m_stackRegionBegin, m_stackRegionEnd, std::move(region));
 }
 
 void VirtualMemoryMap::dump(S2EExecutionState *state) {
@@ -174,7 +182,31 @@ void VirtualMemoryMap::dump(S2EExecutionState *state) {
 }
 
 uint64_t VirtualMemoryMap::getModuleBaseAddress(uint64_t address) const {
-    return 0;
+    auto it = find(address);
+
+    // The given address is not mapped in the va_space?
+    if (it == end()) {
+        return 0;
+    }
+
+    RegionDescriptorPtr region = *it;
+    const std::string &moduleName = region->moduleName;
+
+    // Construct a reverse iterator from the forward iterator `it`,
+    // and start searching toward lower virtual address
+    // until the region has a different module.
+    auto rit = std::find_if(std::make_reverse_iterator(it),
+                            rend(),
+                            [&moduleName](const auto &r) { return r->moduleName != moduleName; });
+
+    if (rit == rend()) {
+        return begin().start();
+    }
+
+    // At this point, we've already iterated past the target region,
+    // so no need to advance `rit` before calling base().
+    it = rit.base();
+    return it.start();
 }
 
 }  // namespace s2e::plugins::crax

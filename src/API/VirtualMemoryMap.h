@@ -26,7 +26,6 @@
 #include <s2e/Plugins/OSMonitors/Support/MemoryMap.h>
 #include <s2e/Plugins/OSMonitors/Support/ModuleMap.h>
 
-#include <functional>
 #include <iterator>
 #include <memory>
 #include <string>
@@ -55,7 +54,9 @@ public:
     VirtualMemoryMap()
         : IntervalMap(s_alloc),
           m_memoryMap(),
-          m_moduleMap() {}
+          m_moduleMap(),
+          m_stackRegionBegin(),
+          m_stackRegionEnd() {}
 
     const_reverse_iterator rbegin() const { return const_reverse_iterator(end()); }
     const_reverse_iterator rend() const { return const_reverse_iterator(begin()); }
@@ -69,10 +70,12 @@ public:
     uint64_t getModuleBaseAddress(uint64_t address) const;
 
 private:
-    void probeDynamicLoaderRegions(S2EExecutionState *state);
-    void probeLibcRegions(S2EExecutionState *state);
-    void probeRemainingSharedLibsRegions(S2EExecutionState *state);
     void probeStackRegion(S2EExecutionState *state);
+
+    void fillDynamicLoaderRegions(S2EExecutionState *state);
+    void fillLibcRegions(S2EExecutionState *state);
+    void fillRemainingSharedLibsRegions(S2EExecutionState *state);
+    void fillStackRegion(S2EExecutionState *state);
 
     // This cannot be a non-static variable because it's used by the
     // parent class but would be destroyed first, causing corruptions.
@@ -80,12 +83,29 @@ private:
 
     MemoryMap *m_memoryMap;
     ModuleMap *m_moduleMap;
+
+    // The MemoryMap plugin cannot keep track of the stack mapping
+    // through sys_mmap, so we have to probe it by ourselves.
+    uint64_t m_stackRegionBegin;
+    uint64_t m_stackRegionEnd;
 };
+
+template <typename T, typename UnaryPredicate>
+T __crax_vmmap_find_if(T first, T last, UnaryPredicate p) {
+    for (; first != last; ++first) {
+        // Dereferencing VirtualMemoryMap::reverse_iterator will cause
+        // reference binding problem at compile time. To avoid that,
+        // convert it to a forward iterator first.
+        auto it = std::next(first).base();
+        if (p(*it)) {
+            return first;
+        }
+    }
+    return last;
+}
 
 }  // namespace s2e::plugins::crax
 
-
-namespace std {
 
 // In VirtualMemoryMap (which inherits from llvm::IntervalMap), we've added
 // support for reverse iterators, but the code won't compile if we use them
@@ -104,24 +124,23 @@ namespace std {
 // 2. Add a partial template specialization to std::find()
 //    for VirtualMemoryMap::reverse_iterator.
 //
-// I'll use the second solution here since it's easier (and probably safer).
+// I'll go with the second solution since it's easier to implement (and maybe safer).
+// Note that both const_reverse_iterator and reverse_iterator must be specialized.
 
-template <class UnaryPredicate>
-::s2e::plugins::crax::VirtualMemoryMap::reverse_iterator
-find_if(::s2e::plugins::crax::VirtualMemoryMap::reverse_iterator first,
-        ::s2e::plugins::crax::VirtualMemoryMap::reverse_iterator last,
-        UnaryPredicate p) {
-    for (; first != last; ++first) {
-        // Dereferencing VirtualMemoryMap::reverse_iterator will cause
-        // reference binding problem at compile time. To avoid that,
-        // convert it to a forward iterator first, and then we're safe to
-        // dereference it.
-        auto it = std::next(first).base();
-        if (p(*it)) {
-            return first;
-        }
-    }
-    return last;
+namespace std {
+
+using __crax_vmmap_cri = ::s2e::plugins::crax::VirtualMemoryMap::const_reverse_iterator;
+using __crax_vmmap_ri = ::s2e::plugins::crax::VirtualMemoryMap::reverse_iterator;
+using ::s2e::plugins::crax::__crax_vmmap_find_if;
+
+template <typename UnaryPredicate>
+__crax_vmmap_cri find_if(__crax_vmmap_cri first, __crax_vmmap_cri last, UnaryPredicate p) {
+    return __crax_vmmap_find_if(first, last, p);
+}
+
+template <typename UnaryPredicate>
+__crax_vmmap_ri find_if(__crax_vmmap_ri first, __crax_vmmap_ri last, UnaryPredicate p) {
+    return __crax_vmmap_find_if(first, last, p);
 }
 
 }  // namespace std

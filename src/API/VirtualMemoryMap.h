@@ -69,6 +69,12 @@ public:
 
     uint64_t getModuleBaseAddress(uint64_t address) const;
 
+    static const std::string s_elfLabel;
+    static const std::string s_libcLabel;
+    static const std::string s_sharedLibraryLabel;
+    static const std::string s_ldsoLabel;
+    static const std::string s_stackLabel;
+
 private:
     void probeStackRegion(S2EExecutionState *state);
 

@@ -29,6 +29,13 @@ using namespace klee;
 
 namespace s2e::plugins::crax {
 
+// XXX: s_elfLabel is currently hardcoded :(
+const std::string VirtualMemoryMap::s_elfLabel = "target";
+const std::string VirtualMemoryMap::s_libcLabel = "libc.so.6";
+const std::string VirtualMemoryMap::s_sharedLibraryLabel = "[shared library]";
+const std::string VirtualMemoryMap::s_ldsoLabel = "ld-linux-x86-64.so.2";
+const std::string VirtualMemoryMap::s_stackLabel = "[stack]";
+
 VirtualMemoryMap::Allocator VirtualMemoryMap::s_alloc;
 
 void VirtualMemoryMap::initialize() {
@@ -111,25 +118,21 @@ void VirtualMemoryMap::probeStackRegion(S2EExecutionState *state) {
 }
 
 void VirtualMemoryMap::fillDynamicLoaderRegions(S2EExecutionState *state) {
-    const std::string ld = "ld-linux-x86-64.so.2";
-
     auto it1 = std::find_if(begin(),
                             end(),
-                            [&ld](const auto &r) { return r->moduleName == ld; });
+                            [](const auto &r) { return r->moduleName == s_ldsoLabel; });
 
     auto rit2 = std::find_if(rbegin(),
                              rend(),
-                             [&ld](const auto &r) { return r->moduleName == ld; });
+                             [](const auto &r) { return r->moduleName == s_ldsoLabel; });
 
-    assert(it1 != end() && "Cannot find the first ld-linux-x86-64.so.2 in vmmap.");
-    assert(rit2 != rend() && "Cannot find the last ld-linux-x86-64.so.2 in vmmap.");
-
+    assert(it1 != end() && rit2 != rend());
     auto it2 = std::next(rit2).base();
-    assert(it1 != it2 && "Only one ld-linux-x86-64.so.2 is present in vmmap.");
+    assert(it1 != it2 && "Only one ld-linux-x86-64.so.2 is present in vmmap");
 
     for (auto it = ++it1; it != it2; it++) {
         RegionDescriptorPtr region = *it;
-        region->moduleName = ld;
+        region->moduleName = s_ldsoLabel;
     }
 }
 
@@ -142,7 +145,7 @@ void VirtualMemoryMap::fillRemainingSharedLibsRegions(S2EExecutionState *state) 
     foreach2 (it, begin(), end()) {
         RegionDescriptorPtr region = *it;
         if (region->moduleName.empty()) {
-            region->moduleName = "[shared library]";
+            region->moduleName = s_sharedLibraryLabel;
         }
     }
 }
@@ -154,7 +157,7 @@ void VirtualMemoryMap::fillStackRegion(S2EExecutionState *state) {
     region->r = true;
     region->w = true;
     region->x = false;  // XXX: inaccurate, we should parse ELF
-    region->moduleName = "[stack]";
+    region->moduleName = s_stackLabel;
 
     insert(m_stackRegionBegin, m_stackRegionEnd, std::move(region));
 }

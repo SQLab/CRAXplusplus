@@ -470,11 +470,11 @@ IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len)
 }
 
 IOStates::LeakType IOStates::getLeakType(const std::string &image) const {
-    if (image == g_crax->getExploit().getElfFilename()) {
+    if (image == VirtualMemoryMap::s_elfLabel) {
         return IOStates::LeakType::CODE;
-    } else if (image == "[shared library]") {
+    } else if (image == VirtualMemoryMap::s_libcLabel) {
         return IOStates::LeakType::LIBC;
-    } else if (image == "[stack]") {
+    } else if (image == VirtualMemoryMap::s_stackLabel) {
         return IOStates::LeakType::STACK;
     } else {
         return IOStates::LeakType::UNKNOWN;

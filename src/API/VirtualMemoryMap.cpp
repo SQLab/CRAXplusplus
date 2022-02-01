@@ -50,7 +50,8 @@ void VirtualMemoryMap::initialize() {
 
 void VirtualMemoryMap::rebuild(S2EExecutionState *state) {
     uint64_t pid = g_crax->getTargetProcessPid();
-    assert(pid && "You're probably trying to rebuild vmmap too early");
+    assert(pid && "Target process not running (pid hasn't been intercepted yet)! "
+                  "You're probably trying to rebuild vmmap too early");
 
     // Rebuild vmmap using the information from MemoryMap and ModuleMap.
     auto memoryMapCb = [this, state, pid](uint64_t start,

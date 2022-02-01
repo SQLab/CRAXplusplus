@@ -79,11 +79,15 @@ uint64_t ELF::bss() const {
     return m_elf.attr("bss").call().cast<uint64_t>();
 }
 
-uint64_t ELF::getRuntimeAddress(const std::string &symbol) const {
-    assert((!m_checksec.hasPIE || m_base) && "PIE enabled, but `m_base` uninitialized!");
 
-    uint64_t offset = symbols()[symbol];
+uint64_t ELF::getRuntimeAddress(uint64_t offset) const {
+    assert((!m_checksec.hasPIE || m_base) && "PIE enabled, but `m_base` uninitialized!");
     return (!m_checksec.hasPIE) ? offset : m_base + offset;
+}
+
+uint64_t ELF::getRuntimeAddress(const std::string &symbol) const {
+    // XXX: Check if symbol exists before using operator[].
+    return getRuntimeAddress(symbols()[symbol]);
 }
 
 uint64_t ELF::convertAddrToNewBase(uint64_t addr, uint64_t newBase) const {

@@ -50,6 +50,7 @@ public:
     SymbolMap got(bool refetch = false) const;
     FunctionMap functions(bool refetch = false) const;
     uint64_t bss() const;
+    uint64_t getRuntimeAddress(uint64_t offset) const;
     uint64_t getRuntimeAddress(const std::string &symbol) const;
     uint64_t convertAddrToNewBase(uint64_t addr, uint64_t newBase) const;
 

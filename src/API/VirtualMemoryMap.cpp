@@ -235,6 +235,7 @@ uint64_t VirtualMemoryMap::getModuleBaseAddress(uint64_t address) const {
 
     // The given address is not mapped in the va_space?
     if (it == end()) {
+        log<WARN>() << "Cannot get module base for: " << hexval(address) << " (not mapped)\n";
         return 0;
     }
 
@@ -265,6 +266,7 @@ uint64_t VirtualMemoryMap::getModuleEndAddress(uint64_t address) const {
 
     // The given address is not mapped in the va_space?
     if (it == end()) {
+        log<WARN>() << "Cannot get module end for: " << hexval(address) << " (not mapped)\n";
         return 0;
     }
 

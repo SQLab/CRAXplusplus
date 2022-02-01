@@ -187,6 +187,16 @@ public:
     const ExploitGenerator &getExploitGenerator() const { return m_exploitGenerator; }
 
     [[nodiscard]]
+    std::vector<Module *> getModules() {
+        std::vector<Module *> ret(m_modules.size());
+        std::transform(m_modules.begin(),
+                       m_modules.end(),
+                       ret.begin(),
+                       [](const auto &p) { return p.get(); });
+        return ret;
+    }
+
+    [[nodiscard]]
     std::vector<Technique *> getTechniques() {
         std::vector<Technique *> ret(m_techniques.size());
         std::transform(m_techniques.begin(),

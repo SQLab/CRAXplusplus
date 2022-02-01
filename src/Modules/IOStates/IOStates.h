@@ -82,6 +82,8 @@ public:
             return new State(*this);
         }
 
+        void dump() const;
+
         std::string toString() const;
 
         // XXX: maybe make these data members private?
@@ -96,9 +98,9 @@ public:
     IOStates();
     virtual ~IOStates() = default;
 
+    virtual bool checkRequirements() const override;
     virtual std::string toString() const override { return "IOStates"; }
 
-    void print() const;
     uint64_t getCanary() const { return m_canary; }
     const std::vector<LeakType> &getLeakTargets() const { return m_leakTargets; }
 

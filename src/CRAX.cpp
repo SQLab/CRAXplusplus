@@ -140,7 +140,8 @@ void CRAX::onSymbolicRip(S2EExecutionState *state,
     beforeExploitGeneration.emit(state);
 
     // Generate the exploit.
-    m_exploitGenerator.run();
+    m_exploitGenerator.run(state);
+
     s2e()->getExecutor()->terminateState(*state, "End of exploit generation");
 }
 

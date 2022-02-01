@@ -43,6 +43,7 @@ public:
     Module() = default;
     virtual ~Module() = default;
 
+    virtual bool checkRequirements() const { return true; }
     virtual std::string toString() const = 0;
 
     ModuleState *getModuleState(CRAXState *state, ModuleStateFactory f) const;

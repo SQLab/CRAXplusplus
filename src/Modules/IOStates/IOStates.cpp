@@ -85,28 +85,17 @@ IOStates::IOStates()
             sigc::mem_fun(*this, &IOStates::beforeExploitGeneration));
 }
 
-std::string IOStates::State::toString() const {
-    std::string ret;
+bool IOStates::checkRequirements() const {
+    auto modState = g_crax->getPluginModuleState(g_crax->getCurrentState(), this);
+    modState->dump();
 
-    for (size_t i = 0; i < stateInfoList.size(); i++) {
-        const auto &info = stateInfoList[i];
-
-        if (const auto stateInfo = std::get_if<InputStateInfo>(&info)) {
-            ret += 'i';
-            ret += std::to_string(stateInfo->offset);
-        } else if (const auto stateInfo = std::get_if<OutputStateInfo>(&info)) {
-            ret += 'o';
-            if (stateInfo->valid) {
-                ret += std::to_string(stateInfo->bufIndex);
-            }
-        }
-
-        if (i != stateInfoList.size() - 1) {
-            ret += ',';
-        }
+    if (modState->currentLeakTargetIdx < m_leakTargets.size()) {
+        log<WARN>() << "Some required information cannot be leaked, skipping current state...\n";
+        return false;
     }
-    return ret;
+    return true;
 }
+
 
 void IOStates::initUserSpecifiedStateInfoList() {
     std::string str = g_s2e->getConfig()->getString(getConfigKey() + ".stateInfoList");
@@ -138,26 +127,6 @@ void IOStates::initUserSpecifiedStateInfoList() {
     }
 }
 
-
-void IOStates::print() const {
-    auto modState = g_crax->getPluginModuleState(g_crax->getCurrentState(), this);
-
-    auto &os = log<WARN>();
-    os << "Dumping IOStates: [";
-
-    for (size_t i = 0; i < modState->stateInfoList.size(); i++) {
-        if (const auto &inputStateInfo = std::get_if<InputStateInfo>(&modState->stateInfoList[i])) {
-            os << "input";
-        } else {
-            os << "output";
-        }
-        if (i != modState->stateInfoList.size() - 1) {
-            os << ", ";
-        }
-    }
-    os << "]\n";
-}
-
 void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
                                      SyscallCtx &syscall) {
     if (syscall.nr != 0 || syscall.arg1 != STDIN_FILENO) {
@@ -176,7 +145,6 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
         }
         os << '\n';
     }
-
 
     auto modState = g_crax->getPluginModuleState(inputState, this);
 
@@ -315,7 +283,6 @@ void IOStates::outputStateHook(S2EExecutionState *outputState,
 
     modState->stateInfoList.push_back(std::move(stateInfo));
 }
-
 
 void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
                                          const Instruction &i) {
@@ -479,6 +446,47 @@ IOStates::LeakType IOStates::getLeakType(const std::string &image) const {
     } else {
         return IOStates::LeakType::UNKNOWN;
     }
+}
+
+
+void IOStates::State::dump() const {
+    auto &os = log<WARN>();
+    os << "Dumping IOStates for this path: [";
+
+    for (size_t i = 0; i < stateInfoList.size(); i++) {
+        if (const auto &inputStateInfo = std::get_if<InputStateInfo>(&stateInfoList[i])) {
+            os << "input";
+        } else {
+            os << "output";
+        }
+        if (i != stateInfoList.size() - 1) {
+            os << ", ";
+        }
+    }
+    os << "]\n";
+}
+
+std::string IOStates::State::toString() const {
+    std::string ret;
+
+    for (size_t i = 0; i < stateInfoList.size(); i++) {
+        const auto &info = stateInfoList[i];
+
+        if (const auto stateInfo = std::get_if<InputStateInfo>(&info)) {
+            ret += 'i';
+            ret += std::to_string(stateInfo->offset);
+        } else if (const auto stateInfo = std::get_if<OutputStateInfo>(&info)) {
+            ret += 'o';
+            if (stateInfo->valid) {
+                ret += std::to_string(stateInfo->bufIndex);
+            }
+        }
+
+        if (i != stateInfoList.size() - 1) {
+            ret += ',';
+        }
+    }
+    return ret;
 }
 
 }  // namespace s2e::plugins::crax

@@ -42,7 +42,8 @@ namespace s2e::plugins::crax {
 
 CRAX *g_crax = nullptr;
 
-S2E_DEFINE_PLUGIN(CRAX, "Modular Exploit Generation System", "", );
+S2E_DEFINE_PLUGIN(CRAX, "Modular Exploit Generation System", "",
+                  "LinuxMonitor", "MemoryMap", "ModuleMap");
 
 pybind11::scoped_interpreter CRAX::s_pybind11;
 pybind11::module CRAX::s_pwnlib(pybind11::module::import("pwnlib.elf"));

@@ -47,7 +47,7 @@ using RegionDescriptorPtr = std::shared_ptr<RegionDescriptor>;
 class VirtualMemoryMap : public llvm::IntervalMap<uint64_t, RegionDescriptorPtr> {
 public:
     // LLVM's IntervalMap supports bidirectional iterators: begin(), end(),
-    // but strangely, it doesn't support reverse iterators, so we'll do it ourselves.
+    // but strangely, it doesn't define reverse iterators, so we'll do it ourselves.
     using const_reverse_iterator = std::reverse_iterator<const_iterator>;
     using reverse_iterator = std::reverse_iterator<iterator>;
 
@@ -55,8 +55,8 @@ public:
         : IntervalMap(s_alloc),
           m_memoryMap(),
           m_moduleMap(),
-          m_stackRegionBegin(),
-          m_stackRegionEnd() {}
+          m_libcRegion(),
+          m_stackRegion() {}
 
     const_reverse_iterator rbegin() const { return const_reverse_iterator(end()); }
     const_reverse_iterator rend() const { return const_reverse_iterator(begin()); }
@@ -68,6 +68,24 @@ public:
     void dump(S2EExecutionState *state);
 
     uint64_t getModuleBaseAddress(uint64_t address) const;
+    uint64_t getModuleEndAddress(uint64_t address) const;
+
+    // Because llvm::IntervalMap::const_iterator only defines `const operator*() const`,
+    // so the default std::find_if() can fail when it tries to dereference a
+    // reverse iterator in order to obtain the corresponding iterator.
+    // We adds two partial specializations to std::find_if() w.r.t. both
+    // const_reverse_iterator and reverse_iterator, preventing std::find_if()
+    // from dereferencing our reverse iterators directly and causing compilation error.
+    template <typename T, typename UnaryPredicate>
+    static T find_if(T first, T last, UnaryPredicate p) {
+        for (; first != last; ++first) {
+            auto it = std::next(first).base();
+            if (p(*it)) {
+                return first;
+            }
+        }
+        return last;
+    }
 
     static const std::string s_elfLabel;
     static const std::string s_libcLabel;
@@ -76,6 +94,7 @@ public:
     static const std::string s_stackLabel;
 
 private:
+    void probeLibcRegion(S2EExecutionState *state);
     void probeStackRegion(S2EExecutionState *state);
 
     void fillDynamicLoaderRegions(S2EExecutionState *state);
@@ -90,63 +109,30 @@ private:
     MemoryMap *m_memoryMap;
     ModuleMap *m_moduleMap;
 
-    // The MemoryMap plugin cannot keep track of the stack mapping
-    // through sys_mmap, so we have to probe it by ourselves.
-    uint64_t m_stackRegionBegin;
-    uint64_t m_stackRegionEnd;
+    // [start, end)
+    std::pair<uint64_t, uint64_t> m_libcRegion;
+    std::pair<uint64_t, uint64_t> m_stackRegion;
 };
-
-template <typename T, typename UnaryPredicate>
-T __crax_vmmap_find_if(T first, T last, UnaryPredicate p) {
-    for (; first != last; ++first) {
-        // Dereferencing VirtualMemoryMap::reverse_iterator will cause
-        // reference binding problem at compile time. To avoid that,
-        // convert it to a forward iterator first.
-        auto it = std::next(first).base();
-        if (p(*it)) {
-            return first;
-        }
-    }
-    return last;
-}
 
 }  // namespace s2e::plugins::crax
 
 
-// In VirtualMemoryMap (which inherits from llvm::IntervalMap), we've added
-// support for reverse iterators, but the code won't compile if we use them
-// with std::find_if(). The problem is that if we pass std::reverse_iterator
-// to std::find_if(), std::find_if() dereferences the reverse iterator, obtains
-// a non-const reference to a RegionDescriptorPtr, and then tests it against
-// the given unary predicate. However, both llvm::IntervalMap::{,const_}iterator
-// only support the const version of operator*(), and when stl tries to bind
-// a non-const reference to a const object, a compilation error will be emitted.
-//
-// There are two possible solutions:
-//
-// 1. Derive a new iterator (VirtualMemoryMap::iterator) and add
-//    a non-const version of operator*().
-//
-// 2. Add a partial template specialization to std::find()
-//    for VirtualMemoryMap::reverse_iterator.
-//
-// I'll go with the second solution since it's easier to implement (and maybe safer).
-// Note that both const_reverse_iterator and reverse_iterator must be specialized.
-
 namespace std {
 
-using __crax_vmmap_cri = ::s2e::plugins::crax::VirtualMemoryMap::const_reverse_iterator;
-using __crax_vmmap_ri = ::s2e::plugins::crax::VirtualMemoryMap::reverse_iterator;
-using ::s2e::plugins::crax::__crax_vmmap_find_if;
+using crax_vmmap = ::s2e::plugins::crax::VirtualMemoryMap;
+using crax_vmmap_const_rit = crax_vmmap::const_reverse_iterator;
+using crax_vmmap_rit = crax_vmmap::reverse_iterator;
 
 template <typename UnaryPredicate>
-__crax_vmmap_cri find_if(__crax_vmmap_cri first, __crax_vmmap_cri last, UnaryPredicate p) {
-    return __crax_vmmap_find_if(first, last, p);
+crax_vmmap_const_rit
+find_if(crax_vmmap_const_rit first, crax_vmmap_const_rit last, UnaryPredicate p) {
+    return crax_vmmap::find_if(first, last, p);
 }
 
 template <typename UnaryPredicate>
-__crax_vmmap_ri find_if(__crax_vmmap_ri first, __crax_vmmap_ri last, UnaryPredicate p) {
-    return __crax_vmmap_find_if(first, last, p);
+crax_vmmap_rit
+find_if(crax_vmmap_rit first, crax_vmmap_rit last, UnaryPredicate p) {
+    return crax_vmmap::find_if(first, last, p);
 }
 
 }  // namespace std

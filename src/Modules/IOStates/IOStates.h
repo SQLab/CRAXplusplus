@@ -48,7 +48,6 @@ public:
     };
 
     struct InputStateInfo {
-        std::vector<uint8_t> buf;
         uint64_t offset;
     };
 

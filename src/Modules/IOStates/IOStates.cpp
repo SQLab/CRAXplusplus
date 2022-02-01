@@ -213,13 +213,9 @@ void IOStates::inputStateHookBottomHalf(S2EExecutionState *inputState,
 
     g_crax->setCurrentState(inputState);
 
-    std::vector<uint8_t> buf
-        = mem().readConcrete(syscall.arg2, syscall.arg3, /*concretize=*/false);
-
     auto modState = g_crax->getPluginModuleState(inputState, this);
 
     InputStateInfo stateInfo;
-    stateInfo.buf = std::move(buf);
 
     if (modState->leakableOffset) {
         // `inputStateHookBottomHalf()` -> `analyzeLeak()` has found

@@ -19,8 +19,9 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
+#include <s2e/Plugins/CRAX/API/Disassembler.h>
+#include <s2e/Plugins/CRAX/Modules/IOStates/LeakBasedCoreGenerator.h>
 #include <s2e/Plugins/CRAX/Pwnlib/Util.h>
-#include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
 #include <unistd.h>
 
@@ -94,6 +95,10 @@ bool IOStates::checkRequirements() const {
         return false;
     }
     return true;
+}
+
+std::unique_ptr<ICoreGenerator> IOStates::getCoreGenerator() const {
+    return std::make_unique<LeakBasedCoreGenerator>();
 }
 
 
@@ -447,7 +452,7 @@ IOStates::LeakType IOStates::getLeakType(const std::string &image) const {
 
 void IOStates::State::dump() const {
     auto &os = log<WARN>();
-    os << "Dumping IOStates for this path: [";
+    os << "Dumping IOStates: [";
 
     for (size_t i = 0; i < stateInfoList.size(); i++) {
         if (const auto &inputStateInfo = std::get_if<InputStateInfo>(&stateInfoList[i])) {

@@ -33,6 +33,7 @@ add_library(
     s2e/Plugins/CRAX/Modules/Module.cpp
     s2e/Plugins/CRAX/Modules/DynamicRop/DynamicRop.cpp
     s2e/Plugins/CRAX/Modules/IOStates/IOStates.cpp
+    s2e/Plugins/CRAX/Modules/IOStates/LeakBasedCoreGenerator.cpp
     s2e/Plugins/CRAX/Techniques/Technique.cpp
     s2e/Plugins/CRAX/Techniques/Ret2csu.cpp
     s2e/Plugins/CRAX/Techniques/StackPivot.cpp

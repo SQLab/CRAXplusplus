@@ -31,6 +31,7 @@ namespace s2e::plugins::crax {
 class CRAXState;
 class Module;
 class ModuleState;
+class ICoreGenerator;
 
 using ModuleStateFactory = ModuleState *(*)(Module *, CRAXState *);
 
@@ -44,6 +45,7 @@ public:
     virtual ~Module() = default;
 
     virtual bool checkRequirements() const { return true; }
+    virtual std::unique_ptr<ICoreGenerator> getCoreGenerator() const { return nullptr; }
     virtual std::string toString() const = 0;
 
     ModuleState *getModuleState(CRAXState *state, ModuleStateFactory f) const;

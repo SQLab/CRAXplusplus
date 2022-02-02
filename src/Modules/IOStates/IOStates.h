@@ -22,15 +22,12 @@
 #define S2E_PLUGINS_CRAX_IO_STATES_H
 
 #include <s2e/S2EExecutionState.h>
-#include <s2e/Plugins/CRAX/API/Disassembler.h>
 #include <s2e/Plugins/CRAX/Modules/Module.h>
 
 #include <array>
-#include <map>
 #include <string>
 #include <vector>
 #include <variant>
-#include <utility>
 
 namespace s2e::plugins::crax {
 
@@ -98,6 +95,7 @@ public:
     virtual ~IOStates() = default;
 
     virtual bool checkRequirements() const override;
+    virtual std::unique_ptr<ICoreGenerator> getCoreGenerator() const override;
     virtual std::string toString() const override { return "IOStates"; }
 
     uint64_t getCanary() const { return m_canary; }

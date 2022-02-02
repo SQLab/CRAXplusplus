@@ -118,8 +118,8 @@ using crax_vmmap = ::s2e::plugins::crax::VirtualMemoryMap;
 using crax_vmmap_const_rit = crax_vmmap::const_reverse_iterator;
 using crax_vmmap_rit = crax_vmmap::reverse_iterator;
 
-template <typename T, typename UnaryPredicate>
-T crax_vmmap_do_find_if(T first, T last, UnaryPredicate p) {
+template <typename InputIt, typename UnaryPredicate>
+InputIt crax_vmmap_do_find_if(InputIt first, InputIt last, UnaryPredicate p) {
     for (; first != last; ++first) {
         auto it = std::next(first).base();
         if (p(*it)) {

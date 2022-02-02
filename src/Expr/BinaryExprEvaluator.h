@@ -34,11 +34,11 @@ namespace klee {
 template <typename T>
 T evaluate(const ref<Expr> &e);
 
-// Explicit (full) template specialization for T = uint64_t.
+// Explicit (full) template specialization [with T = uint64_t].
 template <>
 uint64_t evaluate(const ref<Expr> &e);
 
-// Explicit (full) template specialization for T = std::string.
+// Explicit (full) template specialization [with T = std::string].
 template <>
 std::string evaluate(const ref<Expr> &e);
 

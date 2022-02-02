@@ -131,7 +131,7 @@ template <IterStrategy S>
 class BinaryExprIterator {};
 
 
-// Explicit (full) template specialization for S = IterStrategy::PRE_ORDER.
+// Explicit (full) template specialization [with S = IterStrategy::PRE_ORDER].
 template <>
 class BinaryExprIterator<IterStrategy::PRE_ORDER>
     : public detail::__BaseBinaryExprIterator<IterStrategy::PRE_ORDER> {
@@ -170,7 +170,7 @@ protected:
 };
 
 
-// Explicit (full) template specialization for S = IterStrategy::IN_ORDER.
+// Explicit (full) template specialization [with S = IterStrategy::IN_ORDER].
 template <>
 class BinaryExprIterator<IterStrategy::IN_ORDER>
     : public detail::__BaseBinaryExprIterator<IterStrategy::IN_ORDER> {
@@ -212,7 +212,7 @@ protected:
 };
 
 
-// Explicit (full) template specialization for S = IterStrategy::POST_ORDER.
+// Explicit (full) template specialization [with S = IterStrategy::POST_ORDER].
 template <>
 class BinaryExprIterator<IterStrategy::POST_ORDER>
     : public detail::__BaseBinaryExprIterator<IterStrategy::POST_ORDER> {

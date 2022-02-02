@@ -34,7 +34,7 @@ class CRAX;
 class GotPartialOverwrite : public Technique {
 public:
     GotPartialOverwrite();
-    virtual ~GotPartialOverwrite() = default;
+    virtual ~GotPartialOverwrite() override = default;
 
     virtual void initialize() override {}
     virtual bool checkRequirements() const override;

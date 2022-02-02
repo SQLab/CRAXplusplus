@@ -68,7 +68,7 @@ public:
               currentLeakTargetIdx(),
               stateInfoList() {}
 
-        virtual ~State() = default;
+        virtual ~State() override = default;
 
         static ModuleState *factory(Module *, CRAXState *) {
             return new State();
@@ -92,7 +92,7 @@ public:
 
 
     IOStates();
-    virtual ~IOStates() = default;
+    virtual ~IOStates() override = default;
 
     virtual bool checkRequirements() const override;
     virtual std::unique_ptr<ICoreGenerator> getCoreGenerator() const override;

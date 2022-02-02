@@ -104,11 +104,12 @@ std::unique_ptr<ICoreGenerator> IOStates::getCoreGenerator() const {
 
 void IOStates::initUserSpecifiedStateInfoList() {
     std::string str = g_s2e->getConfig()->getString(getConfigKey() + ".stateInfoList");
-    log<INFO>() << "User-specified StateInfoList: " << str << '\n';
 
     if (str.empty()) {
         return;
     }
+
+    log<INFO>() << "User-specified StateInfoList: " << str << '\n';
 
     // Parse the string into state info list.
     for (const auto &s : split(str, ',')) {

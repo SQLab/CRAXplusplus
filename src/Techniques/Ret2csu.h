@@ -39,16 +39,16 @@ public:
     class UnhandledPlaceholderException : public std::exception {
     public:
         UnhandledPlaceholderException() = default;
-        virtual ~UnhandledPlaceholderException() = default;
+        virtual ~UnhandledPlaceholderException() override = default;
 
-        virtual const char *what() const throw() {
+        virtual const char *what() const throw() override {
             return "Unhandled placeholder expr found";
         }
     };
 
 
     Ret2csu();
-    virtual ~Ret2csu() = default;
+    virtual ~Ret2csu() override = default;
 
     virtual void initialize() override;
     virtual bool checkRequirements() const override;

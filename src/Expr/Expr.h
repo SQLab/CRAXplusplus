@@ -57,7 +57,7 @@ class BaseOffsetExpr : public AddExpr {
     using ELF = s2e::plugins::crax::ELF;
 
 public:
-    virtual ~BaseOffsetExpr() = default;
+    virtual ~BaseOffsetExpr() override = default;
 
     virtual unsigned getNumKids() const override {
         return 0;
@@ -195,7 +195,7 @@ private:
 // In ret2csu, we need to have placeholder expr tree node.
 class PlaceholderExpr : public Expr {
 public:
-    virtual ~PlaceholderExpr() = default;
+    virtual ~PlaceholderExpr() override = default;
 
     virtual Kind getKind() const override {
         // Under normal circumstances, this expr shouldn't exist.
@@ -259,7 +259,7 @@ private:
 // Sometimes we want to send a sequence of bytes whose size is not simply a QWORD.
 class ByteVectorExpr : public Expr {
 public:
-    virtual ~ByteVectorExpr() = default;
+    virtual ~ByteVectorExpr() override = default;
 
     virtual Kind getKind() const override {
         return Expr::Constant;

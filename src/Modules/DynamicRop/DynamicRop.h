@@ -58,7 +58,7 @@ public:
               initialized(),
               constraintsQueue() {}
 
-        virtual ~State() = default;
+        virtual ~State() override = default;
 
         static ModuleState *factory(Module *, CRAXState *) {
             return new State();
@@ -74,7 +74,7 @@ public:
 
 
     DynamicRop();
-    virtual ~DynamicRop() = default;
+    virtual ~DynamicRop() override = default;
 
     virtual std::string toString() const override { return "DynamicRop"; }
 

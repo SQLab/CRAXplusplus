@@ -21,9 +21,8 @@
 #ifndef S2E_PLUGINS_CRAX_IO_STATES_SEARCHER_H
 #define S2E_PLUGINS_CRAX_IO_STATES_SEARCHER_H
 
-#include <s2e/S2EExecutionState.h>
-
 #include <klee/Searcher.h>
+#include <s2e/S2EExecutionState.h>
 
 #include <queue>
 
@@ -33,7 +32,7 @@ namespace s2e::plugins::crax {
 class IOStatesSearcher : public klee::Searcher {
 public:
     IOStatesSearcher();
-    virtual ~IOStatesSearcher() = default;
+    virtual ~IOStatesSearcher() override = default;
 
     virtual klee::ExecutionState &selectState() override;
 

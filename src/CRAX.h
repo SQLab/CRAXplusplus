@@ -57,7 +57,7 @@ class CRAXState : public PluginState {
 
 public:
     CRAXState() : m_moduleState() {}
-    virtual ~CRAXState() = default;
+    virtual ~CRAXState() override = default;
 
     static PluginState *factory(Plugin *, S2EExecutionState *) {
         return new CRAXState();

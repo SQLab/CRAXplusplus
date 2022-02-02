@@ -37,13 +37,13 @@ class CRAX;
 class StackPivot : public Technique {
 public:
     StackPivot() = default;
-    virtual ~StackPivot() = default;
+    virtual ~StackPivot() override = default;
 };
 
 class BasicStackPivot : public StackPivot {
 public:
     BasicStackPivot();
-    virtual ~BasicStackPivot() = default;
+    virtual ~BasicStackPivot() override = default;
 
     virtual void initialize() override {}
     virtual bool checkRequirements() const override;
@@ -57,7 +57,7 @@ public:
 class AdvancedStackPivot : public StackPivot {
 public:
     AdvancedStackPivot();
-    virtual ~AdvancedStackPivot() = default;
+    virtual ~AdvancedStackPivot() override = default;
 
     virtual void initialize() override;
     virtual bool checkRequirements() const override;

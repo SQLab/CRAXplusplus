@@ -70,23 +70,6 @@ public:
     uint64_t getModuleBaseAddress(uint64_t address) const;
     uint64_t getModuleEndAddress(uint64_t address) const;
 
-    // Because llvm::IntervalMap::const_iterator only defines `const operator*() const`,
-    // so the default std::find_if() can fail when it tries to dereference a
-    // reverse iterator in order to obtain the corresponding iterator.
-    // We adds two partial specializations to std::find_if() w.r.t. both
-    // const_reverse_iterator and reverse_iterator, preventing std::find_if()
-    // from dereferencing our reverse iterators directly and causing compilation error.
-    template <typename T, typename UnaryPredicate>
-    static T find_if(T first, T last, UnaryPredicate p) {
-        for (; first != last; ++first) {
-            auto it = std::next(first).base();
-            if (p(*it)) {
-                return first;
-            }
-        }
-        return last;
-    }
-
     static const std::string s_elfLabel;
     static const std::string s_libcLabel;
     static const std::string s_sharedLibraryLabel;
@@ -119,20 +102,43 @@ private:
 
 namespace std {
 
+// TL;DR - The following extension to stl bridges compatibility between
+//         llvm::IntervalMap, std::reverse_iterator and std::find_if()
+//
+// Because llvm::IntervalMap::const_iterator only defines `const operator*() const`,
+// so the default std::find_if() can fail when it tries to dereference a
+// reverse iterator in order to obtain the corresponding iterator.
+// For the details, see: /usr/include/c++/9/bits/stl_iterator.h
+//
+// We add two partial specializations to std::find_if() w.r.t. both
+// const_reverse_iterator and reverse_iterator, preventing std::find_if()
+// from dereferencing our reverse iterators directly and causing compilation error.
+
 using crax_vmmap = ::s2e::plugins::crax::VirtualMemoryMap;
 using crax_vmmap_const_rit = crax_vmmap::const_reverse_iterator;
 using crax_vmmap_rit = crax_vmmap::reverse_iterator;
 
+template <typename T, typename UnaryPredicate>
+T crax_vmmap_do_find_if(T first, T last, UnaryPredicate p) {
+    for (; first != last; ++first) {
+        auto it = std::next(first).base();
+        if (p(*it)) {
+            return first;
+        }
+    }
+    return last;
+}
+
 template <typename UnaryPredicate>
 crax_vmmap_const_rit
 find_if(crax_vmmap_const_rit first, crax_vmmap_const_rit last, UnaryPredicate p) {
-    return crax_vmmap::find_if(first, last, p);
+    return crax_vmmap_do_find_if(first, last, p);
 }
 
 template <typename UnaryPredicate>
 crax_vmmap_rit
 find_if(crax_vmmap_rit first, crax_vmmap_rit last, UnaryPredicate p) {
-    return crax_vmmap::find_if(first, last, p);
+    return crax_vmmap_do_find_if(first, last, p);
 }
 
 }  // namespace std

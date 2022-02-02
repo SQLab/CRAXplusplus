@@ -31,7 +31,15 @@
 
 namespace s2e::plugins::crax {
 
-// This is an implementation of "IOState" from balsn's LAEG.
+// This is an implementation of "IOState" from balsn's LAEG,
+// but adapted to S2E's multi-path execution environment.
+//
+// We renamed it to IOState"s" because an execution path
+// con contain more than just one I/O state.
+//
+// The sequence of I/O states of each execution path is
+// stored in the vector `IOStates::State::stateInfoList`.
+// Namely, each path has its own list of I/O states.
 class IOStates : public Module {
 public:
     enum LeakType {

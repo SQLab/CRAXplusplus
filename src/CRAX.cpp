@@ -174,7 +174,7 @@ void CRAX::onModuleLoad(S2EExecutionState *state,
     log<WARN>() << "onModuleLoad: " << md.Name << '\n';
 
     // Resolve ELF base if the target binary has PIE.
-    if (md.Name == "target" && m_exploit.getElf().getChecksec().hasPIE) {
+    if (md.Name == "target" && m_exploit.getElf().checksec.hasPIE) {
         assert(md.Sections.size());
 
         uint64_t elfBase = md.Sections.front().runtimeLoadBase;

@@ -57,17 +57,17 @@ IOStates::IOStates()
 
     // Determine which base address(es) must be leaked
     // according to checksec of the target binary.
-    const auto &checksec = g_crax->getExploit().getElf().getChecksec();
-    if (checksec.hasCanary) {
+    const ELF &elf = g_crax->getExploit().getElf();
+    if (elf.checksec.hasCanary) {
         m_leakTargets.push_back(IOStates::LeakType::CANARY);
     }
-    if (checksec.hasPIE) {
+    if (elf.checksec.hasPIE) {
         m_leakTargets.push_back(IOStates::LeakType::CODE);
     }
     // XXX: ASLR -> libc
 
     // If stack canary is enabled, install a hook to intercept canary values.
-    if (checksec.hasCanary) {
+    if (elf.checksec.hasCanary) {
         g_crax->afterInstruction.connect(
                 sigc::mem_fun(*this, &IOStates::maybeInterceptStackCanary));
 
@@ -77,7 +77,7 @@ IOStates::IOStates()
 
     // If either stack canary or PIE is enabled, install a hook
     // to suppress native S2E state forks in order to avoid state explosion.
-    if (checksec.hasCanary || checksec.hasPIE) {
+    if (elf.checksec.hasCanary || elf.checksec.hasPIE) {
         g_crax->onStateForkModuleDecide.connect(
                 sigc::mem_fun(*this, &IOStates::onStateForkModuleDecide));
     }
@@ -121,7 +121,7 @@ void IOStates::initUserSpecifiedStateInfoList() {
 
         } else if (s[0] == 'o') {
             OutputStateInfo stateInfo;
-            stateInfo.valid = false;
+            stateInfo.isInteresting = false;
             if (s.size() > 1) {
                 stateInfo.bufIndex = std::stoull(s.substr(1));
             }
@@ -259,17 +259,17 @@ void IOStates::outputStateHook(S2EExecutionState *outputState,
         OutputStateInfo stateInfo
             = std::get<OutputStateInfo>(m_userSpecifiedStateInfoList[idx]);
 
-        if (stateInfo.valid) {
+        if (stateInfo.isInteresting) {
             assert(stateInfo.bufIndex == outputStateInfoList.front().bufIndex &&
                    "OutputStateInfo bufIndex mismatch!?");
         }
     }
 
     OutputStateInfo stateInfo;
-    stateInfo.valid = false;
+    stateInfo.isInteresting = false;
 
     if (outputStateInfoList.size()) {
-        stateInfo.valid = true;
+        stateInfo.isInteresting = true;
         stateInfo.bufIndex = outputStateInfoList.front().bufIndex;
         stateInfo.baseOffset = outputStateInfoList.front().baseOffset;
         stateInfo.leakType = outputStateInfoList.front().leakType;
@@ -392,7 +392,7 @@ IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len)
     for (uint64_t i = 0; i < len; i += 8) {
         uint64_t value = u64(mem().readConcrete(buf + i, 8, /*concretize=*/false));
         //log<WARN>() << "addr = " << hexval(buf + i) << " value = " << hexval(value) << '\n';
-        if (g_crax->getExploit().getElf().getChecksec().hasCanary && value == canary) {
+        if (g_crax->getExploit().getElf().checksec.hasCanary && value == canary) {
             bufInfo[LeakType::CANARY].push_back(i);
         } else {
             foreach2 (it, mapInfo.begin(), mapInfo.end()) {
@@ -416,9 +416,9 @@ IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len)
         uint64_t value = u64(mem().readConcrete(buf + i, 8, /*concretize=*/false));
         //log<WARN>() << "addr = " << hexval(buf + i) << " value = " << hexval(value) << '\n';
         IOStates::OutputStateInfo info;
-        info.valid = true;
+        info.isInteresting = true;
 
-        if (g_crax->getExploit().getElf().getChecksec().hasCanary && (value & ~0xff) == canary) {
+        if (g_crax->getExploit().getElf().checksec.hasCanary && (value & ~0xff) == canary) {
             info.bufIndex = i + 1;
             info.baseOffset = 0;
             info.leakType = LeakType::CANARY;
@@ -479,7 +479,7 @@ std::string IOStates::State::toString() const {
             ret += std::to_string(stateInfo->offset);
         } else if (const auto stateInfo = std::get_if<OutputStateInfo>(&info)) {
             ret += 'o';
-            if (stateInfo->valid) {
+            if (stateInfo->isInteresting) {
                 ret += std::to_string(stateInfo->bufIndex);
             }
         }

@@ -35,8 +35,8 @@ namespace py = pybind11;
 namespace s2e::plugins::crax {
 
 ELF::ELF(const std::string &filename)
-    : m_elf(CRAX::s_pwnlib.attr("elf").attr("ELF").call(filename)),
-      m_checksec(filename),
+    : checksec(filename),
+      m_elf(CRAX::s_pwnlib.attr("elf").attr("ELF").call(filename)),
       m_symbols(symbols(/*refetch=*/true)),
       m_got(got(/*refetch=*/true)),
       m_functions(functions(/*refetch=*/true)),
@@ -81,8 +81,8 @@ uint64_t ELF::bss() const {
 
 
 uint64_t ELF::getRuntimeAddress(uint64_t offset) const {
-    assert((!m_checksec.hasPIE || m_base) && "PIE enabled, but `m_base` uninitialized!");
-    return (!m_checksec.hasPIE) ? offset : m_base + offset;
+    assert((!checksec.hasPIE || m_base) && "PIE enabled, but `m_base` uninitialized!");
+    return (!checksec.hasPIE) ? offset : m_base + offset;
 }
 
 uint64_t ELF::getRuntimeAddress(const std::string &symbol) const {

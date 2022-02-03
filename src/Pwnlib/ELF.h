@@ -37,7 +37,6 @@ public:
 
     struct Checksec {
         Checksec(const std::string &filename);
-
         bool hasCanary;
         bool hasFullRELRO;
         bool hasNX;
@@ -54,13 +53,13 @@ public:
     uint64_t getRuntimeAddress(const std::string &symbol) const;
     uint64_t convertAddrToNewBase(uint64_t addr, uint64_t newBase) const;
 
-    const ELF::Checksec &getChecksec() const { return m_checksec; }
     uint64_t getBase() const { return m_base; }
     void setBase(uint64_t base) { m_base = base; }
 
+    const Checksec checksec;
+
 private:
     pybind11::object m_elf;
-    ELF::Checksec m_checksec;
 
     const SymbolMap m_symbols;
     const SymbolMap m_got;

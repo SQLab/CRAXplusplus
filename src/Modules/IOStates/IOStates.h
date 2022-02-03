@@ -57,7 +57,7 @@ public:
     };
 
     struct OutputStateInfo {
-        bool valid;
+        bool isInteresting;
         uint64_t bufIndex;
         uint64_t baseOffset;
         LeakType leakType;

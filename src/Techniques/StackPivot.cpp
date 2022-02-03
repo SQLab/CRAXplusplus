@@ -210,7 +210,7 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
 
     // When PIE is enabled, _DYNAMIC doesn't contain the runtime address of _fini,
     // so we have to manually write one (in this case, we'll write one in .bss)
-    if (g_crax->getExploit().getElf().getChecksec().hasPIE) {
+    if (g_crax->getExploit().getElf().checksec.hasPIE) {
         auto &exploit = g_crax->getExploit();
         uint64_t elfBase = exploit.getElf().getBase();
         uint64_t pivotDest = elfBase + exploit.getSymbolValue("pivot_dest");

@@ -105,7 +105,7 @@ void VirtualMemoryMap::probeLibcRegion(S2EExecutionState *state) {
 
     static const char *s = "__libc_start_main";
 
-    const auto &elf = g_crax->getExploit().getElf();
+    const ELF &elf = g_crax->getExploit().getElf();
     assert(elf.got().size() && "Global offset table is empty?");
 
     // We assume that __libc_start_main@libc has been resolved,
@@ -121,7 +121,7 @@ void VirtualMemoryMap::probeLibcRegion(S2EExecutionState *state) {
     assert(getModuleBaseAddress(value) != elf.getBase() &&
            "__libc_start_main not resolved yet?");
 
-    auto &libc = g_crax->getExploit().getLibc();
+    ELF &libc = g_crax->getExploit().getLibc();
     uint64_t libcBase = value - libc.symbols().at(s);
 
     log<WARN>() << "libc base address: " << hexval(libcBase) << '\n';

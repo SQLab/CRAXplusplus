@@ -21,6 +21,7 @@
 #ifndef S2E_PLUGINS_CRAX_DYNAMIC_ROP_H
 #define S2E_PLUGINS_CRAX_DYNAMIC_ROP_H
 
+#include <llvm/ADT/SmallVector.h>
 #include <s2e/Plugins/CRAX/API/Memory.h>
 #include <s2e/Plugins/CRAX/API/Register.h>
 #include <s2e/Plugins/CRAX/Modules/Module.h>
@@ -49,6 +50,7 @@ public:
     };
 
     using Constraint = std::variant<RegisterConstraint, MemoryConstraint>;
+    using ConstraintGroup = llvm::SmallVector<Constraint, 8>;
 
 
     class State : public ModuleState {
@@ -69,7 +71,7 @@ public:
         }
 
         bool initialized;
-        std::queue<std::vector<Constraint>> constraintsQueue;
+        std::queue<ConstraintGroup> constraintsQueue;
     };
 
 
@@ -78,19 +80,21 @@ public:
 
     virtual std::string toString() const override { return "DynamicRop"; }
 
-    // Dynamic ROP constraint builder API
+    // Add one constraint to `m_constraintGroup`.
     DynamicRop &addConstraint(const Constraint &c);
-    void scheduleConstraints();
 
-    void applyNextConstraint();
+    // Commit all the constraints in `m_constraintGroup`,
+    // appending them to `modState->constraintsQueue`.
+    void commitConstraints();
+
+    // Fetch the first element in `modState->constraintsQueue`,
+    // and add all the constraints to `state`.
+    void applyNextConstraintGroup(S2EExecutionState &state);
 
 private:
     void beforeExploitGeneration(S2EExecutionState *state);
 
-    // XXX: This is temporary because current vmmap API is lame.
-    bool doesAddrBelongToElf(const ELF &elf, uint64_t addr) const;
-
-    std::vector<Constraint> m_constraints;
+    ConstraintGroup m_currentConstraintGroup;
 };
 
 }  // namespace s2e::plugins::crax

@@ -113,10 +113,12 @@ AdvancedStackPivot::AdvancedStackPivot()
 
 
 void AdvancedStackPivot::initialize() {
+    S2EExecutionState *state = g_crax->getCurrentState();
+
     auto __dynRop = dynamic_cast<DynamicRop *>(g_crax->getModule("DynamicRop"));
     assert(__dynRop && "AdvancedStackPivot relies on DynamicRop module");
 
-    auto modState = g_crax->getPluginModuleState(g_crax->getCurrentState(), __dynRop);
+    auto modState = g_crax->getPluginModuleState(state, __dynRop);
     if (modState->initialized) {
         return;
     }
@@ -138,14 +140,14 @@ void AdvancedStackPivot::initialize() {
 
     dynRop.addConstraint(DynamicRop::RegisterConstraint { Register::X64::RBP, rbp1 })
         .addConstraint(DynamicRop::RegisterConstraint { Register::X64::RIP, rip1 })
-        .scheduleConstraints();
+        .commitConstraints();
 
     ref<Expr> rbp2 = ConstantExpr::create(pivotDest + 8 + rbpOffset, Expr::Int64);
     ref<Expr> rip2 = ConstantExpr::create(ret2LeaRbp, Expr::Int64);
 
     dynRop.addConstraint(DynamicRop::RegisterConstraint { Register::X64::RBP, rbp2 })
         .addConstraint(DynamicRop::RegisterConstraint { Register::X64::RIP, rip2 })
-        .scheduleConstraints();
+        .commitConstraints();
 
     // For debugging convenience, you may uncomment the following line :^)
     //g_crax->setShowInstructions(true);
@@ -154,7 +156,7 @@ void AdvancedStackPivot::initialize() {
     // This is our last chance to stop it. This method will throw a
     // CpuExitException() and force S2E to re-execute at the PC we specified,
     // allowing us to perform Dynamic ROP.
-    dynRop.applyNextConstraint();
+    dynRop.applyNextConstraintGroup(*state);
 }
 
 bool AdvancedStackPivot::checkRequirements() const {

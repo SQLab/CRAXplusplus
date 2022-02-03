@@ -28,26 +28,28 @@ namespace s2e::plugins::crax {
 
 DynamicRop::DynamicRop()
     : Module(),
-      m_constraints() {
+      m_currentConstraintGroup() {
     g_crax->beforeExploitGeneration.connect(
             sigc::mem_fun(*this, &DynamicRop::beforeExploitGeneration));
 }
 
 
 DynamicRop &DynamicRop::addConstraint(const DynamicRop::Constraint &c) {
-    m_constraints.push_back(c);
+    m_currentConstraintGroup.push_back(c);
     return *this;
 }
 
-void DynamicRop::scheduleConstraints() {
+void DynamicRop::commitConstraints() {
     auto modState = g_crax->getPluginModuleState(g_crax->getCurrentState(), this);
-    modState->constraintsQueue.push(std::move(m_constraints));
+    assert(modState);
+
+    modState->constraintsQueue.push(std::move(m_currentConstraintGroup));
 }
 
 
-void DynamicRop::applyNextConstraint() {
-    S2EExecutionState *state = g_crax->getCurrentState();
-    auto modState = g_crax->getPluginModuleState(state, this);
+void DynamicRop::applyNextConstraintGroup(S2EExecutionState &state) {
+    auto modState = g_crax->getPluginModuleState(&state, this);
+    assert(modState);
 
     if (modState->constraintsQueue.empty()) {
         log<WARN>() << "No more dynamic ROP constraints to apply.\n";
@@ -56,7 +58,6 @@ void DynamicRop::applyNextConstraint() {
 
     bool ok;
     bool hasRipConstraint = false;
-
     const ELF &elf = g_crax->getExploit().getElf();
 
     log<WARN>() << "Adding dynamic ROP constraints...\n";
@@ -68,23 +69,30 @@ void DynamicRop::applyNextConstraint() {
             ref<Expr> e1 = rc->expr;
             ref<Expr> e2 = rc->expr;
 
-            if (g_crax->getUserSpecifiedElfBase() &&
-                doesAddrBelongToElf(elf, ce->getZExtValue())) {
+            // Try to rebase address `ce` to the user-specified elf base.
+            // XXX: Currently it only checks whether `ce` is an ELF address.
+            // We should probably do this for any other module/region.
+            const auto &mapInfo = mem(&state).getMapInfo();
+            auto it = mapInfo.find(ce->getZExtValue());
+            bool isElfAddress = it != mapInfo.end() &&
+                                (*it)->moduleName == VirtualMemoryMap::s_elfLabel;
+
+            if (g_crax->getUserSpecifiedElfBase() && isElfAddress) {
                 uint64_t userElfBase = g_crax->getUserSpecifiedElfBase();
                 uint64_t rebasedAddress = elf.rebaseAddress(ce->getZExtValue(), userElfBase);
                 e1 = ConstantExpr::create(rebasedAddress, Expr::Int64);
             }
 
-            ok = RopChainBuilder::addRegisterConstraint(*state, rc->reg, e1);
+            ok = RopChainBuilder::addRegisterConstraint(state, rc->reg, e1);
             reg().writeSymbolic(rc->reg, e2);
 
         } else if (const auto mc = std::get_if<MemoryConstraint>(&c)) {
-            ok = RopChainBuilder::addMemoryConstraint(*state, mc->addr, mc->expr);
+            ok = RopChainBuilder::addMemoryConstraint(state, mc->addr, mc->expr);
             mem().writeSymbolic(mc->addr, mc->expr);
         }
 
         if (!ok) {
-            g_s2e->getExecutor()->terminateState(*state, "Dynamic ROP failed");
+            g_s2e->getExecutor()->terminateState(state, "Dynamic ROP failed");
         }
     }
 
@@ -98,13 +106,8 @@ void DynamicRop::applyNextConstraint() {
 }
 
 void DynamicRop::beforeExploitGeneration(S2EExecutionState *state) {
-    applyNextConstraint();
-}
-
-
-// XXX: This is temporary fuck it
-bool DynamicRop::doesAddrBelongToElf(const ELF &elf, uint64_t addr) const {
-    return addr >= elf.getBase() && addr <= elf.getBase() + 0x5000;
+    assert(state);
+    applyNextConstraintGroup(*state);
 }
 
 }  // namespace s2e::plugins::crax

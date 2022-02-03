@@ -130,6 +130,7 @@ public:
     }
 
     // This is a shortcut to perform `getPluginState()` + `getModuleState()`.
+    // The returned `modState` is guaranteed to be a non-null pointer.
     template <typename T>
     [[nodiscard]]
     typename T::State *getPluginModuleState(S2EExecutionState *state,

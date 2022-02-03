@@ -72,7 +72,7 @@ public:
 
     // Get all the mapped memory region.
     [[nodiscard]]
-    const VirtualMemoryMap &getMapInfo() const;
+    const VirtualMemoryMap &vmmap() const;
 
     // Show all the mapped memory region.
     void showMapInfo() const;

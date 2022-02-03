@@ -385,7 +385,7 @@ void IOStates::beforeExploitGeneration(S2EExecutionState *state) {
 
 std::array<std::vector<uint64_t>, IOStates::LeakType::LAST>
 IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len) {
-    const auto &mapInfo = mem().getMapInfo();
+    const auto &vmmap = mem(inputState).vmmap();
     uint64_t canary = m_canary;
     std::array<std::vector<uint64_t>, IOStates::LeakType::LAST> bufInfo;
 
@@ -395,7 +395,7 @@ IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len)
         if (g_crax->getExploit().getElf().checksec.hasCanary && value == canary) {
             bufInfo[LeakType::CANARY].push_back(i);
         } else {
-            foreach2 (it, mapInfo.begin(), mapInfo.end()) {
+            foreach2 (it, vmmap.begin(), vmmap.end()) {
                 if (value >= it.start() && value <= it.stop()) {
                     RegionDescriptorPtr region = *it;
                     bufInfo[getLeakType(region->moduleName)].push_back(i);
@@ -408,7 +408,7 @@ IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len)
 
 std::vector<IOStates::OutputStateInfo>
 IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len) {
-    const auto &mapInfo = mem().getMapInfo();
+    const auto &vmmap = mem(outputState).vmmap();
     uint64_t canary = m_canary;
     std::vector<IOStates::OutputStateInfo> leakInfo;
 
@@ -424,11 +424,11 @@ IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len)
             info.leakType = LeakType::CANARY;
             leakInfo.push_back(info);
         } else {
-            foreach2 (it, mapInfo.begin(), mapInfo.end()) {
+            foreach2 (it, vmmap.begin(), vmmap.end()) {
                 if (value >= it.start() && value <= it.stop()) {
                     RegionDescriptorPtr region = *it;
                     info.bufIndex = i;
-                    info.baseOffset = value - mapInfo.getModuleBaseAddress(value);
+                    info.baseOffset = value - vmmap.getModuleBaseAddress(value);
                     info.leakType = getLeakType(region->moduleName);
                     leakInfo.push_back(info);
                 }

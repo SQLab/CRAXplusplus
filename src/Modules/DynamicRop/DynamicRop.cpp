@@ -72,9 +72,9 @@ void DynamicRop::applyNextConstraintGroup(S2EExecutionState &state) {
             // Try to rebase address `ce` to the user-specified elf base.
             // XXX: Currently it only checks whether `ce` is an ELF address.
             // We should probably do this for any other module/region.
-            const auto &mapInfo = mem(&state).getMapInfo();
-            auto it = mapInfo.find(ce->getZExtValue());
-            bool isElfAddress = it != mapInfo.end() &&
+            const auto &vmmap = mem(&state).vmmap();
+            auto it = vmmap.find(ce->getZExtValue());
+            bool isElfAddress = it != vmmap.end() &&
                                 (*it)->moduleName == VirtualMemoryMap::s_elfLabel;
 
             if (g_crax->getUserSpecifiedElfBase() && isElfAddress) {

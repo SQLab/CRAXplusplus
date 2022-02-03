@@ -98,11 +98,11 @@ bool Memory::isMapped(uint64_t virtAddr) const {
 }
 
 std::vector<uint64_t> Memory::search(const std::vector<uint8_t> &needle) const {
-    const auto &mapInfo = getMapInfo();
+    const auto &_vmmap = vmmap();
     std::vector<uint64_t> ret;
 
     // Iterate over all the mapped memory regions.
-    foreach2 (it, mapInfo.begin(), mapInfo.end()) {
+    foreach2 (it, _vmmap.begin(), _vmmap.end()) {
         // XXX: Some regions might be unaccessible even though it's mapped,
         // which I believe this is a bug in S2E. Just in case this happens,
         // we'll use `Memory::isMapped()` to scan through every address
@@ -144,7 +144,7 @@ Memory::getSymbolicMemory(uint64_t start, uint64_t end) const {
     return {};
 }
 
-const VirtualMemoryMap &Memory::getMapInfo() const {
+const VirtualMemoryMap &Memory::vmmap() const {
     m_vmmap.rebuild(m_state);
     return m_vmmap;
 }

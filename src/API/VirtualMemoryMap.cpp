@@ -208,7 +208,6 @@ void VirtualMemoryMap::fillStackRegion(S2EExecutionState *state) {
 
 void VirtualMemoryMap::dump(S2EExecutionState *state) {
     auto &os = log<WARN>(state);
-
     os << "Dumping memory map...\n"
         << "--------------- [VMMAP] ---------------\n"
         << "Start\t\tEnd\t\tPerm\tModule\n";

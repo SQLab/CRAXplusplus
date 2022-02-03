@@ -20,6 +20,7 @@
 
 #include <s2e/Plugins/CRAX/CRAX.h>
 #include <s2e/Plugins/CRAX/Expr/BinaryExprEvaluator.h>
+#include <s2e/Plugins/CRAX/InputStream.h>
 
 #include "LeakBasedCoreGenerator.h"
 
@@ -30,6 +31,7 @@ namespace s2e::plugins::crax {
 void LeakBasedCoreGenerator::generateMainFunction(S2EExecutionState *state,
                                                   std::vector<RopSubchain> ropChain,
                                                   std::vector<uint8_t> stage1) {
+    InputStream is(stage1);
     Exploit &exploit = g_crax->getExploit();
     const auto &checksec = exploit.getElf().getChecksec();
 
@@ -38,11 +40,6 @@ void LeakBasedCoreGenerator::generateMainFunction(S2EExecutionState *state,
 
     auto modState = g_crax->getPluginModuleState(state, iostates);
     assert(modState);
-
-    // The number of bytes already removed from the input stream.
-    // XXX: encapsulate this...
-    uint64_t nrConsumedBytes = 0;
-    uint64_t nrTotalBytes = 0;
 
     for (size_t i = 0; i < modState->stateInfoList.size(); i++) {
         using InputStateInfo = IOStates::InputStateInfo;
@@ -55,47 +52,45 @@ void LeakBasedCoreGenerator::generateMainFunction(S2EExecutionState *state,
             if (i != modState->lastInputStateInfoIdx &&
                 modState->lastInputStateInfoIdxBeforeFirstSymbolicRip != -1 &&
                 i >= modState->lastInputStateInfoIdxBeforeFirstSymbolicRip) {
-                exploit.writeline(format("# input state (offset = %d), skipping", stateInfo->offset));
-                nrTotalBytes += stateInfo->offset;
+                exploit.writeline(format("# input state (offset = %d), skipped", stateInfo->offset));
+
+                (void) is.skip(stateInfo->offset);
                 continue;
             }
 
             exploit.writeline(format("# input state (offset = %d)", stateInfo->offset));
 
-            // XXX: remove inputstateinfo->buf
-            std::string byteString = toByteString(stage1.begin() + nrConsumedBytes,
-                                                  stage1.begin() + nrConsumedBytes + stateInfo->offset);
 
             if (i != modState->lastInputStateInfoIdx) {
+                llvm::ArrayRef<uint8_t> bytes = is.read(stateInfo->offset);
+                std::string byteString = toByteString(bytes.begin(), bytes.end());
+
                 exploit.writeline(format("proc.send(%s)", byteString.c_str()));
-                nrConsumedBytes += stateInfo->offset;
-                nrTotalBytes += stateInfo->offset;
                 continue;
             }
 
-            exploit.writeline("# rop chain");
+            exploit.writeline("# input state (rop chain begin)");
             for (size_t j = 0; j < ropChain.size(); j++) {
                 if (j == 0) {
                     if (checksec.hasCanary || checksec.hasPIE) {
-                        std::string fuck;
-                        if (nrConsumedBytes == nrTotalBytes) {
-                            fuck = format("payload  = solve_stage1(canary, elf_base, '%s')[%d:]",
-                                          modState->toString().c_str(), nrConsumedBytes);
+                        std::string s = format("payload  = solve_stage1(canary, elf_base, '%s')",
+                                               modState->toString().c_str());
+
+                        s += format("[%d:", is.getNrBytesRead());
+
+                        if (!is.getNrBytesSkipped()) {
+                            s += ']';
                         } else {
-                            fuck = format("payload  = solve_stage1(canary, elf_base, '%s')[%d:%d]",
-                                          modState->toString().c_str(), nrConsumedBytes, nrTotalBytes);
+                            s += format("%d]", is.getNrBytesConsumed());
                         }
-                        exploit.writeline(fuck);
+
+                        exploit.writeline(s);
                         exploit.flushRopPayload();
 
                     } else if (ropChain[0].size()) {
                         assert(ropChain[0].size() == 1);
-
-                        auto bve = dyn_cast<ByteVectorExpr>(ropChain[0][0]);
-                        stage1 = bve->getBytes();
-                        stage1 = std::vector<uint8_t>(stage1.begin() + nrConsumedBytes, stage1.end());
-
-                        std::string s = evaluate<std::string>(ByteVectorExpr::create(stage1));
+                        llvm::ArrayRef<uint8_t> bytes = is.read(stateInfo->offset);
+                        std::string s = evaluate<std::string>(ByteVectorExpr::create(bytes));
                         exploit.appendRopPayload(s);
                         exploit.flushRopPayload();
                     }

@@ -50,7 +50,7 @@ void DynamicRop::applyNextConstraint() {
     auto modState = g_crax->getPluginModuleState(state, this);
 
     if (modState->constraintsQueue.empty()) {
-        log<WARN>() << "modState->constraintsQueue empty...\n";
+        log<WARN>() << "No more dynamic ROP constraints to apply.\n";
         return;
     }
 
@@ -59,7 +59,7 @@ void DynamicRop::applyNextConstraint() {
     const auto &elf = g_crax->getExploit().getElf();
     const auto &rop = g_crax->getExploitGenerator().getRopChainBuilder();
 
-    log<WARN>() << "Adding constraints from modState->constraintsQueue...\n";
+    log<WARN>() << "Adding dynamic ROP constraints...\n";
     for (const auto &c : modState->constraintsQueue.front()) {
         if (const auto rc = std::get_if<RegisterConstraint>(&c)) {
             hasControlFlowChanged |= rc->reg == Register::X64::RIP;
@@ -71,8 +71,8 @@ void DynamicRop::applyNextConstraint() {
             if (g_crax->getUserSpecifiedElfBase() &&
                 doesAddrBelongToElf(elf, ce->getZExtValue())) {
                 uint64_t userElfBase = g_crax->getUserSpecifiedElfBase();
-                uint64_t relocatedAddr = elf.convertAddrToNewBase(ce->getZExtValue(), userElfBase);
-                e1 = ConstantExpr::create(relocatedAddr, Expr::Int64);
+                uint64_t rebasedAddress = elf.rebaseAddress(ce->getZExtValue(), userElfBase);
+                e1 = ConstantExpr::create(rebasedAddress, Expr::Int64);
             }
 
             ok = rop.addRegisterConstraint(rc->reg, e1);

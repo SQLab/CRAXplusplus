@@ -51,7 +51,7 @@ public:
     uint64_t bss() const;
     uint64_t getRuntimeAddress(uint64_t offset) const;
     uint64_t getRuntimeAddress(const std::string &symbol) const;
-    uint64_t convertAddrToNewBase(uint64_t addr, uint64_t newBase) const;
+    uint64_t rebaseAddress(uint64_t address, uint64_t newBase) const;
 
     uint64_t getBase() const { return m_base; }
     void setBase(uint64_t base) { m_base = base; }

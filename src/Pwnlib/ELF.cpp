@@ -90,9 +90,9 @@ uint64_t ELF::getRuntimeAddress(const std::string &symbol) const {
     return getRuntimeAddress(symbols()[symbol]);
 }
 
-uint64_t ELF::convertAddrToNewBase(uint64_t addr, uint64_t newBase) const {
-    assert(addr >= m_base);
-    return newBase + addr - m_base;
+uint64_t ELF::rebaseAddress(uint64_t address, uint64_t newBase) const {
+    assert(address >= m_base);
+    return newBase + address - m_base;
 }
 
 

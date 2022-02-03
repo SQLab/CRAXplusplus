@@ -44,6 +44,7 @@ struct IOStateInfoVisitor {
     void operator()(const InputStateInfo &stateInfo);
     void operator()(const OutputStateInfo &stateInfo);
 
+    bool shouldSkipInputState() const;
     void handleStage1(const InputStateInfo &stateInfo);
 
     // Extra parameters
@@ -57,11 +58,20 @@ struct IOStateInfoVisitor {
 
 
 void IOStateInfoVisitor::operator()(const InputStateInfo &stateInfo) {
-    if (i != modState.lastInputStateInfoIdx &&
-        modState.lastInputStateInfoIdxBeforeFirstSymbolicRip != -1 &&
-        i >= modState.lastInputStateInfoIdxBeforeFirstSymbolicRip) {
+    // This bridges compatibility between IOStates and DynamicRop modules.
+    // DynamicRop starts after the target program's RIP becomes symbolic
+    // for the first time, and then the DynamicRop module adds constraints
+    // to that execution state, making the target program perform ROP in S2E.
+    // 
+    // During dynamic ROP, the target program may trigger extra I/O states
+    // that shouldn't occur during normal program execution. A good example is
+    // that we make make it return to somewhere in main() again after RIP
+    // has become symbolic for the first time.
+    //
+    // If all required information have already been leaked, then we should
+    // just ignore these extra I/O states (especially the input states).
+    if (shouldSkipInputState()) {
         exploit.writeline(format("# input state (offset = %d), skipped", stateInfo.offset));
-
         static_cast<void>(inputStream.skip(stateInfo.offset));
         return;
     }
@@ -88,6 +98,14 @@ void IOStateInfoVisitor::operator()(const InputStateInfo &stateInfo) {
     }
 }
 
+bool IOStateInfoVisitor::shouldSkipInputState() const {
+    // This shouldn't happen, but...
+    assert(-1 != modState.lastInputStateInfoIdxBeforeFirstSymbolicRip);
+
+    return i != modState.lastInputStateInfoIdx &&
+           i >= modState.lastInputStateInfoIdxBeforeFirstSymbolicRip;
+}
+
 void IOStateInfoVisitor::handleStage1(const InputStateInfo &stateInfo) {
     std::string s;
 
@@ -97,11 +115,11 @@ void IOStateInfoVisitor::handleStage1(const InputStateInfo &stateInfo) {
                "ropChain[0] must only contain a ByteVectorExpr");
 
         llvm::ArrayRef<uint8_t> bytes = inputStream.read(stateInfo.offset);
-        s = evaluate<std::string>(ByteVectorExpr::create(bytes));
+        s += evaluate<std::string>(ByteVectorExpr::create(bytes));
     } else {
         // If either canary or PIE is enabled, stage1 needs to be solved
         // on the fly at exploitation time.
-        s  = format("payload  = solve_stage1(canary, elf_base, '%s')", modState.toString().c_str());
+        s += format("solve_stage1(canary, elf_base, '%s')", modState.toString().c_str());
         s += format("[%d:", inputStream.getNrBytesRead());
 
         if (inputStream.getNrBytesSkipped()) {
@@ -110,7 +128,7 @@ void IOStateInfoVisitor::handleStage1(const InputStateInfo &stateInfo) {
         s += ']';
     }
 
-    exploit.writeline(s);
+    exploit.appendRopPayload(s);
     exploit.flushRopPayload();
 }
 

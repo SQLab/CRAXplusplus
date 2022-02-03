@@ -87,7 +87,7 @@ IOStates::IOStates()
 }
 
 bool IOStates::checkRequirements() const {
-    auto modState = g_crax->getPluginModuleState(g_crax->getCurrentState(), this);
+    auto modState = g_crax->getModuleState(g_crax->getCurrentState(), this);
     modState->dump();
 
     if (modState->currentLeakTargetIdx < m_leakTargets.size()) {
@@ -152,7 +152,7 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
         os << '\n';
     }
 
-    auto modState = g_crax->getPluginModuleState(inputState, this);
+    auto modState = g_crax->getModuleState(inputState, this);
 
     if (modState->currentLeakTargetIdx >= m_leakTargets.size()) {
         log<WARN>() << "No more leak targets :^)\n";
@@ -206,7 +206,7 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
         ref<Expr> ce = ConstantExpr::create(offset, Expr::Int64);
         reg(forkedState).writeSymbolic(Register::X64::RDX, ce);
 
-        auto forkedModState = g_crax->getPluginModuleState(forkedState, this);
+        auto forkedModState = g_crax->getModuleState(forkedState, this);
         forkedModState->leakableOffset = offset;
     }
 }
@@ -219,7 +219,7 @@ void IOStates::inputStateHookBottomHalf(S2EExecutionState *inputState,
 
     g_crax->setCurrentState(inputState);
 
-    auto modState = g_crax->getPluginModuleState(inputState, this);
+    auto modState = g_crax->getModuleState(inputState, this);
 
     InputStateInfo stateInfo;
 
@@ -246,7 +246,7 @@ void IOStates::outputStateHook(S2EExecutionState *outputState,
     g_crax->setCurrentState(outputState);
 
     auto outputStateInfoList = detectLeak(outputState, syscall.arg2, syscall.arg3);
-    auto modState = g_crax->getPluginModuleState(outputState, this);
+    auto modState = g_crax->getModuleState(outputState, this);
 
     // If the user has specified a state info list in s2e-config.lua,
     // then we should check if the leaked data's offset is really the same
@@ -369,7 +369,7 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
 }
 
 void IOStates::beforeExploitGeneration(S2EExecutionState *state) {
-    auto modState = g_crax->getPluginModuleState(state, this);
+    auto modState = g_crax->getModuleState(state, this);
 
     if (modState->lastInputStateInfoIdxBeforeFirstSymbolicRip == -1) {
         for (int i = modState->stateInfoList.size() - 1; i >= 0; i--) {

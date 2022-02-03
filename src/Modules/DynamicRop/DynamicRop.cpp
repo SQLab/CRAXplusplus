@@ -40,7 +40,7 @@ DynamicRop &DynamicRop::addConstraint(const DynamicRop::Constraint &c) {
 }
 
 void DynamicRop::commitConstraints() {
-    auto modState = g_crax->getPluginModuleState(g_crax->getCurrentState(), this);
+    auto modState = g_crax->getModuleState(g_crax->getCurrentState(), this);
     assert(modState);
 
     modState->constraintsQueue.push(std::move(m_currentConstraintGroup));
@@ -48,7 +48,7 @@ void DynamicRop::commitConstraints() {
 
 
 void DynamicRop::applyNextConstraintGroup(S2EExecutionState &state) {
-    auto modState = g_crax->getPluginModuleState(&state, this);
+    auto modState = g_crax->getModuleState(&state, this);
     assert(modState);
 
     if (modState->constraintsQueue.empty()) {

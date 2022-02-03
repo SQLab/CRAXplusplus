@@ -118,7 +118,9 @@ void AdvancedStackPivot::initialize() {
     auto __dynRop = dynamic_cast<DynamicRop *>(g_crax->getModule("DynamicRop"));
     assert(__dynRop && "AdvancedStackPivot relies on DynamicRop module");
 
-    auto modState = g_crax->getPluginModuleState(state, __dynRop);
+    auto modState = g_crax->getModuleState(state, __dynRop);
+    assert(modState);
+
     if (modState->initialized) {
         return;
     }

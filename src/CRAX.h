@@ -129,12 +129,11 @@ public:
         return static_cast<CRAXState *>(Plugin::getPluginState(state, &CRAXState::factory));
     }
 
-    // This is a shortcut to perform `getPluginState()` + `getModuleState()`.
+    // This is a shortcut to perform `getPluginState()` + `plgState->getModuleState()`.
     // The returned `modState` is guaranteed to be a non-null pointer.
     template <typename T>
     [[nodiscard]]
-    typename T::State *getPluginModuleState(S2EExecutionState *state,
-                                            const T *mod) const {
+    typename T::State *getModuleState(S2EExecutionState *state, const T *mod) const {
         CRAXState *craxState = getPluginState(state);
         assert(craxState && "Unable to get plugin state for CRAX!?");
 

@@ -55,14 +55,14 @@ void DynamicRop::applyNextConstraint() {
     }
 
     bool ok;
-    bool hasControlFlowChanged = false;
-    const auto &elf = g_crax->getExploit().getElf();
-    const auto &rop = g_crax->getExploitGenerator().getRopChainBuilder();
+    bool hasRipConstraint = false;
+
+    const ELF &elf = g_crax->getExploit().getElf();
 
     log<WARN>() << "Adding dynamic ROP constraints...\n";
     for (const auto &c : modState->constraintsQueue.front()) {
         if (const auto rc = std::get_if<RegisterConstraint>(&c)) {
-            hasControlFlowChanged |= rc->reg == Register::X64::RIP;
+            hasRipConstraint |= rc->reg == Register::X64::RIP;
 
             auto ce = dyn_cast<ConstantExpr>(rc->expr);
             ref<Expr> e1 = rc->expr;
@@ -75,11 +75,11 @@ void DynamicRop::applyNextConstraint() {
                 e1 = ConstantExpr::create(rebasedAddress, Expr::Int64);
             }
 
-            ok = rop.addRegisterConstraint(rc->reg, e1);
+            ok = RopChainBuilder::addRegisterConstraint(*state, rc->reg, e1);
             reg().writeSymbolic(rc->reg, e2);
 
         } else if (const auto mc = std::get_if<MemoryConstraint>(&c)) {
-            ok = rop.addMemoryConstraint(mc->addr, mc->expr);
+            ok = RopChainBuilder::addMemoryConstraint(*state, mc->addr, mc->expr);
             mem().writeSymbolic(mc->addr, mc->expr);
         }
 
@@ -90,8 +90,9 @@ void DynamicRop::applyNextConstraint() {
 
     modState->constraintsQueue.pop();
 
-    // Invalidate current translation block.
-    if (hasControlFlowChanged) {
+    // To make the target program restart at the address we've specified,
+    // we need to throw a CpuExitException to invalidate the current translation block.
+    if (hasRipConstraint) {
         throw CpuExitException();
     }
 }

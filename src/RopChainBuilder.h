@@ -38,8 +38,6 @@ namespace s2e::plugins::crax {
 // 2. Direct mode (usually used after stack pivoting)
 
 // Forward declaration
-class CRAX;
-class Exploit;
 class Technique;
 
 class RopChainBuilder {
@@ -53,24 +51,31 @@ public:
 
     void reset();
 
-    [[nodiscard]]
-    bool addRegisterConstraint(Register::X64 r, const klee::ref<klee::Expr> &e) const;
-
-    [[nodiscard]]
-    bool addMemoryConstraint(uint64_t addr, const klee::ref<klee::Expr> &e) const;
-
-    [[nodiscard]]
-    ConcreteInputs getConcreteInputs() const;
-
-    [[nodiscard]]
-    ConcreteInput getOneConcreteInput() const;
-
-
+    // Chain the ROP subchain from the given technique
+    // with `m_ropChain`, the ROP chain we've built so far.
     [[nodiscard]]
     bool chain(const Technique &technique);
 
+    // Finalizes and returns the full ROP chain.
     [[nodiscard]]
     const std::vector<RopSubchain> &build();
+
+
+    [[nodiscard]]
+    static bool addRegisterConstraint(S2EExecutionState &state,
+                                      Register::X64 r,
+                                      const klee::ref<klee::Expr> &e);
+
+    [[nodiscard]]
+    static bool addMemoryConstraint(S2EExecutionState &state,
+                                    uint64_t addr,
+                                    const klee::ref<klee::Expr> &e);
+
+    [[nodiscard]]
+    static ConcreteInputs getConcreteInputs(S2EExecutionState &state);
+
+    [[nodiscard]]
+    static ConcreteInput getOneConcreteInput(S2EExecutionState &state);
 
 private:
     [[nodiscard]]

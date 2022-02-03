@@ -103,13 +103,18 @@ void VirtualMemoryMap::probeLibcRegion(S2EExecutionState *state) {
         return;
     }
 
-    static const char s[] = "__libc_start_main";
+    static const char *s = "__libc_start_main";
 
     const auto &elf = g_crax->getExploit().getElf();
     assert(elf.got().size() && "Global offset table is empty?");
 
-    // We assume that __libc_start_main has been resolved at this point...
-    uint64_t address = elf.getRuntimeAddress(s);
+    // We assume that __libc_start_main@libc has been resolved,
+    // and its runtime address has been filled in the GOT at this point...
+    auto it = elf.got().find(s);
+    assert(it != elf.got().end() && "__libc_start_main not present in GOT?");
+
+    // Read the runtime address of __libc_start_main@libc from GOT
+    uint64_t address = elf.getBase() + it->second;
     std::vector<uint8_t> bytes = mem(state).readConcrete(address, 8, /*concretize=*/false);
     uint64_t value = u64(bytes);
 
@@ -117,7 +122,7 @@ void VirtualMemoryMap::probeLibcRegion(S2EExecutionState *state) {
            "__libc_start_main not resolved yet?");
 
     auto &libc = g_crax->getExploit().getLibc();
-    uint64_t libcBase = value - libc.symbols()[s];
+    uint64_t libcBase = value - libc.symbols().at(s);
 
     log<WARN>() << "libc base address: " << hexval(libcBase) << '\n';
     libc.setBase(libcBase);

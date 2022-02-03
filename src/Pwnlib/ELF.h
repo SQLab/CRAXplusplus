@@ -45,9 +45,9 @@ public:
 
     ELF(const std::string &filename); 
 
-    SymbolMap symbols(bool refetch = false) const;
-    SymbolMap got(bool refetch = false) const;
-    FunctionMap functions(bool refetch = false) const;
+    const SymbolMap &symbols() const { return m_symbols; }
+    const SymbolMap &got() const { return m_got; }
+    const FunctionMap &functions() const { return m_functions; }
     uint64_t bss() const;
     uint64_t getRuntimeAddress(uint64_t offset) const;
     uint64_t getRuntimeAddress(const std::string &symbol) const;
@@ -60,10 +60,9 @@ public:
 
 private:
     pybind11::object m_elf;
-
-    const SymbolMap m_symbols;
-    const SymbolMap m_got;
-    const FunctionMap m_functions;
+    SymbolMap m_symbols;
+    SymbolMap m_got;
+    FunctionMap m_functions;
 
     uint64_t m_base;
 };

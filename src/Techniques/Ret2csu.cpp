@@ -155,7 +155,7 @@ void Ret2csu::parseLibcCsuInit() {
 
     // Since there are several variants of __libc_csu_init(),
     // we'll manually disassemble it and parse the offsets of its two gadgets.
-    m_libcCsuInit = elf.symbols()[s_libcCsuInit];
+    m_libcCsuInit = elf.symbols().at(s_libcCsuInit);
 
     // Convert instruction generator into a list of instructions.
     std::vector<Instruction> insns = disas().disasm(s_libcCsuInit);

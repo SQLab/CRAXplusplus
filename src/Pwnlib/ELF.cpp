@@ -37,48 +37,34 @@ namespace s2e::plugins::crax {
 ELF::ELF(const std::string &filename)
     : checksec(filename),
       m_elf(CRAX::s_pwnlib.attr("elf").attr("ELF").call(filename)),
-      m_symbols(symbols(/*refetch=*/true)),
-      m_got(got(/*refetch=*/true)),
-      m_functions(functions(/*refetch=*/true)),
-      m_base() {}
+      m_symbols(),
+      m_got(),
+      m_functions(),
+      m_base() {
+    m_symbols = m_elf.attr("symbols").cast<ELF::SymbolMap>();
+    m_got = m_elf.attr("got").cast<ELF::SymbolMap>();
 
-
-ELF::SymbolMap ELF::symbols(bool refetch) const {
-    return (!refetch) ? m_symbols : m_elf.attr("symbols").cast<ELF::SymbolMap>();
-}
-
-ELF::SymbolMap ELF::got(bool refetch) const {
-    return (!refetch) ? m_got : m_elf.attr("got").cast<ELF::SymbolMap>();
-}
-
-ELF::FunctionMap ELF::functions(bool refetch) const {
-    if (!refetch) {
-        return m_functions;
-    }
-
-    // The ELF class from pwntools is huge and I don't want to
+    // The ELF class from pwnlib is huge and I don't want to
     // introduce the entire of it into crax, so I'll perform
     // manual conversion here.
-    ELF::FunctionMap ret;
     py::dict functionDict = m_elf.attr("functions");
 
     for (const auto &item : functionDict) {
         auto name = item.first.cast<std::string>();
         auto func = item.second.cast<py::object>();
 
-        ret[name] = {
+        m_functions[name] = {
             func.attr("name").cast<std::string>(),
             func.attr("address").cast<uint64_t>(),
             func.attr("size").cast<uint64_t>()
         };
     }
-    return ret;
 }
+
 
 uint64_t ELF::bss() const {
     return m_elf.attr("bss").call().cast<uint64_t>();
 }
-
 
 uint64_t ELF::getRuntimeAddress(uint64_t offset) const {
     assert((!checksec.hasPIE || m_base) && "PIE enabled, but `m_base` uninitialized!");
@@ -86,8 +72,7 @@ uint64_t ELF::getRuntimeAddress(uint64_t offset) const {
 }
 
 uint64_t ELF::getRuntimeAddress(const std::string &symbol) const {
-    // XXX: Check if symbol exists before using operator[].
-    return getRuntimeAddress(symbols()[symbol]);
+    return getRuntimeAddress(symbols().at(symbol));
 }
 
 uint64_t ELF::rebaseAddress(uint64_t address, uint64_t newBase) const {

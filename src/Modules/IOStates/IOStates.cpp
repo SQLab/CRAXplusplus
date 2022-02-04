@@ -426,13 +426,13 @@ void IOStates::beforeExploitGeneration(S2EExecutionState *state) {
 std::array<std::vector<uint64_t>, IOStates::LeakType::LAST>
 IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len) {
     const auto &vmmap = mem(inputState).vmmap();
-    uint64_t canary = m_canary;
     std::array<std::vector<uint64_t>, IOStates::LeakType::LAST> bufInfo;
 
     for (uint64_t i = 0; i < len; i += 8) {
         uint64_t value = u64(mem().readConcrete(buf + i, 8, /*concretize=*/false));
         //log<WARN>() << "addr = " << hexval(buf + i) << " value = " << hexval(value) << '\n';
-        if (g_crax->getExploit().getElf().checksec.hasCanary && value == canary) {
+
+        if (g_crax->getExploit().getElf().checksec.hasCanary && value == m_canary) {
             bufInfo[LeakType::CANARY].push_back(i);
         } else {
             foreach2 (it, vmmap.begin(), vmmap.end()) {
@@ -449,21 +449,23 @@ IOStates::analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len)
 std::vector<IOStates::OutputStateInfo>
 IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len) {
     const auto &vmmap = mem(outputState).vmmap();
-    uint64_t canary = m_canary;
     std::vector<IOStates::OutputStateInfo> leakInfo;
 
-    for (uint64_t i = 0; i < len; i += 8) {
-        uint64_t value = u64(mem().readConcrete(buf + i, 8, /*concretize=*/false));
-        //log<WARN>() << "addr = " << hexval(buf + i) << " value = " << hexval(value) << '\n';
-        IOStates::OutputStateInfo info;
-        info.isInteresting = true;
+    IOStates::OutputStateInfo info;
+    info.isInteresting = true;
 
-        if (g_crax->getExploit().getElf().checksec.hasCanary && (value & ~0xff) == canary) {
+    for (uint64_t i = 0; i < len; i++) {
+        uint64_t n = std::min(len - i, static_cast<uint64_t>(8));
+        uint64_t value = u64(mem().readConcrete(buf + i, n, /*concretize=*/false));
+        //log<WARN>() << "addr = " << hexval(buf + i) << " value = " << hexval(value) << '\n';
+
+        if (g_crax->getExploit().getElf().checksec.hasCanary && (value & ~0xff) == m_canary) {
             info.bufIndex = i + 1;
             info.baseOffset = 0;
             info.leakType = LeakType::CANARY;
             leakInfo.push_back(info);
         } else {
+            value &= 0xffff'ffff'ffff;
             foreach2 (it, vmmap.begin(), vmmap.end()) {
                 if (value >= it.start() && value <= it.stop()) {
                     RegionDescriptorPtr region = *it;

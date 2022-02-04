@@ -66,35 +66,34 @@ class __BaseBinaryExprIterator
     : public std::iterator<std::forward_iterator_tag, Expr> {
 
 public:
-    bool operator== (const BinaryExprIterator<S> &r) const {
+    bool operator==(const BinaryExprIterator<S> &r) const {
         return m_currentNode.get() == r.m_currentNode.get();
     }
 
-    bool operator!= (const BinaryExprIterator<S> &r) const {
+    bool operator!=(const BinaryExprIterator<S> &r) const {
         return m_currentNode.get() != r.m_currentNode.get();
     }
 
     // Pre-increment
-    auto operator++ () -> decltype(*this) {
+    auto operator++() -> decltype(*this) {
         step();
         return *this;
     }
 
     // Post-increment
-    auto operator++ (int) -> decltype(auto) {
+    auto operator++(int) -> decltype(auto) {
         step();
         return *this;
     }
 
-    const ref<Expr> &operator* () const {
+    const ref<Expr> &operator*() const {
         return m_currentNode;
     }
 
-    ref<Expr> &operator* () {
+    ref<Expr> &operator*() {
         return m_currentNode;
     }
 
-    // XXX: optimize this with compile-time polymorphism.
     virtual void step() = 0;
 
     static BinaryExprIterator<S> begin(const ref<Expr> &e) {

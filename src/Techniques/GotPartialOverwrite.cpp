@@ -43,7 +43,7 @@ std::vector<RopSubchain> GotPartialOverwrite::getRopSubchains() const {
     const Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
-    auto ret2csu = dynamic_cast<Ret2csu *>(g_crax->getTechnique("Ret2csu"));
+    auto ret2csu = g_crax->getTechnique<Ret2csu>();
     assert(ret2csu);
 
     // read(0, elf.got['read'], 1), setting RAX to 1.

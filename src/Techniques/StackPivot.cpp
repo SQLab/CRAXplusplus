@@ -63,7 +63,7 @@ std::vector<RopSubchain> BasicStackPivot::getRopSubchains() const {
     const Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
-    auto ret2csu = dynamic_cast<Ret2csu *>(g_crax->getTechnique("Ret2csu"));
+    auto ret2csu = g_crax->getTechnique<Ret2csu>();
     assert(ret2csu);
 
     // RBP
@@ -184,8 +184,8 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
     const Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
-    auto ret2csu = dynamic_cast<Ret2csu *>(g_crax->getTechnique("Ret2csu"));
-    assert(ret2csu && "Ret2csu object not found");
+    auto ret2csu = g_crax->getTechnique<Ret2csu>();
+    assert(ret2csu);
 
     // At this point, a stack-buffer overflow should take place inside libc,
     // and the weird machine shall not return from read@libc. Now we will

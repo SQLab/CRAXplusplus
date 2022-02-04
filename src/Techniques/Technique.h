@@ -27,6 +27,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <typeindex>
 
 namespace s2e::plugins::crax {
 
@@ -48,7 +49,7 @@ public:
     virtual RopSubchain getExtraRopSubchain() const = 0;
 
     static std::unique_ptr<Technique> create(const std::string &name);
-    static std::map<std::string, Technique*> s_mapper;
+    static std::map<std::type_index, Technique*> s_mapper;
 };
 
 }  // namespace s2e::plugins::crax

@@ -217,17 +217,18 @@ public:
         return ret;
     }
 
-    template <typename T>
+    template <typename M>
     [[nodiscard]]
-    static T *getModule() {
-        auto it = Module::s_mapper.find(typeid(T));
-        return (it != Module::s_mapper.end()) ? static_cast<T *>(it->second) : nullptr;
+    static M *getModule() {
+        auto it = Module::s_mapper.find(typeid(M));
+        return (it != Module::s_mapper.end()) ? static_cast<M *>(it->second) : nullptr;
     }
 
+    template <typename T>
     [[nodiscard]]
-    static Technique *getTechnique(const std::string &name) {
-        auto it = Technique::s_mapper.find(name);
-        return (it != Technique::s_mapper.end()) ? it->second : nullptr;
+    static T *getTechnique() {
+        auto it = Technique::s_mapper.find(typeid(T));
+        return (it != Technique::s_mapper.end()) ? static_cast<T *>(it->second) : nullptr;
     }
 
 

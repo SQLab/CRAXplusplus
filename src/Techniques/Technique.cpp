@@ -28,7 +28,7 @@
 
 namespace s2e::plugins::crax {
 
-std::map<std::string, Technique*> Technique::s_mapper;
+std::map<std::type_index, Technique*> Technique::s_mapper;
 
 
 std::unique_ptr<Technique> Technique::create(const std::string &name) {
@@ -44,10 +44,10 @@ std::unique_ptr<Technique> Technique::create(const std::string &name) {
         ret = std::make_unique<GotPartialOverwrite>();
     }
 
-    assert(ret &&
-           "Technique::create() failed, possibly due to incorrect technique name!");
+    assert(ret && "Technique::create() failed, incorrect technique name given in config?");
 
-    Technique::s_mapper[name] = ret.get();
+    auto &technique = *ret;
+    Technique::s_mapper.insert({typeid(technique), &technique});
     return ret;
 }
 

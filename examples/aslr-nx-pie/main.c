@@ -9,9 +9,9 @@ int main() {
     printf("what's your name: ");
     read(0, buf, 0x80);
 
-    printf("%s\n", buf);
+    printf("Hello, %s. Your comment: ", buf);
     read(0, buf, 0x80);
 
-    printf("%s\n", buf);
+    printf("Thanks! We've received it: %s\n", buf);
     read(0, buf, 0x30);
 }

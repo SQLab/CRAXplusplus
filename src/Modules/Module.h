@@ -21,9 +21,10 @@
 #ifndef S2E_PLUGINS_CRAX_MODULE_H
 #define S2E_PLUGINS_CRAX_MODULE_H
 
-#include <memory>
 #include <map>
+#include <memory>
 #include <string>
+#include <typeindex>
 
 namespace s2e::plugins::crax {
 
@@ -52,7 +53,7 @@ public:
     std::string getConfigKey() const;
 
     static std::unique_ptr<Module> create(const std::string &name);
-    static std::map<std::string, Module *> s_mapper;
+    static std::map<std::type_index, Module *> s_mapper;
 };
 
 

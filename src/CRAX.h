@@ -37,12 +37,11 @@
 #include <pybind11/embed.h>
 
 #include <cassert>
-#include <algorithm>
 #include <map>
 #include <memory>
 #include <string>
+#include <typeindex>
 #include <unordered_set>
-#include <utility>
 #include <vector>
 
 namespace s2e::plugins::crax {
@@ -218,10 +217,11 @@ public:
         return ret;
     }
 
+    template <typename T>
     [[nodiscard]]
-    static Module *getModule(const std::string &name) {
-        auto it = Module::s_mapper.find(name);
-        return (it != Module::s_mapper.end()) ? it->second : nullptr;
+    static T *getModule() {
+        auto it = Module::s_mapper.find(typeid(T));
+        return (it != Module::s_mapper.end()) ? static_cast<T *>(it->second) : nullptr;
     }
 
     [[nodiscard]]

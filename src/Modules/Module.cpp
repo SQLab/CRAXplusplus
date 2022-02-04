@@ -23,12 +23,13 @@
 #include <s2e/Plugins/CRAX/Modules/IOStates/IOStates.h>
 
 #include <cassert>
+#include <type_traits>
 
 #include "Module.h"
 
 namespace s2e::plugins::crax {
 
-std::map<std::string, Module *> Module::s_mapper;
+std::map<std::type_index, Module *> Module::s_mapper;
 
 
 ModuleState *Module::getModuleState(CRAXState *s, ModuleStateFactory f) const {
@@ -49,9 +50,13 @@ std::unique_ptr<Module> Module::create(const std::string &name) {
         ret = std::make_unique<IOStates>();
     }
 
-    assert(ret && "Module::create() failed, possibly due to incorrect module name!");
+    assert(ret && "Module::create() failed, incorrect module name given in config?");
 
-    Module::s_mapper[name] = ret.get();
+    // It seems that we cannot write `typeid(*ret)` directly due to
+    // [-Werror,-Wpotentially-evaluated-expression], so we have to add
+    // a layer of indirection here...
+    auto &mod = *ret;
+    Module::s_mapper.insert({typeid(mod), &mod});
     return ret;
 }
 

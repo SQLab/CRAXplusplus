@@ -171,7 +171,7 @@ void LeakBasedCoreGenerator::generateMainFunction(S2EExecutionState *state,
     Exploit &exploit = g_crax->getExploit();
     InputStream inputStream(stage1);
 
-    auto iostates = dynamic_cast<IOStates *>(CRAX::getModule("IOStates"));
+    auto iostates = CRAX::getModule<IOStates>();
     assert(iostates);
 
     auto modState = g_crax->getModuleState(state, iostates);

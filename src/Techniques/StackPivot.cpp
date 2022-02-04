@@ -115,7 +115,7 @@ AdvancedStackPivot::AdvancedStackPivot()
 void AdvancedStackPivot::initialize() {
     S2EExecutionState *state = g_crax->getCurrentState();
 
-    auto __dynRop = dynamic_cast<DynamicRop *>(g_crax->getModule("DynamicRop"));
+    auto __dynRop = g_crax->getModule<DynamicRop>();
     assert(__dynRop && "AdvancedStackPivot relies on DynamicRop module");
 
     auto modState = g_crax->getModuleState(state, __dynRop);

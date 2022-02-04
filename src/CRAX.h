@@ -55,8 +55,24 @@ namespace s2e::plugins::crax {
 class CRAXState : public PluginState {
     using ModuleStateMap = std::map<const Module *, std::unique_ptr<ModuleState>>;
 
+    friend class CRAX;
+
 public:
-    CRAXState() : m_moduleState() {}
+    CRAXState()
+        : m_moduleState(),
+          m_pendingOnExecuteSyscallEnd() {}
+
+    CRAXState(const CRAXState &r)
+        : m_moduleState(),
+          m_pendingOnExecuteSyscallEnd(r.m_pendingOnExecuteSyscallEnd) {
+        // Deep clone modules.
+        for (const auto &entry : r.m_moduleState) {
+            const Module *module = entry.first;
+            std::unique_ptr<ModuleState> newModuleState(entry.second->clone());
+            m_moduleState.insert(std::make_pair(module, std::move(newModuleState)));
+        }
+    }
+
     virtual ~CRAXState() override = default;
 
     static PluginState *factory(Plugin *, S2EExecutionState *) {
@@ -64,20 +80,14 @@ public:
     }
 
     virtual CRAXState *clone() const override {
-        CRAXState *newState = new CRAXState();
-        for (const auto &entry : m_moduleState) {
-            const Module *module = entry.first;
-            std::unique_ptr<ModuleState> newModuleState(entry.second->clone());
-            newState->m_moduleState.insert(std::make_pair(module, std::move(newModuleState)));
-        }
-        return newState;
+        return new CRAXState(*this);
     }
 
 
-    ModuleState *getModuleState(Module *module, ModuleStateFactory factory) {
+    ModuleState *getModuleState(Module *module, ModuleStateFactory f) {
         auto it = m_moduleState.find(module);
         if (it == m_moduleState.end()) {
-            std::unique_ptr<ModuleState> newModuleState(factory(module, this));
+            std::unique_ptr<ModuleState> newModuleState(f(module, this));
             assert(newModuleState);
             ModuleState *ret = newModuleState.get();
             m_moduleState.insert(std::make_pair(module, std::move(newModuleState)));
@@ -88,6 +98,8 @@ public:
 
 private:
     ModuleStateMap m_moduleState;
+
+    std::map<uint64_t, SyscallCtx> m_pendingOnExecuteSyscallEnd;  // key: RIP
 };
 
 
@@ -126,7 +138,10 @@ public:
     [[nodiscard, gnu::always_inline]]
     inline CRAXState *getPluginState(S2EExecutionState *state) const {
         // See: libs2ecore/include/s2e/Plugin.h
-        return static_cast<CRAXState *>(Plugin::getPluginState(state, &CRAXState::factory));
+        auto plgState = getPluginState(state, &CRAXState::factory);
+        assert(plgState && "Unable to get plugin state for CRAX!?");
+
+        return static_cast<CRAXState *>(plgState);
     }
 
     // This is a shortcut to perform `getPluginState()` + `plgState->getModuleState()`.
@@ -134,11 +149,8 @@ public:
     template <typename T>
     [[nodiscard]]
     typename T::State *getModuleState(S2EExecutionState *state, const T *mod) const {
-        CRAXState *craxState = getPluginState(state);
-        assert(craxState && "Unable to get plugin state for CRAX!?");
-
-        ModuleState *modState = mod->getModuleState(craxState, &T::State::factory);
-        assert(modState && "Unable to get plugin module state!");
+        auto modState = mod->getModuleState(getPluginState(state), &T::State::factory);
+        assert(modState && "Unable to get module state!?");
 
         return static_cast<typename T::State *>(modState);
     }
@@ -336,7 +348,6 @@ private:
     std::vector<std::unique_ptr<Technique>> m_techniques;
 
     uint64_t m_targetProcessPid;
-    std::map<uint64_t, SyscallCtx> m_pendingOnExecuteSyscallEnd;  // <pc, SyscallCtx>
     std::unordered_set<S2EExecutionState *> m_allowedForkingStates;
 };
 

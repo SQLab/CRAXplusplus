@@ -72,7 +72,6 @@ CRAX::CRAX(S2E *s2e)
       m_modules(),
       m_techniques(),
       m_targetProcessPid(),
-      m_pendingOnExecuteSyscallEnd(),
       m_allowedForkingStates() {}
 
 
@@ -223,12 +222,14 @@ void CRAX::onExecuteInstructionStart(S2EExecutionState *state,
         return;
     }
 
-    // XXX: m_pendingOnExecuteSyscallEnd should be state-specific?
-    if (m_pendingOnExecuteSyscallEnd.size()) {
-        auto it = m_pendingOnExecuteSyscallEnd.find(pc);
-        if (it != m_pendingOnExecuteSyscallEnd.end()) {
+    auto craxState = getPluginState(state);
+    auto &pending = craxState->m_pendingOnExecuteSyscallEnd;
+
+    if (pending.size()) {
+        auto it = pending.find(pc);
+        if (it != pending.end()) {
             onExecuteSyscallEnd(state, pc, it->second);
-            //m_pendingOnExecuteSyscallEnd.erase(pc);
+            pending.erase(pc);
         }
     }
 
@@ -284,13 +285,16 @@ void CRAX::onExecuteSyscallStart(S2EExecutionState *state,
             << hexval(syscall.arg6) << ")\n";
     }
 
+    auto craxState = getPluginState(state);
+    auto &pending = craxState->m_pendingOnExecuteSyscallEnd;
+
     // Schedule the syscall hook to be called
     // after the instruction at `pc + 2` is executed.
     // Note: pc == state->regs()->getPc().
-    m_pendingOnExecuteSyscallEnd[pc + 2] = syscall;
+    pending[pc + 2] = syscall;
 
     // Execute syscall hooks installed by the user.
-    beforeSyscall.emit(state, m_pendingOnExecuteSyscallEnd[pc + 2]);
+    beforeSyscall.emit(state, pending[pc + 2]);
 }
 
 void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,

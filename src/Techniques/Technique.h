@@ -21,6 +21,7 @@
 #ifndef S2E_PLUGINS_CRAX_TECHNIQUE_H
 #define S2E_PLUGINS_CRAX_TECHNIQUE_H
 
+#include <llvm/ADT/SmallVector.h>
 #include <s2e/Plugins/CRAX/Expr/Expr.h>
 
 #include <map>
@@ -37,19 +38,25 @@ using RopSubchain = std::vector<klee::ref<klee::Expr>>;
 // e.g., stack pivoting, ret2csu, orw, etc.
 class Technique {
 public:
-    Technique() = default;
+    Technique() : m_requiredGadgets() {}
     virtual ~Technique() = default;
 
     virtual void initialize() = 0;
-    virtual bool checkRequirements() const = 0;
-    virtual void resolveRequiredGadgets() = 0;
+    virtual bool checkRequirements() const;
+    virtual void resolveRequiredGadgets();
     virtual std::string toString() const = 0;
 
     virtual std::vector<RopSubchain> getRopSubchains() const = 0;
     virtual RopSubchain getExtraRopSubchain() const = 0;
 
+    // Automatically creates a script variable name from `gadgetAssembly` for you.
+    static std::string toVariableName(const std::string &gadgetAssembly);
+
     static std::unique_ptr<Technique> create(const std::string &name);
     static std::map<std::type_index, Technique*> s_mapper;
+
+protected:
+    llvm::SmallVector<std::string, 8> m_requiredGadgets;
 };
 
 }  // namespace s2e::plugins::crax

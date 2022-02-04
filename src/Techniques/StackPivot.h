@@ -36,8 +36,10 @@ class CRAX;
 
 class StackPivot : public Technique {
 public:
-    StackPivot() = default;
+    StackPivot() : Technique() {}
     virtual ~StackPivot() override = default;
+
+    virtual void resolveRequiredGadgets() override;
 };
 
 class BasicStackPivot : public StackPivot {
@@ -45,9 +47,7 @@ public:
     BasicStackPivot();
     virtual ~BasicStackPivot() override = default;
 
-    virtual void initialize() override {}
-    virtual bool checkRequirements() const override;
-    virtual void resolveRequiredGadgets() override;
+    virtual void initialize() override;
     virtual std::string toString() const override { return "BasicStackPivot"; }
 
     virtual std::vector<RopSubchain> getRopSubchains() const override;
@@ -61,7 +61,6 @@ public:
 
     virtual void initialize() override;
     virtual bool checkRequirements() const override;
-    virtual void resolveRequiredGadgets() override;
     virtual std::string toString() const override { return "AdvancedStackPivot"; }
 
     virtual std::vector<RopSubchain> getRopSubchains() const override;

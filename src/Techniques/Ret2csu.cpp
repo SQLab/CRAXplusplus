@@ -65,16 +65,17 @@ void Ret2csu::initialize() {
 
 bool Ret2csu::checkRequirements() const {
    auto symbolMap = g_crax->getExploit().getElf().symbols();
-   return symbolMap.find(s_libcCsuInit) != symbolMap.end();
+
+   return Technique::checkRequirements() && 
+          symbolMap.find(s_libcCsuInit) != symbolMap.end();
 }
 
 void Ret2csu::resolveRequiredGadgets() {
-    // Gadgets
+    Technique::resolveRequiredGadgets();
+
     g_crax->getExploit().registerSymbol(s_libcCsuInit, m_libcCsuInit);
     g_crax->getExploit().registerSymbol(s_libcCsuInitGadget1, m_libcCsuInitGadget1);
     g_crax->getExploit().registerSymbol(s_libcCsuInitGadget2, m_libcCsuInitGadget2);
-
-    // Memory locations
     g_crax->getExploit().registerSymbol(s_libcCsuInitCallTarget, m_libcCsuInitCallTarget);
 }
 

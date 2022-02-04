@@ -31,31 +31,24 @@ using namespace klee;
 
 namespace s2e::plugins::crax {
 
-BasicStackPivot::BasicStackPivot()
-    : StackPivot() {
+void StackPivot::resolveRequiredGadgets() {
+    Technique::resolveRequiredGadgets();
+
+    // Register pivot destination as a script's variable.
+    Exploit &exploit = g_crax->getExploit();
+    exploit.registerSymbol("pivot_dest", exploit.getElf().bss() + 0x800);
+}
+
+
+BasicStackPivot::BasicStackPivot() : StackPivot() {
+    m_requiredGadgets.push_back("ret");
+    m_requiredGadgets.push_back("pop rbp ; ret");
+    m_requiredGadgets.push_back("leave ; ret");
+}
+
+
+void BasicStackPivot::initialize() {
     resolveRequiredGadgets();
-}
-
-
-bool BasicStackPivot::checkRequirements() const {
-    // XXX: check if ROP gadgets exist.
-    return true;
-}
-
-void BasicStackPivot::resolveRequiredGadgets() {
-    // Gadgets
-    g_crax->getExploit().registerSymbol("ret",
-            g_crax->getExploit().resolveGadget("ret"));
-
-    g_crax->getExploit().registerSymbol("pop_rbp_ret",
-            g_crax->getExploit().resolveGadget("pop rbp ; ret"));
-
-    g_crax->getExploit().registerSymbol("leave_ret",
-            g_crax->getExploit().resolveGadget("leave ; ret"));
-
-    // Memory locations
-    g_crax->getExploit().registerSymbol("pivot_dest",
-            g_crax->getExploit().getElf().bss() + 0x800);
 }
 
 
@@ -80,9 +73,9 @@ std::vector<RopSubchain> BasicStackPivot::getRopSubchains() const {
 
     // Perform stack pivoting.
     RopSubchain part3 = {
-        BaseOffsetExpr::create(exploit, "pop_rbp_ret"),
+        BaseOffsetExpr::create(exploit, toVariableName("pop rbp ; ret")),
         BaseOffsetExpr::create(exploit, "pivot_dest"),
-        BaseOffsetExpr::create(exploit, "leave_ret")};
+        BaseOffsetExpr::create(exploit, toVariableName("leave ; ret"))};
 
     RopSubchain ret;
     ret.reserve(part1.size() + part2.size() + part3.size());
@@ -102,7 +95,7 @@ AdvancedStackPivot::AdvancedStackPivot()
     : StackPivot(),
       m_offsetToRetAddr(),
       m_readCallSites() {
-    resolveRequiredGadgets();
+    m_requiredGadgets.push_back("pop rsi ; pop r15 ; ret");
 
     g_crax->beforeInstruction.connect(
             sigc::mem_fun(*this, &AdvancedStackPivot::maybeInterceptReadCallSites));
@@ -113,6 +106,8 @@ AdvancedStackPivot::AdvancedStackPivot()
 
 
 void AdvancedStackPivot::initialize() {
+    resolveRequiredGadgets();
+
     S2EExecutionState *state = g_crax->getCurrentState();
 
     auto __dynRop = g_crax->getModule<DynamicRop>();
@@ -131,7 +126,7 @@ void AdvancedStackPivot::initialize() {
     // Resolve ret2LeaRbp.
     // XXX: from balsn: this is a good research topic.
     const auto &readCallSiteInfo = *m_readCallSites.rbegin();
-    const auto &exploit = g_crax->getExploit();
+    const Exploit &exploit = g_crax->getExploit();
 
     int rbpOffset = 0;
     uint64_t ret2LeaRbp = determineRetAddr(readCallSiteInfo.address, rbpOffset);
@@ -163,19 +158,11 @@ void AdvancedStackPivot::initialize() {
 
 bool AdvancedStackPivot::checkRequirements() const {
     const auto &sym = g_crax->getExploit().getElf().symbols();
-    return sym.find("read") != sym.end() && m_readCallSites.size();
+
+    return StackPivot::checkRequirements() &&
+           sym.find("read") != sym.end() &&
+           m_readCallSites.size();
 }
-
-void AdvancedStackPivot::resolveRequiredGadgets() {
-    // Gadgets
-    g_crax->getExploit().registerSymbol("pop_rsi_r15_ret",
-            g_crax->getExploit().resolveGadget("pop rsi ; pop r15 ; ret"));
-
-    // Memory locations
-    g_crax->getExploit().registerSymbol("pivot_dest",
-            g_crax->getExploit().getElf().bss() + 0x800);
-}
-
 
 std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
     assert(m_readCallSites.size() &&
@@ -195,7 +182,10 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
     // ret2csu once.
     RopSubchain part1;
     for (size_t i = 0; i < 6; i++) {
-        ref<Expr> e0 = BaseOffsetExpr::create(exploit, "pop_rsi_r15_ret");
+        ref<Expr> e0
+            = BaseOffsetExpr::create(exploit,
+                                     toVariableName("pop rsi ; pop r15 ; ret"));
+
         ref<Expr> e1 = AddExpr::alloc(
                 BaseOffsetExpr::create(exploit, "pivot_dest"),
                 AddExpr::alloc(
@@ -203,6 +193,7 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
                         MulExpr::alloc(
                                 ConstantExpr::create(0x30, Expr::Int64),
                                 ConstantExpr::create(i + 1, Expr::Int64))));
+
         ref<Expr> e2 = ConstantExpr::create(0, Expr::Int64);
         ref<Expr> e3 = BaseOffsetExpr::create(elf, "sym", "read");
 

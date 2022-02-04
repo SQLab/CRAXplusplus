@@ -29,14 +29,18 @@
 
 namespace s2e::plugins::crax {
 
-GotPartialOverwrite::GotPartialOverwrite()
-    : Technique() {
+GotPartialOverwrite::GotPartialOverwrite() : Technique() {}
+
+
+void GotPartialOverwrite::initialize() {
     resolveRequiredGadgets();
 }
 
-
 bool GotPartialOverwrite::checkRequirements() const {
-    return true;
+    const auto &sym = g_crax->getExploit().getElf().symbols();
+
+    // read() must be present in the GOT of the target binary.
+    return Technique::checkRequirements() && sym.find("read") != sym.end();
 }
 
 std::vector<RopSubchain> GotPartialOverwrite::getRopSubchains() const {

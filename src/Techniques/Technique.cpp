@@ -18,11 +18,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <s2e/Plugins/CRAX/CRAX.h>
 #include <s2e/Plugins/CRAX/Techniques/Ret2csu.h>
 #include <s2e/Plugins/CRAX/Techniques/StackPivot.h>
 #include <s2e/Plugins/CRAX/Techniques/GotPartialOverwrite.h>
 
 #include <cassert>
+#include <cctype>
+#include <algorithm>
 
 #include "Technique.h"
 
@@ -30,6 +33,35 @@ namespace s2e::plugins::crax {
 
 std::map<std::type_index, Technique*> Technique::s_mapper;
 
+bool Technique::checkRequirements() const {
+    const Exploit &exploit = g_crax->getExploit();
+
+    return std::all_of(m_requiredGadgets.begin(),
+                       m_requiredGadgets.end(),
+                       [&exploit](const auto &gadget) { return exploit.resolveGadget(gadget); });
+}
+
+void Technique::resolveRequiredGadgets() {
+    Exploit &exploit = g_crax->getExploit();
+
+    for (const auto &gadget : m_requiredGadgets) {
+        std::string varName = Technique::toVariableName(gadget);
+        exploit.registerSymbol(varName, exploit.resolveGadget(gadget));
+    }
+}
+
+std::string Technique::toVariableName(const std::string &gadgetAssembly) {
+    std::string ret;
+
+    for (auto c : gadgetAssembly) {
+        if (std::isalnum(c)) {
+            ret += c;
+        } else if (ret.size() && ret.back() != '_') {
+            ret += '_';
+        }
+    }
+    return ret;
+}
 
 std::unique_ptr<Technique> Technique::create(const std::string &name) {
     std::unique_ptr<Technique> ret;

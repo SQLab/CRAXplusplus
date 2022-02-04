@@ -36,9 +36,8 @@ public:
     GotPartialOverwrite();
     virtual ~GotPartialOverwrite() override = default;
 
-    virtual void initialize() override {}
+    virtual void initialize() override;
     virtual bool checkRequirements() const override;
-    virtual void resolveRequiredGadgets() override {}
     virtual std::string toString() const override { return "GotPartialOverwrite"; }
 
     virtual std::vector<RopSubchain> getRopSubchains() const override;

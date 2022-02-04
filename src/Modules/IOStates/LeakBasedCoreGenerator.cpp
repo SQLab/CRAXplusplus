@@ -30,19 +30,19 @@ namespace s2e::plugins::crax {
 
 using InputStateInfo = IOStates::InputStateInfo;
 using OutputStateInfo = IOStates::OutputStateInfo;
+using SleepStateInfo = IOStates::SleepStateInfo;
 
 
-// Since InputStateInfo and OutputStateInfo holds completely
-// unrelated data, they are declared as std::variant
-// instead of sharing a common base type.
-//
-// Here we'll use std::visit() to visit and handle
-// InputStateInfo and OutputStateInfo separately.
+// Since InputStateInfo, OutputStateInfo and SleepStateInfo hold
+// completely unrelated data, they are declared as std::variant
+// instead of sharing a common base type. As a result we'll use
+// std::visit() to visit and handle them separately.
 
 struct IOStateInfoVisitor {
     // StateInfo handlers
     void operator()(const InputStateInfo &stateInfo);
     void operator()(const OutputStateInfo &stateInfo);
+    void operator()(const SleepStateInfo &stateInfo);
 
     bool shouldSkipInputState() const;
     void handleStage1(const InputStateInfo &stateInfo);
@@ -157,6 +157,11 @@ void IOStateInfoVisitor::operator()(const OutputStateInfo &stateInfo) {
             "log.info('leaked elf_base: {}'.format(hex(elf_base)))",
         });
     }
+}
+
+void IOStateInfoVisitor::operator()(const SleepStateInfo &stateInfo) {
+    exploit.writeline("# sleep state");
+    exploit.writeline(format("sleep(%d)", stateInfo.sec));
 }
 
 

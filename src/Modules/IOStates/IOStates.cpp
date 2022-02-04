@@ -27,7 +27,23 @@
 
 #include "IOStates.h"
 
+// XXX: define all syscall numbers
+#define SYS_READ 0
+#define SYS_WRITE 1
+#define SYS_NANOSLEEP 35
+
 using namespace klee;
+
+namespace {
+
+using __kernel_time64_t = long long;
+
+struct __kernel_timespec {
+    __kernel_time64_t tv_sec;  // seconds
+	long long tv_nsec;         // nanoseconds
+};
+
+}  // namespace
 
 namespace s2e::plugins::crax {
 
@@ -54,6 +70,10 @@ IOStates::IOStates()
     // Install output state syscall hook.
     g_crax->afterSyscall.connect(
             sigc::mem_fun(*this, &IOStates::outputStateHook));
+
+    // Install sleep state syscall hook.
+    g_crax->afterSyscall.connect(
+            sigc::mem_fun(*this, &IOStates::sleepStateHook));
 
     // Determine which base address(es) must be leaked
     // according to checksec of the target binary.
@@ -135,7 +155,7 @@ void IOStates::initUserSpecifiedStateInfoList() {
 
 void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
                                      SyscallCtx &syscall) {
-    if (syscall.nr != 0 || syscall.arg1 != STDIN_FILENO) {
+    if (syscall.nr != SYS_READ || syscall.arg1 != STDIN_FILENO) {
         return;
     }
 
@@ -213,7 +233,7 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
 
 void IOStates::inputStateHookBottomHalf(S2EExecutionState *inputState,
                                         const SyscallCtx &syscall) {
-    if (syscall.nr != 0 || syscall.arg1 != STDIN_FILENO) {
+    if (syscall.nr != SYS_READ || syscall.arg1 != STDIN_FILENO) {
         return;
     }
 
@@ -239,7 +259,7 @@ void IOStates::inputStateHookBottomHalf(S2EExecutionState *inputState,
 
 void IOStates::outputStateHook(S2EExecutionState *outputState,
                                const SyscallCtx &syscall) {
-    if (syscall.nr != 1 || syscall.arg1 != STDOUT_FILENO) {
+    if (syscall.nr != SYS_WRITE || syscall.arg1 != STDOUT_FILENO) {
         return;
     }
 
@@ -284,6 +304,26 @@ void IOStates::outputStateHook(S2EExecutionState *outputState,
     }
 
     modState->stateInfoList.push_back(std::move(stateInfo));
+}
+
+void IOStates::sleepStateHook(S2EExecutionState *sleepState,
+                              const SyscallCtx &syscall) {
+    if (syscall.nr != SYS_NANOSLEEP) {
+        return;
+    }
+
+    g_crax->setCurrentState(sleepState);
+
+    auto modState = g_crax->getModuleState(sleepState, this);
+
+    std::vector<uint8_t> bytes
+        = mem().readConcrete(syscall.arg1, sizeof(__kernel_timespec));
+
+    auto rqtp = reinterpret_cast<__kernel_timespec *>(bytes.data());
+
+    log<WARN>() << "sys_nanosleep(): " << hexval(rqtp->tv_sec) << " secs\n";
+
+    modState->stateInfoList.push_back(SleepStateInfo { rqtp->tv_sec });
 }
 
 void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,

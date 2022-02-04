@@ -63,7 +63,11 @@ public:
         LeakType leakType;
     };
 
-    using StateInfo = std::variant<InputStateInfo, OutputStateInfo>;
+    struct SleepStateInfo {
+        long long sec;
+    };
+
+    using StateInfo = std::variant<InputStateInfo, OutputStateInfo, SleepStateInfo>;
 
 
     class State : public ModuleState {
@@ -126,6 +130,9 @@ private:
 
     void outputStateHook(S2EExecutionState *outputState,
                          const SyscallCtx &syscall);
+
+    void sleepStateHook(S2EExecutionState *sleepState,
+                        const SyscallCtx &syscall);
 
 
     void maybeInterceptStackCanary(S2EExecutionState *state,

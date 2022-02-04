@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 #include <cassert>
+#include <algorithm>
 
 #include "Util.h"
 
@@ -39,7 +40,11 @@ std::vector<uint8_t> p64(uint64_t value) {
 
 uint64_t u64(const std::vector<uint8_t> &bytes) {
     assert(bytes.size() <= 8);
-    return *reinterpret_cast<const uint64_t *>(bytes.data());
+
+    std::vector<uint8_t> ret(8, 0);
+    std::copy(bytes.begin(), bytes.end(), ret.begin());
+
+    return *reinterpret_cast<uint64_t *>(ret.data());
 }
 
 }  // namespace s2e::plugins::crax

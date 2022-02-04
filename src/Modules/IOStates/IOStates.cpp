@@ -40,7 +40,7 @@ using __kernel_time64_t = long long;
 
 struct __kernel_timespec {
     __kernel_time64_t tv_sec;  // seconds
-	long long tv_nsec;         // nanoseconds
+    long long tv_nsec;         // nanoseconds
 };
 
 }  // namespace

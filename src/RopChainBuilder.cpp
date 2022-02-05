@@ -60,6 +60,10 @@ const std::vector<RopSubchain> &RopChainBuilder::build() {
     if (m_isSymbolicMode) {
         buildStage1Payload();
     }
+    
+    if (m_ropChain.size() && m_ropChain.back().empty()) {
+        m_ropChain.pop_back();
+    }
 
     return m_ropChain;
 }
@@ -155,6 +159,8 @@ void RopChainBuilder::doChainDirect(const std::vector<RopSubchain> &ropSubchains
     for (const ref<Expr> &e : extraRopSubchain) {
         m_ropChain.back().push_back(e);
     }
+
+    m_ropChain.push_back({});
 }
 
 bool RopChainBuilder::shouldSwitchToDirectMode(const Technique *t) const {

@@ -29,22 +29,20 @@ namespace s2e::plugins::crax {
 // InputStream is a read-only, non-owning reference to a byte stream.
 // It doesn't incur a copy for any read operation. Additionally,
 // it keeps track of how many bytes have been read and how many bytes
-// have been skipped.
+// have been ignored.
+//
+// Note that InputStream::ignore() works similarly to std::istream::ignore().
+
 class InputStream : public llvm::BinaryByteStream {
 public:
-    InputStream()
-        : BinaryByteStream(),
-          m_nrBytesRead(),
-          m_nrBytesSkipped() {}
-
-    InputStream(llvm::ArrayRef<uint8_t> data)
+    explicit InputStream(llvm::ArrayRef<uint8_t> data)
         : BinaryByteStream(data, llvm::support::endianness::little),
           m_nrBytesRead(),
-          m_nrBytesSkipped() {}
+          m_nrBytesIgnored() {}
 
     virtual ~InputStream() override = default;
 
-    // Read the next n bytes from the input stream.
+    // Reads the next n bytes from the input stream.
     // If failed, the returned ArrayRef will be empty.
     [[nodiscard]]
     llvm::ArrayRef<uint8_t> read(uint64_t n) {
@@ -61,16 +59,28 @@ public:
         return read(getNrBytesRemaining());
     }
 
-    // Skip the next n bytes from the input stream.
-    // The user must explicitly check the error code.
+    // Similar to std::istream::ignore(), this method extracts
+    // the next n bytes from the input stream and discards them.
+    // Note that the user must explicitly check the error code.
     [[nodiscard]]
-    llvm::Error skip(uint64_t n) {
+    llvm::Error ignore(uint64_t n) {
         llvm::ArrayRef<uint8_t> 🐱;
         if (auto EC = readBytes(getNrBytesConsumed(), n, 🐱)) {
             return EC;
         }
-        m_nrBytesSkipped += n;
+        m_nrBytesIgnored += n;
         return llvm::Error::success();
+    }
+
+
+    [[nodiscard]]
+    uint64_t getNrBytesConsumed() const {
+        return m_nrBytesRead + m_nrBytesIgnored;
+    }
+
+    [[nodiscard]]
+    uint64_t getNrBytesRemaining() const {
+        return Data.size() - getNrBytesConsumed();
     }
 
     [[nodiscard]]
@@ -79,23 +89,13 @@ public:
     }
 
     [[nodiscard]]
-    uint64_t getNrBytesSkipped() const {
-        return m_nrBytesSkipped;
-    }
-
-    [[nodiscard]]
-    uint64_t getNrBytesConsumed() const {
-        return m_nrBytesRead + m_nrBytesSkipped;
-    }
-
-    [[nodiscard]]
-    uint64_t getNrBytesRemaining() const {
-        return Data.size() - getNrBytesConsumed();
+    uint64_t getNrBytesIgnored() const {
+        return m_nrBytesIgnored;
     }
 
 private:
     uint64_t m_nrBytesRead;
-    uint64_t m_nrBytesSkipped;
+    uint64_t m_nrBytesIgnored;
 };
 
 

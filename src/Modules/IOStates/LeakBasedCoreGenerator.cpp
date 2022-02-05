@@ -20,7 +20,7 @@
 
 #include <s2e/Plugins/CRAX/CRAX.h>
 #include <s2e/Plugins/CRAX/Expr/BinaryExprEvaluator.h>
-#include <s2e/Plugins/CRAX/InputStream.h>
+#include <s2e/Plugins/CRAX/PseudoInputStream.h>
 
 #include "LeakBasedCoreGenerator.h"
 
@@ -51,7 +51,7 @@ struct IOStateInfoVisitor {
     Exploit &exploit;
     const ELF &elf;
     const std::vector<RopSubchain> &ropChain;
-    InputStream &inputStream;
+    PseudoInputStream &inputStream;
     const IOStates::State &modState;
     const size_t i;  // the index of `stateInfo` in `modState.stateInfoList`
 };
@@ -69,10 +69,10 @@ void IOStateInfoVisitor::operator()(const InputStateInfo &stateInfo) {
     // has become symbolic for the first time.
     //
     // If all required information have already been leaked, then we should
-    // just ignore these extra I/O states (especially the input states).
+    // just skip these extra I/O states (especially the input states).
     if (shouldSkipInputState()) {
         exploit.writeline(format("# input state (offset = %d), skipped", stateInfo.offset));
-        static_cast<void>(inputStream.skip(stateInfo.offset));
+        inputStream.skip(stateInfo.offset);
         return;
     }
 
@@ -99,7 +99,10 @@ void IOStateInfoVisitor::operator()(const InputStateInfo &stateInfo) {
 }
 
 bool IOStateInfoVisitor::shouldSkipInputState() const {
-    // This shouldn't happen, but...
+    // If there are no input states at all, then the onSymbolicRip()
+    // shouldn't have been triggered in the first place. In theory,
+    // this won't happen, but I'll just leave this assertion here
+    // for extra safety.
     assert(-1 != modState.lastInputStateInfoIdxBeforeFirstSymbolicRip);
 
     return i != modState.lastInputStateInfoIdx &&
@@ -107,24 +110,26 @@ bool IOStateInfoVisitor::shouldSkipInputState() const {
 }
 
 void IOStateInfoVisitor::handleStage1(const InputStateInfo &stateInfo) {
+    uint64_t nrBytesRead = inputStream.getNrBytesRead();
+    uint64_t nrBytesSkipped = inputStream.getNrBytesSkipped();
+
     std::string s;
 
     // Let's deal with the simplest case first (no canary and no PIE).
     if (!elf.checksec.hasCanary && !elf.checksec.hasPIE) {
-        assert(ropChain[0].size() == 1 &&
-               "ropChain[0] must only contain a ByteVectorExpr");
-
-        llvm::ArrayRef<uint8_t> bytes = inputStream.read(stateInfo.offset);
+        llvm::ArrayRef<uint8_t> bytes = inputStream.read(nrBytesSkipped + stateInfo.offset);
         s += evaluate<std::string>(ByteVectorExpr::create(bytes));
     } else {
         // If either canary or PIE is enabled, stage1 needs to be solved
         // on the fly at exploitation time.
         s += format("solve_stage1(canary, elf_base, '%s')", modState.toString().c_str());
-        s += format("[%d:", inputStream.getNrBytesRead());
+    }
 
-        if (inputStream.getNrBytesSkipped()) {
-            s += std::to_string(inputStream.getNrBytesConsumed());
-        }
+    if (nrBytesRead || nrBytesSkipped) {
+        s += '[';
+        s += nrBytesRead ? std::to_string(nrBytesRead) : "";
+        s += ':';
+        s += nrBytesSkipped ? std::to_string(nrBytesRead + nrBytesSkipped) : "";
         s += ']';
     }
 
@@ -169,7 +174,7 @@ void LeakBasedCoreGenerator::generateMainFunction(S2EExecutionState *state,
                                                   std::vector<RopSubchain> ropChain,
                                                   std::vector<uint8_t> stage1) {
     Exploit &exploit = g_crax->getExploit();
-    InputStream inputStream(stage1);
+    PseudoInputStream inputStream(stage1);
 
     auto iostates = CRAX::getModule<IOStates>();
     assert(iostates);

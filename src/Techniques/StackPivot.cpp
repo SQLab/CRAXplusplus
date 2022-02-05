@@ -226,7 +226,7 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
             ConstantExpr::create(0x400, Expr::Int64))[0];
 
     while (part2.size() % 6) {
-        part2.push_back(ConstantExpr::create(0, Expr::Int64));
+        part2.push_back(ConstantExpr::create(0x4141414141414141, Expr::Int64));
     }
 
 

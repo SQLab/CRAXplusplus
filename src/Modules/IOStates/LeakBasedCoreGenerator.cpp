@@ -162,6 +162,10 @@ void IOStateInfoVisitor::operator()(const OutputStateInfo &stateInfo) {
             "log.info('leaked elf_base: {}'.format(hex(elf_base)))",
         });
     }
+
+    // We still need to receive whatever that comes after
+    // the canary or the address.
+    exploit.writeline("proc.recvrepeat(0.1)");
 }
 
 void IOStateInfoVisitor::operator()(const SleepStateInfo &stateInfo) {

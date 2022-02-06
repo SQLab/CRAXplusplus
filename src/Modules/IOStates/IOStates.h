@@ -31,15 +31,18 @@
 
 namespace s2e::plugins::crax {
 
-// This is an implementation of "IOState" from balsn's LAEG,
-// but adapted to S2E's multi-path execution environment.
+// This is an implementation of "IOState" from balsn's LAEG, but adapted
+// to S2E's multi-path execution environment. We renamed it to IOState"s"
+// because an execution path con contain more than just one I/O state.
 //
-// We renamed it to IOState"s" because an execution path
-// con contain more than just one I/O state.
+// The sequence of I/O states of each execution path is stored in the
+// vector `IOStates::State::stateInfoList`, i.e., each path has its
+// own list of I/O states.
 //
-// The sequence of I/O states of each execution path is
-// stored in the vector `IOStates::State::stateInfoList`.
-// Namely, each path has its own list of I/O states.
+// Reference:
+// [1] Mow Wei Loon. Bypassing ASLR with Dynamic Binary Analysis for
+//     Automated Exploit Generation (2021)
+
 class IOStates : public Module {
 public:
     enum LeakType {
@@ -64,7 +67,7 @@ public:
     };
 
     struct SleepStateInfo {
-        long long sec;
+        __kernel_time64_t sec;
     };
 
     using StateInfo = std::variant<InputStateInfo, OutputStateInfo, SleepStateInfo>;

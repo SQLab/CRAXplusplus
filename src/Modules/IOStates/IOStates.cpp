@@ -342,12 +342,11 @@ void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
 
     if (hasReachedMain &&
         i.mnemonic == "mov" && i.opStr == "rax, qword ptr fs:[0x28]") {
-        uint64_t canary = reg().readConcrete(Register::X64::RAX);
-        m_canary = canary;
+        m_canary = reg().readConcrete(Register::X64::RAX);
 
         log<WARN>()
             << '[' << hexval(i.address) << "] "
-            << "Intercepted canary: " << hexval(canary) << '\n';
+            << "Intercepted canary: " << hexval(m_canary) << '\n';
     }
 }
 

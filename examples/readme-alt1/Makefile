@@ -1,7 +1,7 @@
 CXX=gcc
 CXXFLAGS=-g -Wall -no-pie -fno-stack-protector
 SRC=main.c
-BIN=readme-alt
+BIN=readme-alt1
 
 all:
 	$(CXX) -o $(BIN) $(SRC) $(CXXFLAGS)

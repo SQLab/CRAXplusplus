@@ -288,13 +288,15 @@ public:
         return ref<Expr>(new ByteVectorExpr(bytes));
     }
 
-    static ref<Expr> create(const std::vector<uint8_t> &bytes) {
-        return alloc(bytes);
+    template <typename InputIt>
+    static ref<Expr> alloc(InputIt first, InputIt last) {
+        std::vector<uint8_t> bytes(first, last);
+        return ref<Expr>(new ByteVectorExpr(bytes));
     }
 
-    static ref<Expr> create(const std::string &s) {
-        std::vector<uint8_t> bytes(s.begin(), s.end());
-        return alloc(bytes);
+    template <typename T>
+    static ref<Expr> create(T container) {
+        return alloc(container.begin(), container.end());
     }
 
     // Method for support type inquiry through isa, cast, and dyn_cast.

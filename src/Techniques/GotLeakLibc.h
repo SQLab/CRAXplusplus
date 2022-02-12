@@ -18,44 +18,30 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef S2E_PLUGINS_CRAX_TECHNIQUE_H
-#define S2E_PLUGINS_CRAX_TECHNIQUE_H
+#ifndef S2E_PLUGINS_CRAX_GOT_LEAK_LIBC_H
+#define S2E_PLUGINS_CRAX_GOT_LEAK_LIBC_H
 
-#include <llvm/ADT/SmallVector.h>
-#include <s2e/Plugins/CRAX/Expr/Expr.h>
+#include <s2e/Plugins/CRAX/Techniques/Technique.h>
 
-#include <map>
-#include <memory>
 #include <string>
 #include <vector>
-#include <typeindex>
 
 namespace s2e::plugins::crax {
 
-using RopSubchain = std::vector<klee::ref<klee::Expr>>;
-
-// The abstract base class of all concrete exploitation techniques,
-// e.g., stack pivoting, ret2csu, orw, etc.
-class Technique {
+class GotLeakLibc : public Technique {
 public:
-    Technique() : m_requiredGadgets() {}
-    virtual ~Technique() = default;
+    GotLeakLibc();
+    virtual ~GotLeakLibc() override = default;
 
-    virtual void initialize() = 0;
-    virtual bool checkRequirements() const;
-    virtual void resolveRequiredGadgets();
-    virtual std::string toString() const = 0;
+    virtual void initialize() override;
+    virtual bool checkRequirements() const override;
+    virtual void resolveRequiredGadgets() override;
+    virtual std::string toString() const override { return "GotLeakLibc"; }
 
-    virtual std::vector<RopSubchain> getRopSubchains() const = 0;
-    virtual RopSubchain getExtraRopSubchain() const = 0;
-
-    static std::unique_ptr<Technique> create(const std::string &name);
-    static std::map<std::type_index, Technique*> s_mapper;
-
-protected:
-    llvm::SmallVector<std::pair<const ELF *, std::string>, 8> m_requiredGadgets;
+    virtual std::vector<RopSubchain> getRopSubchains() const override;
+    virtual RopSubchain getExtraRopSubchain() const override;
 };
 
 }  // namespace s2e::plugins::crax
 
-#endif  // S2E_PLUGINS_CRAX_TECHNIQUE_H
+#endif  // S2E_PLUGINS_CRAX_GOT_LEAK_LIBC_H

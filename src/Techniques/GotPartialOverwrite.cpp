@@ -91,7 +91,7 @@ std::vector<RopSubchain> GotPartialOverwrite::getRopSubchains() const {
     part2 = { ByteVectorExpr::create(std::vector<uint8_t> { getLsbOfReadSyscall() }) };
     part3 = { ByteVectorExpr::create(ljust("/bin/sh", 59, 0x00)) };
 
-    return {part1, part2, part3};
+    return { part1, part2, part3 };
 }
 
 RopSubchain GotPartialOverwrite::getExtraRopSubchain() const {

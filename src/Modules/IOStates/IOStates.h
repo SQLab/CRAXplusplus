@@ -110,7 +110,7 @@ public:
     virtual ~IOStates() override = default;
 
     virtual bool checkRequirements() const override;
-    virtual std::unique_ptr<ICoreGenerator> getCoreGenerator() const override;
+    virtual std::unique_ptr<ICoreGenerator> makeCoreGenerator() const override;
     virtual std::string toString() const override { return "IOStates"; }
 
     uint64_t getCanary() const { return m_canary; }

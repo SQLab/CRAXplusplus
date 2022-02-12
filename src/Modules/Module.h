@@ -46,7 +46,7 @@ public:
     virtual ~Module() = default;
 
     virtual bool checkRequirements() const { return true; }
-    virtual std::unique_ptr<ICoreGenerator> getCoreGenerator() const { return nullptr; }
+    virtual std::unique_ptr<ICoreGenerator> makeCoreGenerator() const { return nullptr; }
     virtual std::string toString() const = 0;
 
     ModuleState *getModuleState(CRAXState *state, ModuleStateFactory f) const;

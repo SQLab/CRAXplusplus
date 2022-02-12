@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
+#include <s2e/Plugins/CRAX/Exploit.h>
 #include <s2e/Plugins/CRAX/Modules/DynamicRop/DynamicRop.h>
 #include <s2e/Plugins/CRAX/Techniques/Ret2csu.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
@@ -41,9 +42,11 @@ void StackPivot::resolveRequiredGadgets() {
 
 
 BasicStackPivot::BasicStackPivot() : StackPivot() {
-    m_requiredGadgets.push_back("ret");
-    m_requiredGadgets.push_back("pop rbp ; ret");
-    m_requiredGadgets.push_back("leave ; ret");
+    const Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
+
+    m_requiredGadgets.push_back(std::make_pair(&elf, "pop rbp ; ret"));
+    m_requiredGadgets.push_back(std::make_pair(&elf, "leave ; ret"));
 }
 
 
@@ -61,21 +64,23 @@ std::vector<RopSubchain> BasicStackPivot::getRopSubchains() const {
 
     // RBP
     RopSubchain part1 = {
-        ConstantExpr::create(0, Expr::Int64)};
+        ConstantExpr::create(0, Expr::Int64)
+    };
 
     // Write the 2nd stage ROP payload via read() to `pivot_dest`
     // via ret2csu(read, 0, pivot_dest, 1024).
     RopSubchain part2 = ret2csu->getRopSubchains(
         BaseOffsetExpr::create(elf, "sym", "read"),
         ConstantExpr::create(0, Expr::Int64),
-        BaseOffsetExpr::create(exploit, "pivot_dest"),
+        BaseOffsetExpr::create(exploit, elf, "pivot_dest"),
         ConstantExpr::create(1024, Expr::Int64))[0];
 
     // Perform stack pivoting.
     RopSubchain part3 = {
-        BaseOffsetExpr::create(exploit, toVariableName("pop rbp ; ret")),
-        BaseOffsetExpr::create(exploit, "pivot_dest"),
-        BaseOffsetExpr::create(exploit, toVariableName("leave ; ret"))};
+        BaseOffsetExpr::create(exploit, elf, Exploit::toVarName("pop rbp ; ret")),
+        BaseOffsetExpr::create(exploit, elf, "pivot_dest"),
+        BaseOffsetExpr::create(exploit, elf, Exploit::toVarName("leave ; ret"))
+    };
 
     RopSubchain ret;
     ret.reserve(part1.size() + part2.size() + part3.size());
@@ -95,7 +100,10 @@ AdvancedStackPivot::AdvancedStackPivot()
     : StackPivot(),
       m_offsetToRetAddr(),
       m_readCallSites() {
-    m_requiredGadgets.push_back("pop rsi ; pop r15 ; ret");
+    const Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
+
+    m_requiredGadgets.push_back(std::make_pair(&elf, "pop rsi ; pop r15 ; ret"));
 
     g_crax->beforeInstruction.connect(
             sigc::mem_fun(*this, &AdvancedStackPivot::maybeInterceptReadCallSites));
@@ -184,10 +192,11 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
     for (size_t i = 0; i < 6; i++) {
         ref<Expr> e0
             = BaseOffsetExpr::create(exploit,
-                                     toVariableName("pop rsi ; pop r15 ; ret"));
+                                     elf,
+                                     Exploit::toVarName("pop rsi ; pop r15 ; ret"));
 
         ref<Expr> e1 = AddExpr::alloc(
-                BaseOffsetExpr::create(exploit, "pivot_dest"),
+                BaseOffsetExpr::create(exploit, elf, "pivot_dest"),
                 AddExpr::alloc(
                         ConstantExpr::create(8, Expr::Int64),
                         MulExpr::alloc(
@@ -214,12 +223,12 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
     }
 
     // Now, we should have accumulated enough space to perform a huge read() via ret2csu.
-    // read(0, pivot_dest + 0x30 * 7, 0x400).
+    // read(0, target_base + pivot_dest + 0x30 * 7, 0x400).
     RopSubchain part2 = ret2csu->getRopSubchains(
             BaseOffsetExpr::create(elf, "sym", "read"),
             ConstantExpr::create(0, Expr::Int64),
             AddExpr::alloc(
-                    BaseOffsetExpr::create(exploit, "pivot_dest"),
+                    BaseOffsetExpr::create(exploit, elf, "pivot_dest"),
                     MulExpr::alloc(
                             ConstantExpr::create(0x30, Expr::Int64),
                             ConstantExpr::create(7, Expr::Int64))),

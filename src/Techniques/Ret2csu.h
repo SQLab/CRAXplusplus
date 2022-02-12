@@ -31,9 +31,6 @@
 
 namespace s2e::plugins::crax {
 
-// Forward declaration
-class CRAX;
-
 class Ret2csu : public Technique {
 public:
     class UnhandledPlaceholderException : public std::exception {

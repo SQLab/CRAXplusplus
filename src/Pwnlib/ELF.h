@@ -43,9 +43,11 @@ public:
         bool hasPIE;
     };
 
+    explicit
     ELF(const std::string &filename); 
 
     const SymbolMap &symbols() const { return m_symbols; }
+    const SymbolMap &plt() const { return m_plt; }
     const SymbolMap &got() const { return m_got; }
     const FunctionMap &functions() const { return m_functions; }
     uint64_t bss() const;
@@ -53,17 +55,24 @@ public:
     uint64_t getRuntimeAddress(const std::string &symbol) const;
     uint64_t rebaseAddress(uint64_t address, uint64_t newBase) const;
 
+    const std::string &getFilename() const { return m_filename; }
+    const std::string &getVarPrefix() const { return m_varPrefix; }
     uint64_t getBase() const { return m_base; }
     void setBase(uint64_t base) { m_base = base; }
 
     const Checksec checksec;
 
 private:
+    FunctionMap buildFunctionMap();
+
     pybind11::object m_elf;
     SymbolMap m_symbols;
+    SymbolMap m_plt;
     SymbolMap m_got;
     FunctionMap m_functions;
 
+    std::string m_filename;
+    std::string m_varPrefix;
     uint64_t m_base;
 };
 

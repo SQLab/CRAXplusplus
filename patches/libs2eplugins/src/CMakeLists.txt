@@ -38,6 +38,8 @@ add_library(
     s2e/Plugins/CRAX/Techniques/Ret2csu.cpp
     s2e/Plugins/CRAX/Techniques/StackPivot.cpp
     s2e/Plugins/CRAX/Techniques/GotPartialOverwrite.cpp
+    s2e/Plugins/CRAX/Techniques/GotLeakLibc.cpp
+    s2e/Plugins/CRAX/Techniques/OneGadget.cpp
     s2e/Plugins/CRAX/Pwnlib/ELF.cpp
     s2e/Plugins/CRAX/Pwnlib/Util.cpp
     s2e/Plugins/CRAX/Utils/Algorithm.cpp

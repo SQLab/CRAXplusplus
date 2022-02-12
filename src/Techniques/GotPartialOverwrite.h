@@ -28,9 +28,6 @@
 
 namespace s2e::plugins::crax {
 
-// Forward declaration
-class CRAX;
-
 class GotPartialOverwrite : public Technique {
 public:
     GotPartialOverwrite();

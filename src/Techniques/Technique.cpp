@@ -19,12 +19,14 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
+#include <s2e/Plugins/CRAX/Exploit.h>
 #include <s2e/Plugins/CRAX/Techniques/Ret2csu.h>
 #include <s2e/Plugins/CRAX/Techniques/StackPivot.h>
 #include <s2e/Plugins/CRAX/Techniques/GotPartialOverwrite.h>
+#include <s2e/Plugins/CRAX/Techniques/GotLeakLibc.h>
+#include <s2e/Plugins/CRAX/Techniques/OneGadget.h>
 
 #include <cassert>
-#include <cctype>
 #include <algorithm>
 
 #include "Technique.h"
@@ -38,29 +40,21 @@ bool Technique::checkRequirements() const {
 
     return std::all_of(m_requiredGadgets.begin(),
                        m_requiredGadgets.end(),
-                       [&exploit](const auto &gadget) { return exploit.resolveGadget(gadget); });
+                       [&exploit](const auto &entry) {
+                           return exploit.resolveGadget(*entry.first, entry.second);
+                       });
 }
 
 void Technique::resolveRequiredGadgets() {
     Exploit &exploit = g_crax->getExploit();
 
-    for (const auto &gadget : m_requiredGadgets) {
-        std::string varName = Technique::toVariableName(gadget);
-        exploit.registerSymbol(varName, exploit.resolveGadget(gadget));
-    }
-}
+    for (const auto &entry : m_requiredGadgets) {
+        const ELF &elf = *entry.first;
+        const std::string &gadget = entry.second;
 
-std::string Technique::toVariableName(const std::string &gadgetAssembly) {
-    std::string ret;
-
-    for (auto c : gadgetAssembly) {
-        if (std::isalnum(c)) {
-            ret += c;
-        } else if (ret.size() && ret.back() != '_') {
-            ret += '_';
-        }
+        std::string varName = Exploit::toVarName(entry.second);
+        exploit.registerSymbol(varName, exploit.resolveGadget(elf, gadget));
     }
-    return ret;
 }
 
 std::unique_ptr<Technique> Technique::create(const std::string &name) {
@@ -74,6 +68,10 @@ std::unique_ptr<Technique> Technique::create(const std::string &name) {
         ret = std::make_unique<AdvancedStackPivot>();
     } else if (name == "GotPartialOverwrite") {
         ret = std::make_unique<GotPartialOverwrite>();
+    } else if (name == "GotLeakLibc") {
+        ret = std::make_unique<GotLeakLibc>();
+    } else if (name == "OneGadget") {
+        ret = std::make_unique<OneGadget>();
     }
 
     assert(ret && "Technique::create() failed, incorrect technique name given in config?");

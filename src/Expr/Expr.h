@@ -28,6 +28,7 @@
 
 #include <cassert>
 #include <cstdlib>
+#include <functional>
 #include <string>
 #include <vector>
 #include <utility>
@@ -41,16 +42,16 @@ namespace klee {
 // In a generated exploit script, each line contains a statement such as:
 //
 // 1. payload = p64(0x401060)
-// 2. payload = p64(elf_base + elf.sym['read'] + 0x30 * 2)
+// 2. payload = p64(target_base + elf.sym['read'] + 0x30 * 2)
 // 3. payload = p64(__libc_csu_init_gadget1)
 //
 // Analysis:
 //
 // 1. The simple 0x401060 can be represented by a klee::ConstantExpr.
-// 2. `elf_base + elf.sym['read']` will be represented by our BaseOffsetExpr
+// 2. `target_base + elf.sym['read']` will be represented by our BaseOffsetExpr
 //     which essentially is a klee::AddExpr.
 // 3. `__libc_csu_init_gadget1` is a symbol used by the script itself
-//     and can be rewritten as `elf_base + __libc_csu_init_gadget1`,
+//     and can be rewritten as `target_base + __libc_csu_init_gadget1`,
 //     so essentially it is also a klee::AddExpr.
 class BaseOffsetExpr : public AddExpr {
     using Exploit = s2e::plugins::crax::Exploit;
@@ -74,41 +75,33 @@ public:
         return ref<Expr>(new BaseOffsetExpr(lce, rce, strBase, strOffset));
     }
 
-    static ref<Expr> create(uint64_t base,
-                            uint64_t offset,
-                            std::string strBase = "",
-                            std::string strOffset = "") {
-        auto lce = ConstantExpr::create(base, Expr::Int64);
-        auto rce = ConstantExpr::create(offset, Expr::Int64);
-
-        return alloc(lce, rce, strBase, strOffset);
-    }
-
-    // Create a BaseOffsetExpr that represents an offset from elf_base,
-    // E.g. "elf_base + 0x666"
+    // Create a BaseOffsetExpr that represents an offset from target_base,
+    // E.g. "target_base + 0x666"
     static ref<Expr> create(const ELF &elf, uint64_t offset) {
-        return create(elf.getBase(), offset, "elf_base", "");
+        return create(elf.getBase(), offset, elf.getVarPrefix() + "_base", "");
     }
 
-    // Create a BaseOffsetExpr that represents an offset from elf_base,
+    // Create a BaseOffsetExpr that represents an offset from target_base,
     // where the offset is a variable declared in the exploit script's symbol table.
-    // E.g., "elf_base + __libc_csu_init_gadget1"
-    // XXX: The base is hardcoded to elf_base for now...
-    static ref<Expr> create(const Exploit &exploit, std::string var = "") {
+    // E.g., "target_base + __libc_csu_init_gadget1"
+    static ref<Expr> create(const Exploit &exploit,
+                            const ELF &elf,
+                            std::string var = "") {
         auto it = exploit.getSymtab().find(var);
         assert(it != exploit.getSymtab().end() && "Var doesn't exist in script's symtab");
 
-        return create(exploit.getElf().getBase(), it->second, "elf_base", var);
+        return create(elf.getBase(), it->second, elf.getVarPrefix() + "_base", var);
     }
 
     // Create a BaseOffsetExpr that represents one of the following:
-    // 1. "elf_base + elf.sym['read']"  <- `BaseOffsetExpr::create(elf, "sym", "read")`
-    // 2. "elf_base + elf.got['read']"  <- `BaseOffsetExpr::create(elf, "got", "read")`
-    // 3. "elf_base + elf.bss()"        <- `BaseOffsetExpr::create(elf, "bss")`
-    // XXX: Add support for libc base/offset
+    // 1. "target_base + elf.sym['read']"  <- `BaseOffsetExpr::create(elf, "sym", "read")`
+    // 2. "target_base + elf.got['read']"  <- `BaseOffsetExpr::create(elf, "got", "read")`
+    // 3. "target_base + elf.bss()"        <- `BaseOffsetExpr::create(elf, "bss")`
     static ref<Expr> create(const ELF &elf,
                             const std::string &base,
                             const std::string &symbol = "") {
+        const std::string &prefix = elf.getVarPrefix();
+
         uint64_t offset = 0;
         std::string strOffset;
 
@@ -117,24 +110,24 @@ public:
             auto it = symbolMap.find(symbol);
             assert(it != symbolMap.end() && "Symbol doesn't exist in elf.sym");
             offset = it->second;
-            strOffset = format("elf.sym['%s']", symbol.c_str());
+            strOffset = format("%s.sym['%s']", prefix.c_str(), symbol.c_str());
 
         } else if (base == "got") {
             const auto &gotMap = elf.got();
             auto it = gotMap.find(symbol);
             assert(it != gotMap.end() && "Symbol doesn't exist in elf.got");
             offset = it->second;
-            strOffset = format("elf.got['%s']", symbol.c_str());
+            strOffset = format("%s.got['%s']", prefix.c_str(), symbol.c_str());
 
         } else if (base == "bss") {
             offset = elf.bss();
-            strOffset = "elf.bss()";
+            strOffset = format("%s.bss()", prefix.c_str());
 
         } else {
             pabort("Unsupported type of `base`");
         }
 
-        return create(elf.getBase(), offset, "elf_base", std::move(strOffset));
+        return create(elf.getBase(), offset, prefix + "_base", std::move(strOffset));
     }
 
     // Method for support type inquiry through isa, cast, and dyn_cast.
@@ -187,6 +180,16 @@ private:
         assert(strBase.size() || strOffset.size());
     }
 
+    static ref<Expr> create(uint64_t base,
+                            uint64_t offset,
+                            std::string strBase = "",
+                            std::string strOffset = "") {
+        auto lce = ConstantExpr::create(base, Expr::Int64);
+        auto rce = ConstantExpr::create(offset, Expr::Int64);
+
+        return alloc(lce, rce, strBase, strOffset);
+    }
+
     std::string m_strBase;
     std::string m_strOffset;
 };
@@ -229,7 +232,7 @@ public:
 
     // Method for support type inquiry through isa, cast, and dyn_cast.
     static bool classof(const Expr *E) {
-        return dynamic_cast<const PlaceholderExpr*>(E) != nullptr;
+        return dynamic_cast<const PlaceholderExpr *>(E) != nullptr;
     }
 
     // Method for support type inquiry through isa, cast, and dyn_cast.
@@ -326,6 +329,60 @@ private:
     ByteVectorExpr(const std::vector<uint8_t> &bytes) : Expr(), m_bytes(bytes) {}
 
     std::vector<uint8_t> m_bytes;
+};
+
+
+// A flexible expression which allows the caller to perform arbitrary action.
+class LambdaExpr : public Expr {
+    using CallbackType = std::function<void ()>;
+
+public:
+    virtual ~LambdaExpr() override = default;
+
+    virtual Kind getKind() const override {
+        return Expr::InvalidKind;
+    }
+
+    virtual Width getWidth() const override {
+        return Expr::InvalidWidth;
+    }
+
+    virtual unsigned getNumKids() const override {
+        return 0;
+    }
+
+    virtual ref<Expr> getKid(unsigned i) const override {
+        return nullptr;
+    }
+
+    virtual ref<Expr> rebuild(ref<Expr> kids[]) const override {
+        std::abort();
+    }
+
+    static ref<Expr> alloc(const CallbackType &cb) {
+        return ref<Expr>(new LambdaExpr(cb));
+    }
+
+    static ref<Expr> create(const CallbackType &cb) {
+        return alloc(cb);
+    }
+
+    // Method for support type inquiry through isa, cast, and dyn_cast.
+    static bool classof(const Expr *E) {
+        return dynamic_cast<const LambdaExpr *>(E) != nullptr;
+    }
+
+    // Method for support type inquiry through isa, cast, and dyn_cast.
+    static bool classof(const LambdaExpr *) {
+        return true;
+    }
+
+    void executeCallback() const { m_callback(); }
+
+private:
+    LambdaExpr(const CallbackType &cb) : Expr(), m_callback(cb) {}
+
+    CallbackType m_callback;
 };
 
 }  // namespace klee

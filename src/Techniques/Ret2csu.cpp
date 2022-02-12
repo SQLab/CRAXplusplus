@@ -128,7 +128,7 @@ Ret2csu::getRopSubchains(const ref<Expr> &retAddr,
     if (evaluate<uint64_t>(arg1) >= (static_cast<uint64_t>(1) << 32)) {
         const Exploit &exploit = g_crax->getExploit();
         const ELF &elf = exploit.getElf();
-        uint64_t gadgetAddr = exploit.resolveGadget("pop rdi ; ret");
+        uint64_t gadgetAddr = exploit.resolveGadget(elf, "pop rdi ; ret");
 
         ret.back() = BaseOffsetExpr::create(elf, gadgetAddr);
         ret.push_back(arg1);
@@ -239,6 +239,7 @@ void Ret2csu::searchGadget2CallTarget(std::string funcName) {
 
 void Ret2csu::buildRopSubchainTemplate() const {
     const Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
 
     std::map<std::string, std::string> transform = {
         {"rsp", "4141414141414141"},
@@ -254,7 +255,7 @@ void Ret2csu::buildRopSubchainTemplate() const {
     m_ropSubchainTemplate.resize(1);
 
     RopSubchain &rop = m_ropSubchainTemplate[0];
-    rop.push_back(BaseOffsetExpr::create(exploit, s_libcCsuInitGadget1));
+    rop.push_back(BaseOffsetExpr::create(exploit, elf, s_libcCsuInitGadget1));
     for (int i = 0; i < 7; i++) {
         std::string content = transform[m_gadget1Regs[i]];
 
@@ -264,10 +265,10 @@ void Ret2csu::buildRopSubchainTemplate() const {
             uint64_t val = std::stoull(content, nullptr, 16);
             rop.push_back(ConstantExpr::create(val, Expr::Int64));
         } else {
-            rop.push_back(BaseOffsetExpr::create(exploit, content));
+            rop.push_back(BaseOffsetExpr::create(exploit, elf, content));
         }
     }
-    rop.push_back(BaseOffsetExpr::create(exploit, s_libcCsuInitGadget2));
+    rop.push_back(BaseOffsetExpr::create(exploit, elf, s_libcCsuInitGadget2));
     for (int i = 0; i < 7; i++) {
         rop.push_back(ConstantExpr::create(0x4141414141414141, Expr::Int64));
     }

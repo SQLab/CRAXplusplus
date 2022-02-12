@@ -91,10 +91,15 @@ void IOStateInfoVisitor::operator()(const InputStateInfo &stateInfo) {
     handleStage1(stateInfo);
 
     for (size_t j = 1; j < ropChain.size(); j++) {
-        for (const ref<Expr> &e : ropChain[j]) {
-            exploit.appendRopPayload(evaluate<std::string>(e));
+        if (auto le = dyn_cast<LambdaExpr>(ropChain[j][0])) {
+            assert(ropChain[j].size() == 1);
+            le->executeCallback();
+        } else {
+            for (const ref<Expr> &e : ropChain[j]) {
+                exploit.appendRopPayload(evaluate<std::string>(e));
+            }
+            exploit.flushRopPayload();
         }
-        exploit.flushRopPayload();
     }
 }
 
@@ -122,7 +127,8 @@ void IOStateInfoVisitor::handleStage1(const InputStateInfo &stateInfo) {
     } else {
         // If either canary or PIE is enabled, stage1 needs to be solved
         // on the fly at exploitation time.
-        s += format("solve_stage1(canary, elf_base, '%s')", modState.toString().c_str());
+        s += format("solve_stage1(canary, %s_base, '%s')", elf.getVarPrefix().c_str(),
+                                                           modState.toString().c_str());
     }
 
     if (nrBytesRead || nrBytesSkipped) {
@@ -147,20 +153,13 @@ void IOStateInfoVisitor::operator()(const OutputStateInfo &stateInfo) {
     }
 
     exploit.writeline("# leaking: " + IOStates::toString(stateInfo.leakType));
+    exploit.writeline(format("proc.recv(%d)", stateInfo.bufIndex));
 
+    // XXX: Add support for leaking libc via IOStates
     if (stateInfo.leakType == IOStates::LeakType::CANARY) {
-        exploit.writelines({
-            format("proc.recv(%d)", stateInfo.bufIndex),
-            "canary = u64(b'\\x00' + proc.recv(7))",
-            "log.info('leaked canary: {}'.format(hex(canary)))",
-        });
+        exploit.writeLeakCanary();
     } else {
-        exploit.writelines({
-            format("proc.recv(%d)", stateInfo.bufIndex),
-            "elf_leak = u64(proc.recv(6).ljust(8, b'\\x00'))",
-            format("elf_base = elf_leak - 0x%x", stateInfo.baseOffset),
-            "log.info('leaked elf_base: {}'.format(hex(elf_base)))",
-        });
+        exploit.writeLeakElfBase(stateInfo.baseOffset);
     }
 
     // We still need to receive whatever that comes after

@@ -19,48 +19,50 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
+#include <s2e/Plugins/CRAX/Exploit.h>
 #include <s2e/Plugins/CRAX/Utils/Subprocess.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
 #include <cassert>
+#include <filesystem>
 #include <string>
 #include <vector>
+
 #include <pybind11/embed.h>
 #include <pybind11/stl.h>
 
 #include "ELF.h"
-
-namespace py = pybind11;
 
 namespace s2e::plugins::crax {
 
 ELF::ELF(const std::string &filename)
     : checksec(filename),
       m_elf(CRAX::s_pwnlib.attr("elf").attr("ELF").call(filename)),
-      m_symbols(),
-      m_got(),
-      m_functions(),
-      m_base() {
-    m_symbols = m_elf.attr("symbols").cast<ELF::SymbolMap>();
-    m_got = m_elf.attr("got").cast<ELF::SymbolMap>();
+      m_symbols(m_elf.attr("symbols").cast<ELF::SymbolMap>()),
+      m_plt(m_elf.attr("plt").cast<ELF::SymbolMap>()),
+      m_got(m_elf.attr("got").cast<ELF::SymbolMap>()),
+      m_functions(buildFunctionMap()),
+      m_filename(filename),
+      m_varPrefix(Exploit::toVarName(std::filesystem::path(filename).filename())),
+      m_base() {}
 
-    // The ELF class from pwnlib is huge and I don't want to
-    // introduce the entire of it into crax, so I'll perform
-    // manual conversion here.
-    py::dict functionDict = m_elf.attr("functions");
 
-    for (const auto &item : functionDict) {
-        auto name = item.first.cast<std::string>();
-        auto func = item.second.cast<py::object>();
+ELF::FunctionMap ELF::buildFunctionMap() {
+    ELF::FunctionMap ret;
 
-        m_functions[name] = {
+    for (const auto &item : m_elf.attr("functions").cast<pybind11::dict>()) {
+        const auto &name = item.first.cast<std::string>();
+        const auto &func = item.second.cast<pybind11::object>();
+
+        ret[name] = {
             func.attr("name").cast<std::string>(),
             func.attr("address").cast<uint64_t>(),
             func.attr("size").cast<uint64_t>()
         };
     }
-}
 
+    return ret;
+}
 
 uint64_t ELF::bss() const {
     return m_elf.attr("bss").call().cast<uint64_t>();

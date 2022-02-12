@@ -404,6 +404,8 @@ pluginsConfig.CRAX = {
         "Ret2csu",
         --"BasicStackPivot",
         "AdvancedStackPivot",
-        "GotPartialOverwrite",
+        --"GotPartialOverwrite",
+        "GotLeakLibc",
+        "OneGadget"
     },
 }

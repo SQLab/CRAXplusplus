@@ -31,9 +31,6 @@
 
 namespace s2e::plugins::crax {
 
-// Forward declaration
-class CRAX;
-
 class StackPivot : public Technique {
 public:
     StackPivot() : Technique() {}

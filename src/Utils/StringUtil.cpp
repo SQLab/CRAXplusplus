@@ -24,18 +24,6 @@
 
 namespace s2e::plugins::crax {
 
-std::string toString(const std::istream &is) {
-    std::stringstream ss;
-    ss << is.rdbuf();
-    return ss.str();
-}
-
-std::string toString(const std::ostream &os) {
-    std::stringstream ss;
-    ss << os.rdbuf();
-    return ss.str();
-}
-
 std::vector<std::string> split(const std::string &s, const char delim) {
     std::stringstream ss(s);
     std::vector<std::string> tokens;

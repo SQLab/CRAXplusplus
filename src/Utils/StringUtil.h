@@ -27,6 +27,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <type_traits>
 
 namespace s2e::plugins::crax {
 
@@ -58,8 +59,16 @@ std::string toByteString(InputIt first, InputIt last) {
     return ret + '\'';
 }
 
-std::string toString(const std::istream &is);
-std::string toString(const std::ostream &os);
+template <typename T,
+          std::enable_if_t<std::is_same_v<T, std::istream> ||
+                           std::is_same_v<T, std::ostream>> * = nullptr>
+std::string streamToString(const T &s) {
+    std::stringstream ss;
+    ss << s.rdbuf();
+    return ss.str();
+}
+
+
 std::vector<std::string> split(const std::string &s, const char delim);
 std::string join(const std::vector<std::string> &strings, const char delim);
 std::string replace(std::string s, const std::string &keyword, const std::string &newword);

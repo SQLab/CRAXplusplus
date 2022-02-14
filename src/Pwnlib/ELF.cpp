@@ -91,7 +91,7 @@ ELF::Checksec::Checksec(const std::string &filename)
     // Get the output of `checksec --file <m_elfFilename>`
     // and store it in `output`.
     subprocess::popen checksec("checksec", {"--file", filename});
-    std::string output = toString(checksec.stderr());
+    std::string output = streamToString(checksec.stderr());
 
     // Example output:
     // [*] '/lib/x86_64-linux-gnu/libc.so.6'

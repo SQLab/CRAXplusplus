@@ -152,7 +152,7 @@ void CRAX::onProcessLoad(S2EExecutionState *state,
 
     log<WARN>() << "onProcessLoad: " << imageFileName << '\n';
 
-    if (imageFileName.find(m_exploit.getElfFilename()) != imageFileName.npos) {
+    if (imageFileName.find(m_exploit.getElf().getFilename()) != imageFileName.npos) {
         m_targetProcessPid = pid;
 
         m_linuxMonitor->onModuleLoad.connect(

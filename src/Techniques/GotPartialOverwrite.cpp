@@ -100,11 +100,13 @@ RopSubchain GotPartialOverwrite::getExtraRopSubchain() const {
 
 
 uint8_t GotPartialOverwrite::getLsbOfReadSyscall() const {
+    const ELF &libc = g_crax->getExploit().getLibc();
+
     // Get __read() info from libc.
-    auto f = g_crax->getExploit().getLibc().functions().at("__read");
+    const Function &f = libc.functions().at("__read");
 
     std::vector<uint8_t> code(f.size);
-    std::ifstream ifs(g_crax->getExploit().getLibcFilename(), std::ios::binary);
+    std::ifstream ifs(libc.getFilename(), std::ios::binary);
     ifs.seekg(f.address, std::ios::beg);
     ifs.read(reinterpret_cast<char*>(code.data()), f.size);
 

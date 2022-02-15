@@ -1,4 +1,4 @@
-# Writing Your Own Module
+## Writing Your Own Module
 
 For example, suppose we're going to create a module called "MyModule":
 

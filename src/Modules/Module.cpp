@@ -21,6 +21,7 @@
 #include <s2e/Plugins/CRAX/CRAX.h>
 #include <s2e/Plugins/CRAX/Modules/DynamicRop/DynamicRop.h>
 #include <s2e/Plugins/CRAX/Modules/IOStates/IOStates.h>
+#include <s2e/Plugins/CRAX/Modules/IOStates/SymbolicAddressMap.h>
 
 #include <cassert>
 #include <type_traits>
@@ -48,6 +49,8 @@ std::unique_ptr<Module> Module::create(const std::string &name) {
         ret = std::make_unique<DynamicRop>();
     } else if (name == "IOStates") {
         ret = std::make_unique<IOStates>();
+    } else if (name == "SymbolicAddressMap") {
+        ret = std::make_unique<SymbolicAddressMap>();
     }
 
     assert(ret && "Module::create() failed, incorrect module name given in config?");

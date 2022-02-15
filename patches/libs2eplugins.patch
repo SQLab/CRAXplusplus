@@ -24,3 +24,50 @@ index 933ae3e..087d621 100644
                      ${S2EGUEST_INCLUDE_DIR})
  
  add_subdirectory(src)
+diff --git a/libs2eplugins/src/CMakeLists.txt b/libs2eplugins/src/CMakeLists.txt
+index e3b2d37..1a8e1fb 100644
+--- a/libs2eplugins/src/CMakeLists.txt
++++ b/libs2eplugins/src/CMakeLists.txt
+@@ -23,6 +23,33 @@ PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/s2e/Plug
+ add_library(
+     s2eplugins
+ 
++    # Exploit generation
++    s2e/Plugins/CRAX/API/Disassembler.cpp
++    s2e/Plugins/CRAX/API/Logging.cpp
++    s2e/Plugins/CRAX/API/Memory.cpp
++    s2e/Plugins/CRAX/API/Register.cpp
++    s2e/Plugins/CRAX/API/VirtualMemoryMap.cpp
++    s2e/Plugins/CRAX/Expr/BinaryExprEvaluator.cpp
++    s2e/Plugins/CRAX/Modules/Module.cpp
++    s2e/Plugins/CRAX/Modules/DynamicRop/DynamicRop.cpp
++    s2e/Plugins/CRAX/Modules/IOStates/IOStates.cpp
++    s2e/Plugins/CRAX/Modules/IOStates/LeakBasedCoreGenerator.cpp
++    s2e/Plugins/CRAX/Modules/SymbolicAddressMap/SymbolicAddressMap.cpp
++    s2e/Plugins/CRAX/Techniques/Technique.cpp
++    s2e/Plugins/CRAX/Techniques/Ret2csu.cpp
++    s2e/Plugins/CRAX/Techniques/StackPivot.cpp
++    s2e/Plugins/CRAX/Techniques/GotPartialOverwrite.cpp
++    s2e/Plugins/CRAX/Techniques/GotLeakLibc.cpp
++    s2e/Plugins/CRAX/Techniques/OneGadget.cpp
++    s2e/Plugins/CRAX/Pwnlib/ELF.cpp
++    s2e/Plugins/CRAX/Pwnlib/Util.cpp
++    s2e/Plugins/CRAX/Utils/Algorithm.cpp
++    s2e/Plugins/CRAX/Utils/StringUtil.cpp
++    s2e/Plugins/CRAX/CRAX.cpp
++    s2e/Plugins/CRAX/Exploit.cpp
++    s2e/Plugins/CRAX/ExploitGenerator.cpp
++    s2e/Plugins/CRAX/RopChainBuilder.cpp
++
+     # Core plugins
+     s2e/Plugins/Core/BaseInstructions.cpp
+     s2e/Plugins/Core/HostFiles.cpp
+@@ -163,7 +190,7 @@ set(WERROR_FLAGS "-Werror -Wno-zero-length-array -Wno-c99-extensions          \
+                   -Wno-zero-length-array")
+ 
+ set(COMMON_FLAGS "-D__STDC_FORMAT_MACROS -D_GNU_SOURCE -DNEED_CPU_H  -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -DTARGET_PHYS_ADDR_BITS=64")
+-set(COMMON_FLAGS "${COMMON_FLAGS} -Wall -fPIC -fno-strict-aliasing -fexceptions -std=c++17")
++set(COMMON_FLAGS "${COMMON_FLAGS} -Wall -fPIC -fno-strict-aliasing -fexceptions -fsized-deallocation -std=c++17")
+ 
+ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${WERROR_FLAGS} ${COMMON_FLAGS}")
+ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${WERROR_FLAGS} ${COMMON_FLAGS}")

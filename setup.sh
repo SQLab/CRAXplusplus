@@ -57,8 +57,6 @@ cd "$S2E_SRC" && {
         echo -e "${YELLOW}[!] Warning: failed to apply patch. You may ignore this message.${RESET}"
     fi
 }
-ln -sfv "$CRAX_ROOT"/patches/libs2eplugins/src/CMakeLists.txt \
-        "$S2E_SRC"/libs2eplugins/src/CMakeLists.txt
 
 
 echo -e "[*] Copying CRAXplusplus source tree..."

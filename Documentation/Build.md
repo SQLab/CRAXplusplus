@@ -61,7 +61,7 @@ Download pre-built VM images (~30 mins)
 s2e image_build linux -d
 ```
 
-## Grabbing the Source of CRAX++
+## Building CRAX++ Manually
 
 Now let's move on and build CRAX++.
 ```
@@ -86,11 +86,14 @@ s2e new_project --image debian-9.2.1-x86_64 ~/s2e/source/CRAXplusplus/proxies/sy
 
 Run `setup.sh`. This applies several patches to the S2E source tree, and places some symlinks in your S2E project.
 ```
+cd ~/s2e/source/CRAXplusplus
 ./setup.sh
 ```
 
-Rebuild S2E
+Merge the source code of CRAX++ into S2E source tree, and rebuild S2E.
 ```
+rm -rf ~/s2e/source/s2e/libs2eplugins/src/s2e/Plugins/CRAX
+cp -ar ~/s2e/source/CRAXplusplus/src ~/s2e/source/s2e/libs2eplugins/src/s2e/Plugins/CRAX
 cd ~/s2e
 s2e build
 ```

@@ -59,9 +59,7 @@ std::string toByteString(InputIt first, InputIt last) {
     return ret + '\'';
 }
 
-template <typename T,
-          std::enable_if_t<std::is_same_v<T, std::istream> ||
-                           std::is_same_v<T, std::ostream>> * = nullptr>
+template <typename T>
 std::string streamToString(const T &s) {
     std::stringstream ss;
     ss << s.rdbuf();
@@ -70,11 +68,14 @@ std::string streamToString(const T &s) {
 
 
 std::vector<std::string> split(const std::string &s, const char delim);
+std::vector<std::string> split(const std::string &s, const std::string &delim);
+
 std::string join(const std::vector<std::string> &strings, const char delim);
 std::string replace(std::string s, const std::string &keyword, const std::string &newword);
 std::string slice(std::string s, size_t start, size_t end = std::string::npos);  // [start, end)
 std::string strip(std::string s);
 std::string ljust(std::string s, size_t size, char c);
+
 bool startsWith(const std::string &s, const std::string &prefix);
 bool endsWith(const std::string &s, const std::string &suffix);
 bool isNumString(const std::string &s);

@@ -37,6 +37,20 @@ std::vector<std::string> split(const std::string &s, const char delim) {
     return tokens;
 }
 
+std::vector<std::string> split(const std::string &s, const std::string &delim) {
+    size_t begin = 0;
+    size_t end = s.npos;
+    std::vector<std::string> tokens;
+
+    while ((end = s.find(delim, begin)) && end != s.npos) {
+        tokens.push_back(s.substr(begin, end - begin));
+        begin = end + delim.size();
+    }
+
+    tokens.push_back(s.substr(begin, end - begin));
+    return tokens;
+}
+
 std::string join(const std::vector<std::string> &strings, const char delim) {
     std::stringstream ss;
     for (size_t i = 0; i < strings.size(); i++) {

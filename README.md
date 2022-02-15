@@ -82,7 +82,7 @@ int main() {
 
 [[Paper](https://www.airitilibrary.com/Publication/alDetailedMesh1?DocID=U0001-0508202117214500)]
 
-> ASLR is a binary protection technique to prevent exploitation by randomizing the loaded section base address in every execution, which is enabled by default in modern operating systems. With ASLR enabled, exploitation will become more complicated as attacker has to leak additional information to bypass ASLR. However, we notice that most of the state-of-the-art Auto- mated Exploit Generation solutions assume that ASLR is disabled to generate a working exploit. Thus, we proposed a prototype called LAEG that utilizes Dynamic Taint Analysis to analyse the given proof-of-crash input and record the input and output state information that can be used to determine potential information leak. Then, LAEG leverages this information to recover sections’ base address and generate an exploit to bypass ASLR. Our result shows that LAEG can bypass various binary protections, including not only ASLR, but also PIE, and stack canary. In addition, LAEG shows better performance than an opensource AEG solution Zeratool and has about 6.46x to 45.15x speedup in exploit generation compared to human experts.
+> ASLR is a binary protection technique to prevent exploitation by randomizing the loaded section base address in every execution, which is enabled by default in modern operating systems. With ASLR enabled, exploitation will become more complicated as attacker has to leak additional information to bypass ASLR. However, we notice that most of the state-of-the-art Automated Exploit Generation solutions assume that ASLR is disabled to generate a working exploit. Thus, we proposed a prototype called LAEG that utilizes Dynamic Taint Analysis to analyse the given proof-of-crash input and record the input and output state information that can be used to determine potential information leak. Then, LAEG leverages this information to recover sections’ base address and generate an exploit to bypass ASLR. Our result shows that LAEG can bypass various binary protections, including not only ASLR, but also PIE, and stack canary. In addition, LAEG shows better performance than an opensource AEG solution Zeratool and has about 6.46x to 45.15x speedup in exploit generation compared to human experts.
 >
 > -- [@how2hack](https://github.com/how2hack), Balsn CTF Team from Network Security Lab of National Taiwan University
 
@@ -107,7 +107,7 @@ All binaries are concolically executed in S2E guest environment () evaluted on U
 This work is impossible without:
 
 * [Balsn CTF Team](https://github.com/balsn) and Network Security Lab, NTU
-* [Vitaly Chipounov](https://github.com/vitalych/), the lead developer of S2E, as well as all the S2E contributors
+* S2E: [Vitaly Chipounov](https://github.com/vitalych/) and all the S2E authors/contributors
 * Software Quality Lab, NYCU
 
 ## License

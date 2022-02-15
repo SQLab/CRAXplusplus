@@ -39,6 +39,25 @@ public:
 
     virtual std::vector<RopSubchain> getRopSubchains() const override;
     virtual RopSubchain getExtraRopSubchain() const override;
+
+private:
+    struct LibcOneGadget {
+        LibcOneGadget() : offset(), gadgets() {}
+        uint64_t offset;
+        std::vector<std::string> gadgets;
+    };
+
+    // Parses the output of `one_gadget <libc_path>` 
+    std::vector<LibcOneGadget> parseOneGadget();
+
+    // Parses a line of constraint and returns the gadget we need to resolve.
+    // Input:  "r15 == NULL"
+    // Output: "pop r15 ; ret"
+    std::string parseConstraint(const std::string &constraintStr);
+
+
+    // The "one" gadget which will be used during the actual exploitation.
+    LibcOneGadget m_oneGadget;
 };
 
 }  // namespace s2e::plugins::crax

@@ -390,6 +390,7 @@ pluginsConfig.CRAX = {
     modules = {
         "DynamicRop",
         "IOStates",
+        --"SymbolicAddressMap",
     },
 
     -- Module config

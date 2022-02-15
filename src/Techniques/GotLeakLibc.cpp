@@ -89,7 +89,9 @@ std::vector<RopSubchain> GotLeakLibc::getRopSubchains() const {
     }
 
     assert(targetSym.size() && "No suitable candiate for leaking libc base from GOT?");
-    log<WARN>() << "targetSym = " << targetSym << '\n';
+
+    // The following line is for debugging purpose:
+    //log<WARN>() << "targetSym = " << targetSym << '\n';
 
 
     // Write "%s\n\x00" to somewhere in .bss, so that we can

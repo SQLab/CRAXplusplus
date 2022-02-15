@@ -1,25 +1,30 @@
 # Writing Your Own Module
 
-For instance, suppose we're going to create a module called "MyModule":
+For example, suppose we're going to create a module called "MyModule":
 
-1. Create two files in **libs2eplugins/src/s2e/Plugins/CRAX/Modules/**:
+1. Create a directory named `MyModule` in **libs2eplugins/src/s2e/Plugins/CRAX/Modules/**.
+
+2. In MyModule directory, create two files:
+   * MyModule.h
+   * MyModule.cpp
+
+   <br>
 
    ```cpp
-   // libs2eplugins/src/s2e/Plugins/CRAX/Modules/MyModule.h
-
+   // libs2eplugins/src/s2e/Plugins/CRAX/Modules/MyModule/MyModule.h
    #ifndef S2E_PLUGINS_CRAX_MY_MODULE_H
    #define S2E_PLUGINS_CRAX_MY_MODULE_H
 
    #include <s2e/Plugins/CRAX/Modules/Module.h>
 
    namespace s2e::plugins::crax {
-
+   
    class MyModule : public Module {
    public:
        class State : public ModuleState {
        public:
-           State() = default;
-           virtual ~State() = default;
+           State() : ModuleState() {}
+           virtual ~State() override = default;
 
            static ModuleState *factory(Module *, CRAXState *) {
                return new State();
@@ -28,13 +33,15 @@ For instance, suppose we're going to create a module called "MyModule":
            virtual ModuleState *clone() const override {
                return new State(*this);
            }
-
+           
+       private:
            // Your per-state module data goes here:
            // ...
        };
 
-       explicit MyModule(CRAX &ctx);
-       virtual ~MyModule() = default;
+
+       MyModule() = default;
+       virtual ~MyModule() override = default;
 
        virtual std::string toString() const override {
            return "MyModule";
@@ -51,8 +58,7 @@ For instance, suppose we're going to create a module called "MyModule":
    ```
 
    ```cpp
-   // libs2eplugins/src/s2e/Plugins/CRAX/Modules/MyModule.cpp
-
+   // libs2eplugins/src/s2e/Plugins/CRAX/Modules/MyModule/MyModule.cpp
    #include "MyModule.h"
 
    namespace s2e::plugins::crax {
@@ -65,7 +71,8 @@ For instance, suppose we're going to create a module called "MyModule":
    ```
 
 2. In **libs2eplugins/src/CMakeLists.txt**, remember to add your corresponding .cpp file.
-3. In **s2e-config.lua**, make sure to add "MyModule".
+
+3. In **s2e-config.template.lua**, make sure to add "MyModule".
 
    ```lua
    add_plugin("CRAX")
@@ -74,9 +81,9 @@ For instance, suppose we're going to create a module called "MyModule":
        -- ...
        -- Modules of CRAX++ that you wish to load.
        modules = {
-           "ExploitGenerator",
-           "RopChainBuilder",
+           "DynamicRop",
            "IOStates",
+           "SymbolicAddressMap",
            "MyModule",  -- <-- here
        },
        -- ...
@@ -86,8 +93,10 @@ For instance, suppose we're going to create a module called "MyModule":
 4. To access per-state module data from MyModule::foo()
 
    ```cpp
+   #include <s2e/Plugins/CRAX/CRAX.h>
+   
    void MyModule::foo(S2EExecutionState *state) {
-       MyModule::State *modState = m_ctx.getPluginModuleState(state, this);
+       MyModule::State *modState = g_crax->getModuleState(state, this);
        // ...
    }
    ```
@@ -95,11 +104,11 @@ For instance, suppose we're going to create a module called "MyModule":
 5. To access per-state module data from another module, e.g. ExploitGenerator::foo()
 
    ```cpp
+   #include <s2e/Plugins/CRAX/CRAX.h>
+   
    void ExploitGenerator::foo(S2EExecutionState *state) {
-       MyModule *mod = dynamic_cast<MyModule *>(CRAX::getModule("MyModule"));
-       assert(mod);
-
-       MyModule::State *modState = m_ctx.getPluginModuleState(state, mod);
+       MyModule *mod = CRAX::getModule<MyModule>();
+       MyModule::State *modState = g_crax->getModuleState(state, mod);
        // ...
    }
    ```

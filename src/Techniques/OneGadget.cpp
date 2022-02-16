@@ -148,7 +148,7 @@ std::vector<OneGadget::LibcOneGadget> OneGadget::parseOneGadget() const {
 OneGadget::GadgetValuePair OneGadget::parseConstraint(const std::string &constraintStr) const {
     static const std::regex reg1("^[a-z0-9]* == NULL$");
     static const std::regex reg2("^[[a-z0-9]*] == NULL$");
-    static const std::regex reg3("^[[a-z0-9]*\\+0[xX][a-f0-9]+] == NULL$");
+    static const std::regex reg3("^[[a-z0-9]*[\\+\\-]0[xX][a-f0-9]+] == NULL$");
     static const std::regex reg4("^[a-z0-9]* is the GOT address of libc");
 
     const Exploit &exploit = g_crax->getExploit();
@@ -160,21 +160,43 @@ OneGadget::GadgetValuePair OneGadget::parseConstraint(const std::string &constra
     if (std::regex_match(constraintStr, match, reg1)) {
         // e.g., x == NULL
         // Set the register x to 0.
-        std::string reg = constraintStr.substr(0, constraintStr.find(' '));
+        size_t i = constraintStr.find(' ');
+        assert(i != std::string::npos);
+
+        std::string reg = constraintStr.substr(0, i);
+
         ret.first = format("pop %s ; ret", reg.c_str());
         ret.second = ConstantExpr::create(0, Expr::Int64);
 
     } else if (std::regex_match(constraintStr, match, reg2)) {
         // e.g., [x] == NULL
         // Set the register x to some value where [x] == 0.
-        std::string reg = constraintStr.substr(1, constraintStr.find(']') - 1);
+        size_t i = constraintStr.find(']');
+        assert(i != std::string::npos);
+
+        std::string reg = constraintStr.substr(1, i - 1);
         uint64_t offset = elf.checksec.hasPIE ? 8 : 0x400008;
+
         ret.first = format("pop %s ; ret", reg.c_str());
         ret.second = BaseOffsetExpr::create(elf, offset);
 
     } else if (std::regex_match(constraintStr, match, reg3)) {
-        // e.g., [x+0x40] == NULL
-        // XXX: Implement this
+        // e.g., [x+0x40] == NULL or [x-0x32] == NULL
+        size_t i = constraintStr.find_first_of("+-");
+        size_t j = constraintStr.find(']', i + 1);
+        assert(i != std::string::npos);
+        assert(j != std::string::npos);
+
+        std::string reg = constraintStr.substr(1, i - 1);
+        std::string regOffsetStr = constraintStr.substr(i + 1, j - i - 1);
+        uint64_t regOffset = std::stoull(regOffsetStr, nullptr, 16);
+
+        bool isRegOffsetPositive = constraintStr[i] == '+';
+        uint64_t offset = elf.checksec.hasPIE ? 8 : 0x400008;
+        offset += isRegOffsetPositive ? -regOffset : regOffset;
+
+        ret.first = format("pop %s ; ret", reg.c_str());
+        ret.second = BaseOffsetExpr::create(elf, offset);
 
     } else if (std::regex_match(constraintStr, match, reg4)) {
         // e.g., x is the GOT address of libc

@@ -43,25 +43,26 @@ Extending CRAX++
 
 ## Quick Example
 
-* ASLR + NX + PIE + Canary
-* Exploit: [examples/aslr-nx-pie-canary/exploit_9.py](examples/aslr-nx-pie-canary/exploit_9.py)
+* ASLR + NX + PIE + Canary + Full RELRO
+* Exploit script: [examples/aslr-nx-pie-canary-fullrelro/exploit_11.py](examples/aslr-nx-pie-canary-fullrelro/exploit_11.py)
 
 ```c
 #include <stdio.h>
 #include <unistd.h>
 
 int main() {
-    setvbuf(stdin, NULL, _IONBF, 0);
-    setvbuf(stdout, NULL, _IONBF, 0);
-
     char buf[0x18];
+
     printf("what's your name: ");
+    fflush(stdout);
     read(0, buf, 0x80);
 
     printf("Hello, %s. Your comment: ", buf);
+    fflush(stdout);
     read(0, buf, 0x80);
 
     printf("Thanks! We've received it: %s\n", buf);
+    fflush(stdout);
     read(0, buf, 0x30);
 }
 ```

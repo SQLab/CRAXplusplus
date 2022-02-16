@@ -311,7 +311,7 @@ void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,
 void CRAX::onStateForkDecide(S2EExecutionState *state,
                              const ref<Expr> &condition,
                              bool &allowForking) {
-    // At this point, `*allowForking` is true by default.
+    // At this point, `allowForking` is true by default.
     if (!m_disableNativeForking) {
         return;
     }

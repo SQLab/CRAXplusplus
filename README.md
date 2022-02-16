@@ -88,7 +88,12 @@ int main() {
 
 ## Trophies
 
-All binaries are concolically executed in S2E guest environment () evaluted on Ubuntu 20.04.1 (5.11.0-46-generic). See the `example` directory for details.
+All binaries are concolically executed within S2E guest, while all generate exploit scripts are executed in host.
+
+* Guest: Debian 9.2.1 x86_64 (4.9.3-s2e)
+* Host: Ubuntu 20.04.1 x86_64 (5.11.0-46-generic)
+
+We avoid using libc-sensitive exploitation techniques, i.e., our exploitation techniques work across different versions of libc.
 
 | Binary | ASLR | NX | PIE | Canary | Full RELRO | Source | Exploit |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -101,6 +106,8 @@ All binaries are concolically executed in S2E guest environment () evaluted on U
 | [readme-alt1](examples/readme-alt1) | ✓ | ✓ | | |  | [main.c](examples/readme-alt1/main.c) | [script](examples/readme-alt1/exploit_0.py) |
 | [readme-alt2](examples/readme-alt2) | ✓ | ✓ | | |  | [main.c](examples/readme-alt2/main.c) | [script](examples/readme-alt2/exploit_0.py) |
 | [pwnable.tw: unexploitable (500 pts)](https://pwnable.tw/challenge/#20) | ✓ | ✓ | | | | [main.c](examples/unexploitable/main.c) | [script](examples/unexploitable/exploit_0.py) |
+
+See the `example` directory for details.
 
 ## Special Thanks (Listed Lexicographically)
 

@@ -1,5 +1,5 @@
 CXX=gcc
-CXXFLAGS=-g -Wall -no-pie -fno-stack-protector
+CXXFLAGS=-g -z lazy -no-pie -fno-stack-protector
 SRC=main.c
 BIN=aslr-nx
 

@@ -1,5 +1,5 @@
 CXX=gcc
-CXXFLAGS=-g
+CXXFLAGS=-g -z lazy
 SRC=main.c
 BIN=aslr-nx-pie-canary
 

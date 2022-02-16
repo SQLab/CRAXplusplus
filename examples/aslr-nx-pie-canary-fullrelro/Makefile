@@ -1,5 +1,5 @@
 CXX=gcc
-CXXFLAGS=-g -Wl,-z,relro,-z,now
+CXXFLAGS=-g -z now
 SRC=main.c
 BIN=aslr-nx-pie-canary-fullrelro
 

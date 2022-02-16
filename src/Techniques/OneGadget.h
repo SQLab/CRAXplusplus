@@ -21,10 +21,13 @@
 #ifndef S2E_PLUGINS_CRAX_ONE_GADGET_H
 #define S2E_PLUGINS_CRAX_ONE_GADGET_H
 
+#include <klee/Expr.h>
 #include <s2e/Plugins/CRAX/Techniques/Technique.h>
 
+#include <regex>
 #include <string>
 #include <vector>
+#include <utility>
 
 namespace s2e::plugins::crax {
 
@@ -41,19 +44,21 @@ public:
     virtual RopSubchain getExtraRopSubchain() const override;
 
 private:
+    using GadgetValuePair = std::pair<std::string, klee::ref<klee::Expr>>;
+
     struct LibcOneGadget {
         LibcOneGadget() : offset(), gadgets() {}
         uint64_t offset;
-        std::vector<std::string> gadgets;
+        std::vector<GadgetValuePair> gadgets;
     };
 
     // Parses the output of `one_gadget <libc_path>` 
-    std::vector<LibcOneGadget> parseOneGadget();
+    std::vector<LibcOneGadget> parseOneGadget() const;
 
     // Parses a line of constraint and returns the gadget we need to resolve.
     // Input:  "r15 == NULL"
-    // Output: "pop r15 ; ret"
-    std::string parseConstraint(const std::string &constraintStr);
+    // Output: ["pop r15 ; ret", r15_value]
+    GadgetValuePair parseConstraint(const std::string &constraintStr) const;
 
 
     // The "one" gadget which will be used during the actual exploitation.

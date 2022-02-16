@@ -495,17 +495,7 @@ IOStates::LeakType IOStates::getLeakType(const std::string &image) const {
 void IOStates::State::dump() const {
     auto &os = log<WARN>();
     os << "Dumping IOStates: [";
-
-    for (size_t i = 0; i < stateInfoList.size(); i++) {
-        if (const auto &inputStateInfo = std::get_if<InputStateInfo>(&stateInfoList[i])) {
-            os << "input";
-        } else {
-            os << "output";
-        }
-        if (i != stateInfoList.size() - 1) {
-            os << ", ";
-        }
-    }
+    os << toString();
     os << "]\n";
 }
 

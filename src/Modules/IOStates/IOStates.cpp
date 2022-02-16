@@ -147,6 +147,12 @@ void IOStates::initUserSpecifiedStateInfoList() {
             }
             m_userSpecifiedStateInfoList.push_back(std::move(stateInfo));
 
+        } else if (s[0] == 's') {
+            assert(s.size() > 1);
+            SleepStateInfo stateInfo;
+            stateInfo.sec = std::stoull(s.substr(1));
+            m_userSpecifiedStateInfoList.push_back(std::move(stateInfo));
+
         } else {
             pabort("Corrupted stateInfoList provided.");
         }
@@ -508,11 +514,16 @@ std::string IOStates::State::toString() const {
         if (const auto stateInfo = std::get_if<InputStateInfo>(&info)) {
             ret += 'i';
             ret += std::to_string(stateInfo->offset);
+
         } else if (const auto stateInfo = std::get_if<OutputStateInfo>(&info)) {
             ret += 'o';
             if (stateInfo->isInteresting) {
                 ret += std::to_string(stateInfo->bufIndex);
             }
+
+        } else if (const auto stateInfo = std::get_if<SleepStateInfo>(&info)) {
+            ret += 's';
+            ret += std::to_string(stateInfo->sec);
         }
 
         if (i != stateInfoList.size() - 1) {

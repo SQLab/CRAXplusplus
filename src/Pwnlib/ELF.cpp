@@ -44,7 +44,15 @@ ELF::ELF(const std::string &filename)
       m_functions(buildFunctionMap()),
       m_filename(filename),
       m_varPrefix(Exploit::toVarName(std::filesystem::path(filename).filename())),
-      m_base() {}
+      m_base() {
+    // XXX: This is a workaround for https://github.com/Gallopsled/pwntools/issues/1983
+    for (auto &entry : m_plt) {
+        auto it = m_symbols.find(entry.first);
+        assert(it != m_symbols.end());
+        it->second &= ~0xf;
+        entry.second &= ~0xf;
+    }
+}
 
 
 ELF::FunctionMap ELF::buildFunctionMap() {

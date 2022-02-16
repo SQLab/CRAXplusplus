@@ -37,10 +37,12 @@ void GotPartialOverwrite::initialize() {
 }
 
 bool GotPartialOverwrite::checkRequirements() const {
-    const auto &sym = g_crax->getExploit().getElf().symbols();
+    const ELF &elf = g_crax->getExploit().getElf();
 
     // read() must be present in the GOT of the target binary.
-    return Technique::checkRequirements() && sym.find("read") != sym.end();
+    return Technique::checkRequirements() &&
+           !elf.checksec.hasFullRELRO &&
+           elf.symbols().find("read") != elf.symbols().end();
 }
 
 std::vector<RopSubchain> GotPartialOverwrite::getRopSubchains() const {

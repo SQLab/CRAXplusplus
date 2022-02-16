@@ -88,12 +88,13 @@ int main() {
 
 ## Trophies
 
-All binaries are concolically executed within S2E guest, while all generate exploit scripts are executed in host.
+Experimental Setup:
 
-* Guest: Debian 9.2.1 x86_64 (4.9.3-s2e)
-* Host: Ubuntu 20.04.1 x86_64 (5.11.0-46-generic)
+* Binaries are compiled with gcc 9.3.0 (Ubuntu 9.3.0-17ubuntu1~20.04)
+* Binaries are concolically executed in S2E guest (Debian 9.2.1 x86_64, 4.9.3-s2e)
+* All generate exploit scripts are executed in host (Ubuntu 20.04.1 x86_64, 5.11.0-46-generic)
 
-We avoid using libc-sensitive exploitation techniques, i.e., our exploitation techniques work across different versions of libc.
+We avoid using libc-sensitive exploitation techniques, i.e., the exploit scripts work across different versions of libc.
 
 | Binary | ASLR | NX | PIE | Canary | Full RELRO | Source | Exploit |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -107,11 +108,9 @@ We avoid using libc-sensitive exploitation techniques, i.e., our exploitation te
 | [readme-alt2](examples/readme-alt2) | ✓ | ✓ | | |  | [main.c](examples/readme-alt2/main.c) | [script](examples/readme-alt2/exploit_0.py) |
 | [pwnable.tw: unexploitable (500 pts)](https://pwnable.tw/challenge/#20) | ✓ | ✓ | | | | [main.c](examples/unexploitable/main.c) | [script](examples/unexploitable/exploit_0.py) |
 
-See the `example` directory for details.
-
 ## Special Thanks (Listed Lexicographically)
 
-This work is impossible without:
+This project is impossible without:
 
 * [Balsn CTF Team](https://github.com/balsn) and Network Security Lab, NTU
 * S2E: [Vitaly Chipounov](https://github.com/vitalych/) and all the S2E authors/contributors

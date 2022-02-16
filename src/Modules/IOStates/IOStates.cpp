@@ -22,6 +22,7 @@
 #include <s2e/Plugins/CRAX/API/Disassembler.h>
 #include <s2e/Plugins/CRAX/Modules/IOStates/LeakBasedCoreGenerator.h>
 #include <s2e/Plugins/CRAX/Pwnlib/Util.h>
+#include <s2e/Plugins/CRAX/Utils/VariantOverload.h>
 
 #include <unistd.h>
 
@@ -509,22 +510,20 @@ std::string IOStates::State::toString() const {
     std::string ret;
 
     for (size_t i = 0; i < stateInfoList.size(); i++) {
-        const auto &info = stateInfoList[i];
-
-        if (const auto stateInfo = std::get_if<InputStateInfo>(&info)) {
-            ret += 'i';
-            ret += std::to_string(stateInfo->offset);
-
-        } else if (const auto stateInfo = std::get_if<OutputStateInfo>(&info)) {
-            ret += 'o';
-            if (stateInfo->isInteresting) {
-                ret += std::to_string(stateInfo->bufIndex);
+        std::visit(overload {
+            [&ret](const InputStateInfo &stateInfo) {
+                ret += 'i' + std::to_string(stateInfo.offset);
+            },
+            [&ret](const OutputStateInfo &stateInfo) {
+                ret += 'o';
+                if (stateInfo.isInteresting) {
+                    ret += std::to_string(stateInfo.bufIndex);
+                }
+            },
+            [&ret](const SleepStateInfo &stateInfo) {
+                ret += 's' + std::to_string(stateInfo.sec);
             }
-
-        } else if (const auto stateInfo = std::get_if<SleepStateInfo>(&info)) {
-            ret += 's';
-            ret += std::to_string(stateInfo->sec);
-        }
+        }, stateInfoList[i]);
 
         if (i != stateInfoList.size() - 1) {
             ret += ',';

@@ -268,6 +268,9 @@ void AdvancedStackPivot::maybeInterceptReadCallSites(S2EExecutionState *state,
 }
 
 void AdvancedStackPivot::beforeExploitGeneration(S2EExecutionState *state) {
+    assert(m_readCallSites.size() &&
+           "AdvancedStackPivot requires at least one call site of read().");
+
     const auto &readCallSiteInfo = *m_readCallSites.rbegin();
     uint64_t rsp = reg().readConcrete(Register::X64::RSP);
     m_offsetToRetAddr = rsp - readCallSiteInfo.buf - 16;

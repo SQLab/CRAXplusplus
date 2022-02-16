@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
+#include <s2e/Plugins/CRAX/Utils/VariantOverload.h>
 
 #include "DynamicRop.h"
 
@@ -57,39 +58,40 @@ void DynamicRop::applyNextConstraintGroup(S2EExecutionState &state) {
     }
 
     bool ok;
-    bool hasRipConstraint = false;
-    const ELF &elf = g_crax->getExploit().getElf();
 
     log<WARN>() << "Adding dynamic ROP constraints...\n";
     for (const auto &c : modState->constraintsQueue.front()) {
-        if (const auto rc = std::get_if<RegisterConstraint>(&c)) {
-            hasRipConstraint |= rc->reg == Register::X64::RIP;
+        std::visit(overload {
+            [&state, &ok](const MemoryConstraint &mc) {
+                ok = RopChainBuilder::addMemoryConstraint(state, mc.addr, mc.expr);
+                mem().writeSymbolic(mc.addr, mc.expr);
+            },
 
-            auto ce = dyn_cast<ConstantExpr>(rc->expr);
-            ref<Expr> e1 = rc->expr;
-            ref<Expr> e2 = rc->expr;
+            [&state, &ok](const RegisterConstraint &rc) {
+                auto ce = dyn_cast<ConstantExpr>(rc.expr);
+                ref<Expr> e1 = rc.expr;
+                ref<Expr> e2 = rc.expr;
 
-            // Try to rebase address `ce` to the user-specified elf base.
-            // XXX: Currently it only checks whether `ce` is an ELF address.
-            // We should probably do this for any other module/region.
-            const auto &vmmap = mem(&state).vmmap();
-            auto it = vmmap.find(ce->getZExtValue());
-            bool isElfAddress = it != vmmap.end() &&
-                                (*it)->moduleName == VirtualMemoryMap::s_elfLabel;
+                // Try to rebase address `ce` to the user-specified elf base.
+                //
+                // XXX: Currently it only checks whether `ce` is an ELF address.
+                //      We should probably do this for any other module/region.
+                const auto &vmmap = mem(&state).vmmap();
+                auto it = vmmap.find(ce->getZExtValue());
+                bool isElfAddress = it != vmmap.end() &&
+                                    (*it)->moduleName == VirtualMemoryMap::s_elfLabel;
 
-            if (g_crax->getUserSpecifiedElfBase() && isElfAddress) {
-                uint64_t userElfBase = g_crax->getUserSpecifiedElfBase();
-                uint64_t rebasedAddress = elf.rebaseAddress(ce->getZExtValue(), userElfBase);
-                e1 = ConstantExpr::create(rebasedAddress, Expr::Int64);
+                if (g_crax->getUserSpecifiedElfBase() && isElfAddress) {
+                    const ELF &elf = g_crax->getExploit().getElf();
+                    uint64_t userElfBase = g_crax->getUserSpecifiedElfBase();
+                    uint64_t rebasedAddress = elf.rebaseAddress(ce->getZExtValue(), userElfBase);
+                    e1 = ConstantExpr::create(rebasedAddress, Expr::Int64);
+                }
+
+                ok = RopChainBuilder::addRegisterConstraint(state, rc.reg, e1);
+                reg().writeSymbolic(rc.reg, e2);
             }
-
-            ok = RopChainBuilder::addRegisterConstraint(state, rc->reg, e1);
-            reg().writeSymbolic(rc->reg, e2);
-
-        } else if (const auto mc = std::get_if<MemoryConstraint>(&c)) {
-            ok = RopChainBuilder::addMemoryConstraint(state, mc->addr, mc->expr);
-            mem().writeSymbolic(mc->addr, mc->expr);
-        }
+        }, c);
 
         if (!ok) {
             g_s2e->getExecutor()->terminateState(state, "Dynamic ROP failed");
@@ -100,9 +102,7 @@ void DynamicRop::applyNextConstraintGroup(S2EExecutionState &state) {
 
     // To make the target program restart at the address we've specified,
     // we need to throw a CpuExitException to invalidate the current translation block.
-    if (hasRipConstraint) {
-        throw CpuExitException();
-    }
+    throw CpuExitException();
 }
 
 void DynamicRop::beforeExploitGeneration(S2EExecutionState *state) {

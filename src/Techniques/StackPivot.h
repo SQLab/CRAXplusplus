@@ -84,6 +84,8 @@ private:
 
     void beforeExploitGeneration(S2EExecutionState *state);
 
+    void initDynamicRopConstraintsOnce() const;
+
     uint64_t determineRetAddr(uint64_t readCallSiteAddr,
                               int &rbpOffset) const;
 

@@ -115,60 +115,15 @@ AdvancedStackPivot::AdvancedStackPivot()
 
 void AdvancedStackPivot::initialize() {
     resolveRequiredGadgets();
-
-    S2EExecutionState *state = g_crax->getCurrentState();
-
-    auto __dynRop = g_crax->getModule<DynamicRop>();
-    assert(__dynRop && "AdvancedStackPivot relies on DynamicRop module");
-
-    auto modState = g_crax->getModuleState(state, __dynRop);
-    assert(modState);
-
-    if (modState->initialized) {
-        return;
-    }
-
-    modState->initialized = true;
-    auto &dynRop = *__dynRop;
-
-    // Resolve ret2LeaRbp.
-    // XXX: from balsn: this is a good research topic.
-    const auto &readCallSiteInfo = *m_readCallSites.rbegin();
-    const Exploit &exploit = g_crax->getExploit();
-
-    int rbpOffset = 0;
-    uint64_t ret2LeaRbp = determineRetAddr(readCallSiteInfo.address, rbpOffset);
-    uint64_t pivotDest = exploit.getElf().getBase() + exploit.getSymbolValue("pivot_dest");
-
-    ref<Expr> rbp1 = ConstantExpr::create(pivotDest, Expr::Int64);
-    ref<Expr> rip1 = ConstantExpr::create(ret2LeaRbp, Expr::Int64);
-
-    dynRop.addConstraint(DynamicRop::RegisterConstraint { Register::X64::RBP, rbp1 })
-        .addConstraint(DynamicRop::RegisterConstraint { Register::X64::RIP, rip1 })
-        .commitConstraints();
-
-    ref<Expr> rbp2 = ConstantExpr::create(pivotDest + 8 + rbpOffset, Expr::Int64);
-    ref<Expr> rip2 = ConstantExpr::create(ret2LeaRbp, Expr::Int64);
-
-    dynRop.addConstraint(DynamicRop::RegisterConstraint { Register::X64::RBP, rbp2 })
-        .addConstraint(DynamicRop::RegisterConstraint { Register::X64::RIP, rip2 })
-        .commitConstraints();
-
-    // For debugging convenience, you may uncomment the following line :^)
-    //g_crax->setShowInstructions(true);
-
-    // At this point, the exploit generator is already running.
-    // This is our last chance to stop it. This method will throw a
-    // CpuExitException() and force S2E to re-execute at the PC we specified,
-    // allowing us to perform Dynamic ROP.
-    dynRop.applyNextConstraintGroup(*state);
 }
 
 bool AdvancedStackPivot::checkRequirements() const {
-    const auto &sym = g_crax->getExploit().getElf().symbols();
+    const ELF &elf = g_crax->getExploit().getElf();
+
+    initDynamicRopConstraintsOnce();
 
     return StackPivot::checkRequirements() &&
-           sym.find("read") != sym.end() &&
+           elf.symbols().find("read") != elf.symbols().end() &&
            m_readCallSites.size();
 }
 
@@ -274,6 +229,56 @@ void AdvancedStackPivot::beforeExploitGeneration(S2EExecutionState *state) {
     const auto &readCallSiteInfo = *m_readCallSites.rbegin();
     uint64_t rsp = reg().readConcrete(Register::X64::RSP);
     m_offsetToRetAddr = rsp - readCallSiteInfo.buf - 16;
+}
+
+void AdvancedStackPivot::initDynamicRopConstraintsOnce() const {
+    S2EExecutionState *state = g_crax->getCurrentState();
+
+    auto __dynRop = g_crax->getModule<DynamicRop>();
+    assert(__dynRop && "AdvancedStackPivot relies on DynamicRop module");
+
+    auto modState = g_crax->getModuleState(state, __dynRop);
+    assert(modState);
+
+    // These dynamic ROP constraints should only be added once.
+    if (modState->initialized) {
+        return;
+    }
+
+    modState->initialized = true;
+    auto &dynRop = *__dynRop;
+
+    // Resolve ret2LeaRbp.
+    // XXX: from balsn: this is a good research topic.
+    const auto &readCallSiteInfo = *m_readCallSites.rbegin();
+    const Exploit &exploit = g_crax->getExploit();
+
+    int rbpOffset = 0;
+    uint64_t ret2LeaRbp = determineRetAddr(readCallSiteInfo.address, rbpOffset);
+    uint64_t pivotDest = exploit.getElf().getBase() + exploit.getSymbolValue("pivot_dest");
+
+    ref<Expr> rbp1 = ConstantExpr::create(pivotDest, Expr::Int64);
+    ref<Expr> rip1 = ConstantExpr::create(ret2LeaRbp, Expr::Int64);
+
+    dynRop.addConstraint(DynamicRop::RegisterConstraint { Register::X64::RBP, rbp1 })
+        .addConstraint(DynamicRop::RegisterConstraint { Register::X64::RIP, rip1 })
+        .commitConstraints();
+
+    ref<Expr> rbp2 = ConstantExpr::create(pivotDest + 8 + rbpOffset, Expr::Int64);
+    ref<Expr> rip2 = ConstantExpr::create(ret2LeaRbp, Expr::Int64);
+
+    dynRop.addConstraint(DynamicRop::RegisterConstraint { Register::X64::RBP, rbp2 })
+        .addConstraint(DynamicRop::RegisterConstraint { Register::X64::RIP, rip2 })
+        .commitConstraints();
+
+    // For debugging convenience, you may uncomment the following line :^)
+    //g_crax->setShowInstructions(true);
+
+    // At this point, the exploit generator is already running.
+    // This is our last chance to stop it. This method will throw a
+    // CpuExitException() and force S2E to re-execute at the PC we specified,
+    // allowing us to perform Dynamic ROP.
+    dynRop.applyNextConstraintGroup(*state);
 }
 
 uint64_t AdvancedStackPivot::determineRetAddr(uint64_t readCallSiteAddr,

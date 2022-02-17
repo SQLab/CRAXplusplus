@@ -25,6 +25,7 @@
 
 #include <cassert>
 #include <filesystem>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -96,6 +97,14 @@ ELF::Checksec::Checksec(const std::string &filename)
       hasFullRELRO(),
       hasNX(),
       hasPIE() {
+    // Check if the file exists.
+    if (!std::filesystem::exists(filename)) {
+        std::cerr
+            << "No such file or directory: " << filename
+            << " (is your symlink valid?)" <<'\n';
+        ::exit(-1);
+    }
+
     // Get the output of `checksec --file <m_elfFilename>`
     // and store it in `output`.
     subprocess::popen checksec("checksec", {"--file", filename});

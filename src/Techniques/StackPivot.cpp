@@ -300,13 +300,12 @@ uint64_t AdvancedStackPivot::determineRetAddr(uint64_t readCallSiteAddr,
     for (int i = insns.size() - 1; i >= 0; i--) {
         static const std::string keyword = "[rbp - ";
         const std::string &target = insns[i].opStr;
-        size_t j = 0;
 
         if (target.back() != ']') {
             continue;
         }
 
-        j = target.find(keyword);
+        size_t j = target.find(keyword);
         if (j == std::string::npos) {
             continue;
         }
@@ -319,7 +318,7 @@ uint64_t AdvancedStackPivot::determineRetAddr(uint64_t readCallSiteAddr,
         break;
     }
 
-    assert(ret && "determineReturnAddr(): no suitable candidates?");
+    assert(ret && "determineRetAddr(): no suitable candidates?");
     return ret;
 }
 

@@ -37,7 +37,6 @@ while [[ $# -gt 0 ]]; do
             exit 1
             ;;
         *)
-            echo $1
             create_symlinks "examples" $1
             exit 0
             ;;

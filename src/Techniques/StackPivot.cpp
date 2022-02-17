@@ -115,12 +115,12 @@ AdvancedStackPivot::AdvancedStackPivot()
 
 void AdvancedStackPivot::initialize() {
     resolveRequiredGadgets();
+
+    initDynamicRopConstraintsOnce();
 }
 
 bool AdvancedStackPivot::checkRequirements() const {
     const ELF &elf = g_crax->getExploit().getElf();
-
-    initDynamicRopConstraintsOnce();
 
     return StackPivot::checkRequirements() &&
            elf.symbols().find("read") != elf.symbols().end() &&

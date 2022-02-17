@@ -79,13 +79,14 @@ IOStates::IOStates()
     // Determine which base address(es) must be leaked
     // according to checksec of the target binary.
     const ELF &elf = g_crax->getExploit().getElf();
+
     if (elf.checksec.hasCanary) {
         m_leakTargets.push_back(IOStates::LeakType::CANARY);
     }
+
     if (elf.checksec.hasPIE) {
         m_leakTargets.push_back(IOStates::LeakType::CODE);
     }
-    // XXX: ASLR -> libc
 
     // If stack canary is enabled, install a hook to intercept canary values.
     if (elf.checksec.hasCanary) {
@@ -397,7 +398,7 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
     }
 
     log<WARN>() << "Allowing fork before __stack_chk_fail@plt\n";
-    allowForking &= true;
+    allowForking = true;
 
     if (uint64_t canary = g_crax->getUserSpecifiedCanary()) {
         log<WARN>()

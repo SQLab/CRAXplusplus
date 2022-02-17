@@ -311,15 +311,18 @@ void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,
 void CRAX::onStateForkDecide(S2EExecutionState *state,
                              const ref<Expr> &condition,
                              bool &allowForking) {
-    // At this point, `allowForking` is true by default.
+    // `allowForking` is true by default.
     if (!m_disableNativeForking) {
         return;
     }
 
     setCurrentState(state);
 
-    // If the user has explicitly disabled all state forks done by S2E,
-    // then we'll let CRAX's modules decide whether this fork should be done.
+    // The user sets `m_disableNativeForking` to true,
+    // so we should disallow this fork by default.
+    allowForking = false;
+
+    // Let the modules of CRAX++ decide whether this fork should be done.
     onStateForkModuleDecide.emit(state, condition, allowForking);
 
     // We'll also check if current state forking was requested by CRAX.

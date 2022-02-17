@@ -19,7 +19,6 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
-#include <s2e/Plugins/CRAX/Utils/VariantOverload.h>
 
 #include "DynamicRop.h"
 
@@ -35,8 +34,8 @@ DynamicRop::DynamicRop()
 }
 
 
-DynamicRop &DynamicRop::addConstraint(const DynamicRop::Constraint &c) {
-    m_currentConstraintGroup.push_back(c);
+DynamicRop &DynamicRop::addConstraint(DynamicRop::ConstraintPtr c) {
+    m_currentConstraintGroup.push_back(std::move(c));
     return *this;
 }
 
@@ -57,41 +56,24 @@ void DynamicRop::applyNextConstraintGroup(S2EExecutionState &state) {
         return;
     }
 
-    bool ok;
-
     log<WARN>() << "Adding dynamic ROP constraints...\n";
     for (const auto &c : modState->constraintsQueue.front()) {
-        std::visit(overload {
-            [&state, &ok](const MemoryConstraint &mc) {
-                ok = RopChainBuilder::addMemoryConstraint(state, mc.addr, mc.expr);
-                mem().writeSymbolic(mc.addr, mc.expr);
-            },
+        bool ok = false;
+        auto ce = dyn_cast<ConstantExpr>(c->expr);
 
-            [&state, &ok](const RegisterConstraint &rc) {
-                auto ce = dyn_cast<ConstantExpr>(rc.expr);
-                ref<Expr> e1 = rc.expr;
-                ref<Expr> e2 = rc.expr;
+        uint64_t userElfBase = g_crax->getUserSpecifiedElfBase();
+        uint64_t rebasedAddr = maybeRebaseAddr(state, ce->getZExtValue(), userElfBase);
 
-                // Try to rebase address `ce` to the user-specified elf base.
-                //
-                // XXX: Currently it only checks whether `ce` is an ELF address.
-                //      We should probably do this for any other module/region.
-                const auto &vmmap = mem(&state).vmmap();
-                auto it = vmmap.find(ce->getZExtValue());
-                bool isElfAddress = it != vmmap.end() &&
-                                    (*it)->moduleName == VirtualMemoryMap::s_elfLabel;
+        ref<Expr> guestExpr = ce;
+        ref<Expr> rebasedExpr = ConstantExpr::create(rebasedAddr, Expr::Int64);
 
-                if (g_crax->getUserSpecifiedElfBase() && isElfAddress) {
-                    const ELF &elf = g_crax->getExploit().getElf();
-                    uint64_t userElfBase = g_crax->getUserSpecifiedElfBase();
-                    uint64_t rebasedAddress = elf.rebaseAddress(ce->getZExtValue(), userElfBase);
-                    e1 = ConstantExpr::create(rebasedAddress, Expr::Int64);
-                }
-
-                ok = RopChainBuilder::addRegisterConstraint(state, rc.reg, e1);
-                reg().writeSymbolic(rc.reg, e2);
-            }
-        }, c);
+        if (auto mc = std::dynamic_pointer_cast<MemoryConstraint>(c)) {
+            ok = RopChainBuilder::addMemoryConstraint(state, mc->addr, rebasedExpr);
+            mem().writeSymbolic(mc->addr, c->expr);
+        } else if (auto rc = std::dynamic_pointer_cast<RegisterConstraint>(c)) {
+            ok = RopChainBuilder::addRegisterConstraint(state, rc->reg, rebasedExpr);
+            reg().writeSymbolic(rc->reg, c->expr);
+        }
 
         if (!ok) {
             g_s2e->getExecutor()->terminateState(state, "Dynamic ROP failed");
@@ -108,6 +90,28 @@ void DynamicRop::applyNextConstraintGroup(S2EExecutionState &state) {
 void DynamicRop::beforeExploitGeneration(S2EExecutionState *state) {
     assert(state);
     applyNextConstraintGroup(*state);
+}
+
+
+uint64_t DynamicRop::maybeRebaseAddr(S2EExecutionState &state,
+                                     uint64_t guestVirtualAddress,
+                                     uint64_t userSpecifiedElfBase) const {
+    const ELF &elf = g_crax->getExploit().getElf();
+    const auto &vmmap = mem(&state).vmmap();
+    auto it = vmmap.find(guestVirtualAddress);
+    uint64_t ret = guestVirtualAddress;
+
+    // XXX: Currently it only checks whether `guestVirtualAddress` is
+    // an ELF address. If we want to rebase libc addresses as well,
+    // we should also add support for user-specified libc base.
+    bool isElfAddress = it != vmmap.end() &&
+                        (*it)->moduleName == VirtualMemoryMap::s_elfLabel;
+
+    if (userSpecifiedElfBase && isElfAddress) {
+        ret = elf.rebaseAddress(guestVirtualAddress, userSpecifiedElfBase);
+    }
+
+    return ret;
 }
 
 }  // namespace s2e::plugins::crax

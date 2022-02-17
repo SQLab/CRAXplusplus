@@ -64,7 +64,6 @@ public:
     virtual RopSubchain getExtraRopSubchain() const override { return {}; }
 
 private:
-    // XXX: This is temporary
     struct ReadCallSiteInfo {
         uint64_t address;
         uint64_t buf;

@@ -25,6 +25,7 @@
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
 #include <cassert>
+#include <memory>
 
 #include "StackPivot.h"
 
@@ -226,18 +227,19 @@ void AdvancedStackPivot::beforeExploitGeneration(S2EExecutionState *state) {
     assert(m_readCallSites.size() &&
            "AdvancedStackPivot requires at least one call site of read().");
 
-    const auto &readCallSiteInfo = *m_readCallSites.rbegin();
     uint64_t rsp = reg().readConcrete(Register::X64::RSP);
-    m_offsetToRetAddr = rsp - readCallSiteInfo.buf - 16;
+    m_offsetToRetAddr = rsp - (*m_readCallSites.rbegin()).buf - 16;
 }
 
 void AdvancedStackPivot::initDynamicRopConstraintsOnce() const {
+    const Exploit &exploit = g_crax->getExploit();
     S2EExecutionState *state = g_crax->getCurrentState();
 
     auto __dynRop = g_crax->getModule<DynamicRop>();
     assert(__dynRop && "AdvancedStackPivot relies on DynamicRop module");
+    auto &dynRop = *__dynRop;
 
-    auto modState = g_crax->getModuleState(state, __dynRop);
+    auto modState = g_crax->getModuleState(state, &dynRop);
     assert(modState);
 
     // These dynamic ROP constraints should only be added once.
@@ -246,29 +248,26 @@ void AdvancedStackPivot::initDynamicRopConstraintsOnce() const {
     }
 
     modState->initialized = true;
-    auto &dynRop = *__dynRop;
 
     // Resolve ret2LeaRbp.
-    // XXX: from balsn: this is a good research topic.
-    const auto &readCallSiteInfo = *m_readCallSites.rbegin();
-    const Exploit &exploit = g_crax->getExploit();
-
     int rbpOffset = 0;
-    uint64_t ret2LeaRbp = determineRetAddr(readCallSiteInfo.address, rbpOffset);
+    uint64_t ret2LeaRbp = determineRetAddr((*m_readCallSites.rbegin()).address, rbpOffset);
     uint64_t pivotDest = exploit.getElf().getBase() + exploit.getSymbolValue("pivot_dest");
 
     ref<Expr> rbp1 = ConstantExpr::create(pivotDest, Expr::Int64);
     ref<Expr> rip1 = ConstantExpr::create(ret2LeaRbp, Expr::Int64);
 
-    dynRop.addConstraint(DynamicRop::RegisterConstraint { Register::X64::RBP, rbp1 })
-        .addConstraint(DynamicRop::RegisterConstraint { Register::X64::RIP, rip1 })
+    using RegisterConstraint = DynamicRop::RegisterConstraint;
+
+    dynRop.addConstraint(std::make_shared<RegisterConstraint>(Register::X64::RBP, rbp1))
+        .addConstraint(std::make_shared<RegisterConstraint>(Register::X64::RIP, rip1))
         .commitConstraints();
 
     ref<Expr> rbp2 = ConstantExpr::create(pivotDest + 8 + rbpOffset, Expr::Int64);
     ref<Expr> rip2 = ConstantExpr::create(ret2LeaRbp, Expr::Int64);
 
-    dynRop.addConstraint(DynamicRop::RegisterConstraint { Register::X64::RBP, rbp2 })
-        .addConstraint(DynamicRop::RegisterConstraint { Register::X64::RIP, rip2 })
+    dynRop.addConstraint(std::make_shared<RegisterConstraint>(Register::X64::RBP, rbp2))
+        .addConstraint(std::make_shared<RegisterConstraint>(Register::X64::RIP, rip2))
         .commitConstraints();
 
     // For debugging convenience, you may uncomment the following line :^)

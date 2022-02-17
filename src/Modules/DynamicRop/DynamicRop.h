@@ -29,7 +29,6 @@
 #include <memory>
 #include <queue>
 #include <vector>
-#include <variant>
 
 namespace s2e::plugins::crax {
 
@@ -39,18 +38,34 @@ namespace s2e::plugins::crax {
 // path exploration.
 class DynamicRop : public Module {
 public:
-    struct RegisterConstraint {
+    struct Constraint {
+        virtual ~Constraint() = default;
+        klee::ref<klee::Expr> expr;
+
+    protected:
+        Constraint(klee::ref<klee::Expr> expr) : expr(expr) {}
+    };
+
+    struct RegisterConstraint : public Constraint {
+        RegisterConstraint(Register::X64 reg, klee::ref<klee::Expr> expr)
+            : Constraint(expr),
+              reg(reg) {}
+
+        virtual ~RegisterConstraint() override = default;
         Register::X64 reg;
-        klee::ref<klee::Expr> expr;
     };
 
-    struct MemoryConstraint {
+    struct MemoryConstraint : public Constraint {
+        MemoryConstraint(uint64_t addr, klee::ref<klee::Expr> expr)
+            : Constraint(expr),
+              addr(addr) {}
+
+        virtual ~MemoryConstraint() override = default;
         uint64_t addr;
-        klee::ref<klee::Expr> expr;
     };
 
-    using Constraint = std::variant<RegisterConstraint, MemoryConstraint>;
-    using ConstraintGroup = llvm::SmallVector<Constraint, 8>;
+    using ConstraintPtr = std::shared_ptr<Constraint>;
+    using ConstraintGroup = llvm::SmallVector<ConstraintPtr, 8>;
 
 
     class State : public ModuleState {
@@ -81,7 +96,7 @@ public:
     virtual std::string toString() const override { return "DynamicRop"; }
 
     // Add one constraint to `m_constraintGroup`.
-    DynamicRop &addConstraint(const Constraint &c);
+    DynamicRop &addConstraint(ConstraintPtr c);
 
     // Commit all the constraints in `m_constraintGroup`,
     // appending them to `modState->constraintsQueue`.
@@ -93,6 +108,10 @@ public:
 
 private:
     void beforeExploitGeneration(S2EExecutionState *state);
+
+    uint64_t maybeRebaseAddr(S2EExecutionState &state,
+                             uint64_t guestVirtualAddress,
+                             uint64_t userSpecifiedElfBase) const;
 
     ConstraintGroup m_currentConstraintGroup;
 };

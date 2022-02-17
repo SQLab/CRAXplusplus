@@ -39,7 +39,14 @@ public:
     virtual std::string toString() const override { return "GotLeakLibc"; }
 
     virtual std::vector<RopSubchain> getRopSubchains() const override;
-    virtual RopSubchain getExtraRopSubchain() const override;
+    virtual RopSubchain getExtraRopSubchain() const override { return {}; }
+
+private:
+    std::vector<RopSubchain>
+    getRopSubchainsForPrintf(const std::string &targetSym) const;
+
+    std::vector<RopSubchain>
+    getRopSubchainsForPuts(const std::string &targetSym) const;
 };
 
 }  // namespace s2e::plugins::crax

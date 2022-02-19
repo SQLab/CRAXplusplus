@@ -35,6 +35,10 @@ namespace s2e::plugins::crax {
 
 std::map<std::type_index, Technique*> Technique::s_mapper;
 
+void Technique::initialize() {
+    resolveRequiredGadgets();
+}
+
 bool Technique::checkRequirements() const {
     const Exploit &exploit = g_crax->getExploit();
 

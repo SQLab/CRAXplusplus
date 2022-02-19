@@ -60,7 +60,8 @@ Ret2csu::Ret2csu()
 void Ret2csu::initialize() {
     parseLibcCsuInit();
     searchGadget2CallTarget();
-    resolveRequiredGadgets();
+
+    Technique::initialize();
 }
 
 bool Ret2csu::checkRequirements() const {

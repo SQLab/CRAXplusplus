@@ -44,7 +44,6 @@ public:
     BasicStackPivot();
     virtual ~BasicStackPivot() override = default;
 
-    virtual void initialize() override;
     virtual std::string toString() const override { return "BasicStackPivot"; }
 
     virtual std::vector<RopSubchain> getRopSubchains() const override;

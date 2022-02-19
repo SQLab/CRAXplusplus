@@ -40,10 +40,6 @@ GotLeakLibc::GotLeakLibc() : Technique() {
 }
 
 
-void GotLeakLibc::initialize() {
-    resolveRequiredGadgets();
-}
-
 bool GotLeakLibc::checkRequirements() const {
     const auto &sym = g_crax->getExploit().getElf().symbols();
 

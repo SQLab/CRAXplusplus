@@ -32,10 +32,6 @@ namespace s2e::plugins::crax {
 GotPartialOverwrite::GotPartialOverwrite() : Technique() {}
 
 
-void GotPartialOverwrite::initialize() {
-    resolveRequiredGadgets();
-}
-
 bool GotPartialOverwrite::checkRequirements() const {
     const ELF &elf = g_crax->getExploit().getElf();
 

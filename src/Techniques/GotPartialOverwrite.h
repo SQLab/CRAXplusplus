@@ -33,7 +33,6 @@ public:
     GotPartialOverwrite();
     virtual ~GotPartialOverwrite() override = default;
 
-    virtual void initialize() override;
     virtual bool checkRequirements() const override;
     virtual std::string toString() const override { return "GotPartialOverwrite"; }
 

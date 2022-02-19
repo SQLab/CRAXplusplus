@@ -38,10 +38,9 @@ using RopSubchain = std::vector<klee::ref<klee::Expr>>;
 // e.g., stack pivoting, ret2csu, orw, etc.
 class Technique {
 public:
-    Technique() : m_requiredGadgets() {}
     virtual ~Technique() = default;
 
-    virtual void initialize() = 0;
+    virtual void initialize();
     virtual bool checkRequirements() const;
     virtual void resolveRequiredGadgets();
     virtual std::string toString() const = 0;
@@ -53,6 +52,8 @@ public:
     static std::map<std::type_index, Technique*> s_mapper;
 
 protected:
+    Technique() : m_requiredGadgets() {}
+
     llvm::SmallVector<std::pair<const ELF *, std::string>, 8> m_requiredGadgets;
 };
 

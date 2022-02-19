@@ -51,10 +51,6 @@ BasicStackPivot::BasicStackPivot() : StackPivot() {
 }
 
 
-void BasicStackPivot::initialize() {
-    resolveRequiredGadgets();
-}
-
 
 std::vector<RopSubchain> BasicStackPivot::getRopSubchains() const {
     using BaseType = BaseOffsetExpr::BaseType;
@@ -117,7 +113,7 @@ AdvancedStackPivot::AdvancedStackPivot()
 
 
 void AdvancedStackPivot::initialize() {
-    resolveRequiredGadgets();
+    Technique::initialize();
 
     initDynamicRopConstraintsOnce();
 }

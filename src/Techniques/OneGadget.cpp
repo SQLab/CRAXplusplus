@@ -72,13 +72,11 @@ void OneGadget::populateRequiredGadgets() {
 
 void OneGadget::initialize() {
     blockUntilWorkerDone();
-
-    resolveRequiredGadgets();
+    Technique::initialize();
 }
 
 bool OneGadget::checkRequirements() const {
     blockUntilWorkerDone();
-
     return Technique::checkRequirements();
 }
 

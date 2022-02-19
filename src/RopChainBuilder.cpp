@@ -87,7 +87,7 @@ bool RopChainBuilder::chainSymbolic(const Technique &technique) {
             ok = addRegisterConstraint(*state, Register::X64::RIP, ropSubchains[0][i]);
         } else {
             ok = addMemoryConstraint(*state, rsp + m_rspOffset, ropSubchains[0][i]);
-            m_rspOffset += 8;
+            m_rspOffset += sizeof(uint64_t);
         }
 
         if (!ok) {
@@ -107,6 +107,7 @@ bool RopChainBuilder::chainSymbolic(const Technique &technique) {
 
     log<INFO>() << "Switching to direct mode...\n";
     m_isSymbolicMode = false;
+    m_rspOffset = 0;
 
     // Chain the rest (i.e. ropSubchains[1..last]).
     if (ropSubchains.size() > 1) {
@@ -127,6 +128,7 @@ void RopChainBuilder::doChainDirect(const std::vector<RopSubchain> &ropSubchains
                                     size_t ropSubchainsBegin) {
     size_t i = ropSubchainsBegin;
     size_t j = m_shouldSkipSavedRbp;
+    uint64_t newRspOffset = m_rspOffset;
 
     // The first expr in ropSubchains[0] is saved RBP.
     // It should only be used for constructing the very first ROP subchain.
@@ -143,8 +145,19 @@ void RopChainBuilder::doChainDirect(const std::vector<RopSubchain> &ropSubchains
             continue;
         }
 
+        m_ropChain.back().reserve(ropSubchains[i].size());
+
         for (; j < ropSubchains[i].size(); j++) {
-            m_ropChain.back().push_back(ropSubchains[i][j]);
+            ref<Expr> e = ropSubchains[i][j];
+
+            // If `e` is a PlaceholderExpr, turn it into a ConstantExpr.
+            // Sometimes an offset in the Rop chain cannot be hardcoded,
+            // because the user may chain different techniques in different
+            // orders, resulting in a non-fixed offset.
+            maybeConcretizePlaceholderExpr(e);
+
+            m_ropChain.back().push_back(e);
+            newRspOffset += e->getWidth() / 8;
         }
 
         if (i != ropSubchains.size() - 1) {
@@ -153,14 +166,27 @@ void RopChainBuilder::doChainDirect(const std::vector<RopSubchain> &ropSubchains
     }
 
     if (extraRopSubchain.size()) {
-        m_ropChain.push_back({});
-    }
-
-    for (const ref<Expr> &e : extraRopSubchain) {
-        m_ropChain.back().push_back(e);
+        m_ropChain.push_back(extraRopSubchain);
     }
 
     m_ropChain.push_back({});
+    m_rspOffset = newRspOffset;
+}
+
+void RopChainBuilder::maybeConcretizePlaceholderExpr(ref<Expr> &e) const {
+    auto phe = dyn_cast<PlaceholderExpr<uint64_t>>(e);
+
+    if (!phe) {
+        return;
+    }
+
+    const Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
+    uint64_t offset = phe->getUserData();
+
+    e = AddExpr::alloc(
+            BaseOffsetExpr::create(exploit, elf, "pivot_dest"),
+            ConstantExpr::create(sizeof(uint64_t) + m_rspOffset + offset, Expr::Int64));
 }
 
 bool RopChainBuilder::shouldSwitchToDirectMode(const Technique *t) const {
@@ -228,6 +254,9 @@ bool RopChainBuilder::addMemoryConstraint(S2EExecutionState &state,
 
 RopChainBuilder::ConcreteInputs
 RopChainBuilder::getConcreteInputs(S2EExecutionState &state) {
+    // FIXME: To integrate tl455047's adaptive symbolic input selection with this,
+    // replace the use of `getSymbolicSolution()` with TestCaseGenerator.
+    // See: testcase_generator_register_concrete_file().
     ConcreteInputs ret;
     state.getSymbolicSolution(ret);
     return ret;

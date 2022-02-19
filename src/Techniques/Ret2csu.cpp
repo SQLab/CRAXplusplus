@@ -105,15 +105,15 @@ Ret2csu::getRopSubchains(const ref<Expr> &retAddr,
     }
 
     for (const ref<Expr> &e : m_ropSubchainTemplate[0]) {
-        if (auto phe = dyn_cast<PlaceholderExpr>(e)) {
+        if (auto phe = dyn_cast<PlaceholderExpr<std::string>>(e)) {
             // If this expr is a placeholder, replace it now.
-            if (phe->hasTag("arg1")) {
+            if (phe->getUserData() == "arg1") {
                 ret.push_back(arg1);
-            } else if (phe->hasTag("arg2")) {
+            } else if (phe->getUserData() == "arg2") {
                 ret.push_back(arg2);
-            } else if (phe->hasTag("arg3")) {
+            } else if (phe->getUserData() == "arg3") {
                 ret.push_back(arg3);
-            } else if (phe->hasTag("retAddr")) {
+            } else if (phe->getUserData() == "retAddr") {
                 ret.push_back(retAddr);
             } else {
                 throw UnhandledPlaceholderException();
@@ -260,7 +260,7 @@ void Ret2csu::buildRopSubchainTemplate() const {
         std::string content = transform[m_gadget1Regs[i]];
 
         if (content == "arg1" || content == "arg2" || content == "arg3") {
-            rop.push_back(PlaceholderExpr::create(content));
+            rop.push_back(PlaceholderExpr<std::string>::create(content));
         } else if (isNumString(content)) {
             uint64_t val = std::stoull(content, nullptr, 16);
             rop.push_back(ConstantExpr::create(val, Expr::Int64));
@@ -272,7 +272,7 @@ void Ret2csu::buildRopSubchainTemplate() const {
     for (int i = 0; i < 7; i++) {
         rop.push_back(ConstantExpr::create(0x4141414141414141, Expr::Int64));
     }
-    rop.push_back(PlaceholderExpr::create("retAddr"));
+    rop.push_back(PlaceholderExpr<std::string>::create("retAddr"));
 }
 
 }  // namespace s2e::plugins::crax

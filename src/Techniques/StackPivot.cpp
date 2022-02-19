@@ -190,16 +190,11 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
                             ConstantExpr::create(7, Expr::Int64))),
             ConstantExpr::create(0x400, Expr::Int64))[0];
 
-    while (part2.size() % 6) {
-        part2.push_back(ConstantExpr::create(0x4141414141414141, Expr::Int64));
-    }
-
-
-    std::vector<RopSubchain> ret;
 
     // Symbolic ROP subchain
     // We're exploiting the overflow in libc's sys_read(),
     // so constraint solver isn't needed.
+    std::vector<RopSubchain> ret;
     ret.push_back({});
 
     // Direct ROP subchain
@@ -207,7 +202,8 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
         ret.push_back(RopSubchain(part1.begin() + i, part1.begin() + i + 6));
     }
     for (size_t i = 0; i < part2.size(); i += 6) {
-        ret.push_back(RopSubchain(part2.begin() + i, part2.begin() + i + 6));
+        size_t end = std::min(i + 6, part2.size());
+        ret.push_back(RopSubchain(part2.begin() + i, part2.begin() + end));
     }
 
     return ret;

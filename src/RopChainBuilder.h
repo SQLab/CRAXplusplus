@@ -60,6 +60,9 @@ public:
     [[nodiscard]]
     const std::vector<RopSubchain> &build();
 
+    [[nodiscard]]
+    uint32_t getRspOffset() const { return m_rspOffset; }
+
 
     [[nodiscard]]
     static bool addRegisterConstraint(S2EExecutionState &state,
@@ -87,6 +90,8 @@ private:
     void doChainDirect(const std::vector<RopSubchain> &ropSubchains,
                        const RopSubchain &extraRopSubchain,
                        size_t ropSubchainsBegin = 0);
+
+    void maybeConcretizePlaceholderExpr(ref<Expr> &e) const;
 
     [[nodiscard]]
     bool shouldSwitchToDirectMode(const Technique *t) const;

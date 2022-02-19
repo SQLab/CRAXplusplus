@@ -195,7 +195,9 @@ private:
 };
 
 
-// In ret2csu, we need to have placeholder expr tree node.
+// A placeholder expr which supports storing user data of arbitrary type.
+// The user may decide what to do with the underlying user data.
+template <typename T>
 class PlaceholderExpr : public Expr {
 public:
     virtual ~PlaceholderExpr() override = default;
@@ -222,12 +224,12 @@ public:
         std::abort();
     }
 
-    static ref<Expr> alloc(const std::string &tag) {
-        return ref<Expr>(new PlaceholderExpr(tag));
+    static ref<Expr> alloc(const T &userData) {
+        return ref<Expr>(new PlaceholderExpr(userData));
     }
 
-    static ref<Expr> create(const std::string &tag) {
-        return alloc(tag);
+    static ref<Expr> create(const T &userData) {
+        return alloc(userData);
     }
 
     // Method for support type inquiry through isa, cast, and dyn_cast.
@@ -240,22 +242,18 @@ public:
         return true;
     }
 
-    const std::string &getTag() const {
-        return m_tag;
+    const T &getUserData() const {
+        return m_userData;
     }
 
-    bool hasTag(const std::string &tag) const {
-        return m_tag.find(tag) != m_tag.npos;
-    }
-
-    void setTag(const std::string &tag) {
-        m_tag = tag;
+    void setUserData(const T &userData) {
+        m_userData = userData;
     }
 
 private:
-    PlaceholderExpr(const std::string &tag) : Expr(), m_tag(tag) {}
+    PlaceholderExpr(const T &userData) : Expr(), m_userData(userData) {}
 
-    std::string m_tag;
+    T m_userData;
 };
 
 
@@ -269,10 +267,7 @@ public:
     }
 
     virtual Width getWidth() const override {
-        // XXX: the width of byte vector is not fixed,
-        // but maybe we can return something like Expr::Int32 or Expr::Int64
-        // according to m_bytes.size()?
-        return Expr::InvalidWidth;
+        return 8 * m_bytes.size();  // number of bits
     }
 
     virtual unsigned getNumKids() const override {

@@ -24,6 +24,7 @@
 #include <s2e/Plugins/CRAX/Utils/Subprocess.h>
 
 #include <cassert>
+#include <thread>
 #include <utility>
 
 #include "OneGadget.h"
@@ -32,14 +33,22 @@ using namespace klee;
 
 namespace s2e::plugins::crax {
 
-OneGadget::OneGadget() : Technique(), m_oneGadget() {
+OneGadget::OneGadget()
+    : Technique(),
+      m_isWorkerDone(),
+      m_oneGadget() {
+    // Parsing the output of one_gadget and checking the constraints of
+    // each candidate can be time consuming, so we'll do this in background.
+    std::thread(std::mem_fun(&OneGadget::populateRequiredGadgets), this).detach();
+}
+
+void OneGadget::populateRequiredGadgets() {
     const Exploit &exploit = g_crax->getExploit();
     const ELF &libc = exploit.getLibc();
     bool canSatisfyAllConstraints = true;
 
     for (auto libcOneGadget : parseOneGadget()) {
         for (const auto &gadget : libcOneGadget.gadgets) {
-            log<INFO>() << "Checking OneGadget constraint: " << gadget.first << '\n';
             if (!exploit.resolveGadget(libc, gadget.first)) {
                 canSatisfyAllConstraints = false;
                 break;
@@ -57,14 +66,19 @@ OneGadget::OneGadget() : Technique(), m_oneGadget() {
     for (const auto &gadget : m_oneGadget.gadgets) {
         m_requiredGadgets.push_back(std::make_pair(&libc, gadget.first));
     }
+
+    m_isWorkerDone = true;
 }
 
-
 void OneGadget::initialize() {
+    blockUntilWorkerDone();
+
     resolveRequiredGadgets();
 }
 
 bool OneGadget::checkRequirements() const {
+    blockUntilWorkerDone();
+
     return Technique::checkRequirements();
 }
 
@@ -72,22 +86,18 @@ std::vector<RopSubchain> OneGadget::getRopSubchains() const {
     Exploit &exploit = g_crax->getExploit();
     ELF &libc = exploit.getLibc();
 
-    RopSubchain rop;
-    rop.push_back(ConstantExpr::create(0, Expr::Int64));  // RBP
+    RopSubchain ret;
+    ret.push_back(ConstantExpr::create(0, Expr::Int64));  // RBP
 
     // Set all the required registers to the desired value.
     for (const auto &gadget : m_oneGadget.gadgets) {
-        rop.push_back(BaseOffsetExpr::create(exploit, libc, Exploit::toVarName(gadget.first)));
-        rop.push_back(gadget.second);
+        ret.push_back(BaseOffsetExpr::create(exploit, libc, Exploit::toVarName(gadget.first)));
+        ret.push_back(gadget.second);
     }
 
     // Return to the gadget, spawning a shell.
-    rop.push_back(BaseOffsetExpr::create(libc, m_oneGadget.offset));
-    return { rop };
-}
-
-RopSubchain OneGadget::getExtraRopSubchain() const {
-    return {};
+    ret.push_back(BaseOffsetExpr::create(libc, m_oneGadget.offset));
+    return { ret };
 }
 
 

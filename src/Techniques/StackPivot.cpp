@@ -94,7 +94,7 @@ std::vector<RopSubchain> BasicStackPivot::getRopSubchains() const {
 }
 
 RopSubchain BasicStackPivot::getExtraRopSubchain() const {
-    return { ConstantExpr::create(0, Expr::Int64) };  // rbp
+    return { ConstantExpr::create(0, Expr::Int64) };  // RBP
 }
 
 

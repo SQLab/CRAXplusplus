@@ -24,6 +24,7 @@
 #include <klee/Expr.h>
 #include <s2e/Plugins/CRAX/Techniques/Technique.h>
 
+#include <atomic>
 #include <regex>
 #include <string>
 #include <vector>
@@ -41,7 +42,7 @@ public:
     virtual std::string toString() const override { return "OneGadget"; }
 
     virtual std::vector<RopSubchain> getRopSubchains() const override;
-    virtual RopSubchain getExtraRopSubchain() const override;
+    virtual RopSubchain getExtraRopSubchain() const override { return {}; }
 
 private:
     using GadgetValuePair = std::pair<std::string, klee::ref<klee::Expr>>;
@@ -52,6 +53,20 @@ private:
         std::vector<GadgetValuePair> gadgets;
     };
 
+    // Parses the output of one_gadget and checks the constraints
+    // of each candidate until a feasible one is found.
+    void populateRequiredGadgets();
+
+    [[gnu::always_inline]]
+    inline void blockUntilWorkerDone() const {
+        if (m_isWorkerDone) {
+            return;
+        }
+
+        log<WARN>() << "OneGadget is still running, please wait...\n";
+        while (!m_isWorkerDone) {}
+    }
+
     // Parses the output of `one_gadget <libc_path>` 
     std::vector<LibcOneGadget> parseOneGadget() const;
 
@@ -60,6 +75,8 @@ private:
     // Output: ["pop r15 ; ret", r15_value]
     GadgetValuePair parseConstraint(const std::string &constraintStr) const;
 
+
+    std::atomic<bool> m_isWorkerDone;
 
     // The "one" gadget which will be used during the actual exploitation.
     LibcOneGadget m_oneGadget;

@@ -38,7 +38,7 @@ public:
     virtual std::string toString() const override { return "GotPartialOverwrite"; }
 
     virtual std::vector<RopSubchain> getRopSubchains() const override;
-    virtual RopSubchain getExtraRopSubchain() const override;
+    virtual RopSubchain getExtraRopSubchain() const override { return {}; }
 
 private:
     uint8_t getLsbOfReadSyscall() const;

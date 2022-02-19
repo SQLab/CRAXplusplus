@@ -57,16 +57,6 @@ private:
     // of each candidate until a feasible one is found.
     void populateRequiredGadgets();
 
-    [[gnu::always_inline]]
-    inline void blockUntilWorkerDone() const {
-        if (m_isWorkerDone) {
-            return;
-        }
-
-        log<WARN>() << "OneGadget is still running, please wait...\n";
-        while (!m_isWorkerDone) {}
-    }
-
     // Parses the output of `one_gadget <libc_path>` 
     std::vector<LibcOneGadget> parseOneGadget() const;
 
@@ -74,6 +64,16 @@ private:
     // Input:  "r15 == NULL"
     // Output: ["pop r15 ; ret", r15_value]
     GadgetValuePair parseConstraint(const std::string &constraintStr) const;
+
+    // Blocks the main thread until the worker thread has completed.
+    [[gnu::always_inline]]
+    inline void blockUntilWorkerDone() const {
+        if (m_isWorkerDone) {
+            return;
+        }
+        log<WARN>() << "OneGadget is still running, please wait...\n";
+        while (!m_isWorkerDone) {}
+    }
 
 
     std::atomic<bool> m_isWorkerDone;

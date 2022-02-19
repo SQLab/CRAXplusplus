@@ -144,12 +144,12 @@ public:
     }
 
     // Method for support type inquiry through isa, cast, and dyn_cast.
-    static bool classof(const Expr *E) {
+    static bool classof(const Expr *e) {
         // XXX: The normal way of implementing BaseOffsetExpr::classof() is
         // adding our typeinfo to klee::Expr::Kind enum. However, since I don't
         // want to touch klee's source code, I'll simply forward the job
         // to C++'s vtable. Perhaps this can be optimized later.
-        return dynamic_cast<const BaseOffsetExpr *>(E) != nullptr;
+        return dynamic_cast<const BaseOffsetExpr *>(e);
     }
 
     // Method for support type inquiry through isa, cast, and dyn_cast.
@@ -248,8 +248,8 @@ public:
     }
 
     // Method for support type inquiry through isa, cast, and dyn_cast.
-    static bool classof(const Expr *E) {
-        return dynamic_cast<const PlaceholderExpr *>(E) != nullptr;
+    static bool classof(const Expr *e) {
+        return dynamic_cast<const PlaceholderExpr *>(e);
     }
 
     // Method for support type inquiry through isa, cast, and dyn_cast.
@@ -266,8 +266,13 @@ public:
     }
 
 private:
-    PlaceholderExpr(const T &userData) : Expr(), m_userData(userData) {}
-    PlaceholderExpr(T &&userData) : Expr(), m_userData(std::move(userData)) {}
+    PlaceholderExpr(const T &userData)
+        : Expr(),
+          m_userData(userData) {}
+
+    PlaceholderExpr(T &&userData)
+        : Expr(),
+          m_userData(std::move(userData)) {}
 
     T m_userData;
 };
@@ -298,14 +303,9 @@ public:
         std::abort();
     }
 
-    static ref<Expr> alloc(const std::vector<uint8_t> &bytes) {
-        return ref<Expr>(new ByteVectorExpr(bytes));
-    }
-
     template <typename InputIt>
     static ref<Expr> alloc(InputIt first, InputIt last) {
-        std::vector<uint8_t> bytes(first, last);
-        return ref<Expr>(new ByteVectorExpr(bytes));
+        return ref<Expr>(new ByteVectorExpr(std::vector<uint8_t>(first, last)));
     }
 
     template <typename T>
@@ -314,8 +314,8 @@ public:
     }
 
     // Method for support type inquiry through isa, cast, and dyn_cast.
-    static bool classof(const Expr *E) {
-        return dynamic_cast<const ByteVectorExpr*>(E) != nullptr;
+    static bool classof(const Expr *e) {
+        return dynamic_cast<const ByteVectorExpr*>(e);
     }
 
     // Method for support type inquiry through isa, cast, and dyn_cast.
@@ -337,7 +337,9 @@ public:
     }
 
 private:
-    ByteVectorExpr(const std::vector<uint8_t> &bytes) : Expr(), m_bytes(bytes) {}
+    ByteVectorExpr(std::vector<uint8_t> &&bytes)
+        : Expr(),
+          m_bytes(std::move(bytes)) {}
 
     std::vector<uint8_t> m_bytes;
 };
@@ -370,17 +372,19 @@ public:
         std::abort();
     }
 
-    static ref<Expr> alloc(const CallbackType &cb) {
-        return ref<Expr>(new LambdaExpr(cb));
+    template <typename U>
+    static ref<Expr> alloc(U &&cb) {
+        return ref<Expr>(new LambdaExpr(std::forward<U>(cb)));
     }
 
-    static ref<Expr> create(const CallbackType &cb) {
-        return alloc(cb);
+    template <typename U>
+    static ref<Expr> create(U &&cb) {
+        return alloc(std::forward<U>(cb));
     }
 
     // Method for support type inquiry through isa, cast, and dyn_cast.
-    static bool classof(const Expr *E) {
-        return dynamic_cast<const LambdaExpr *>(E) != nullptr;
+    static bool classof(const Expr *e) {
+        return dynamic_cast<const LambdaExpr *>(e);
     }
 
     // Method for support type inquiry through isa, cast, and dyn_cast.
@@ -388,10 +392,18 @@ public:
         return true;
     }
 
-    void executeCallback() const { m_callback(); }
+    void operator()() const {
+        m_callback();
+    }
 
 private:
-    LambdaExpr(const CallbackType &cb) : Expr(), m_callback(cb) {}
+    LambdaExpr(const CallbackType &cb)
+        : Expr(),
+          m_callback(cb) {}
+
+    LambdaExpr(CallbackType &&cb)
+        : Expr(),
+          m_callback(std::move(cb)) {}
 
     CallbackType m_callback;
 };

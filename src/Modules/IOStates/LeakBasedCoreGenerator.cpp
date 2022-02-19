@@ -25,6 +25,7 @@
 #include "LeakBasedCoreGenerator.h"
 
 #include <variant>
+#include <utility>
 
 namespace s2e::plugins::crax {
 
@@ -93,7 +94,7 @@ void IOStateInfoVisitor::operator()(const InputStateInfo &stateInfo) {
     for (size_t j = 1; j < ropChain.size(); j++) {
         if (auto le = dyn_cast<LambdaExpr>(ropChain[j][0])) {
             assert(ropChain[j].size() == 1);
-            le->executeCallback();
+            std::invoke(*le);
         } else {
             for (const ref<Expr> &e : ropChain[j]) {
                 exploit.appendRopPayload(evaluate<std::string>(e));

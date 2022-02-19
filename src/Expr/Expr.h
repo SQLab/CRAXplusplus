@@ -293,7 +293,7 @@ public:
     }
 
     template <typename T>
-    static ref<Expr> create(T container) {
+    static ref<Expr> create(const T &container) {
         return alloc(container.begin(), container.end());
     }
 

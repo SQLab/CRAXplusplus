@@ -31,6 +31,7 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <type_traits>
 #include <utility>
 
 using s2e::plugins::crax::format;
@@ -196,7 +197,7 @@ private:
 
 
 // A placeholder expr which supports storing user data of arbitrary type.
-// The user may decide what to do with the underlying user data.
+// It is up to the user to decide what to do with the underlying user data.
 template <typename T>
 class PlaceholderExpr : public Expr {
 public:
@@ -224,12 +225,14 @@ public:
         std::abort();
     }
 
-    static ref<Expr> alloc(const T &userData) {
-        return ref<Expr>(new PlaceholderExpr(userData));
+    template <typename U>
+    static ref<Expr> alloc(U &&userData) {
+        return ref<Expr>(new PlaceholderExpr(std::forward<U>(userData)));
     }
 
-    static ref<Expr> create(const T &userData) {
-        return alloc(userData);
+    template <typename U>
+    static ref<Expr> create(U &&userData) {
+        return alloc(std::forward<U>(userData));
     }
 
     // Method for support type inquiry through isa, cast, and dyn_cast.
@@ -252,6 +255,7 @@ public:
 
 private:
     PlaceholderExpr(const T &userData) : Expr(), m_userData(userData) {}
+    PlaceholderExpr(T &&userData) : Expr(), m_userData(std::move(userData)) {}
 
     T m_userData;
 };

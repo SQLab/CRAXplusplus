@@ -25,16 +25,17 @@
 #include <s2e/Plugins/CRAX/Exploit.h>
 #include <s2e/Plugins/CRAX/Pwnlib/ELF.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
+#include <s2e/Plugins/CRAX/Utils/TypeTraits.h>
 
 #include <cassert>
 #include <cstdlib>
 #include <functional>
 #include <string>
 #include <vector>
-#include <type_traits>
 #include <utility>
 
 using s2e::plugins::crax::format;
+using s2e::plugins::crax::always_false_v;
 
 namespace klee {
 
@@ -59,6 +60,13 @@ class BaseOffsetExpr : public AddExpr {
     using ELF = s2e::plugins::crax::ELF;
 
 public:
+    // Supported base types
+    enum class BaseType {
+        SYM,
+        GOT,
+        BSS,
+    };
+
     virtual ~BaseOffsetExpr() override = default;
 
     virtual unsigned getNumKids() const override {
@@ -95,37 +103,41 @@ public:
     }
 
     // Create a BaseOffsetExpr that represents one of the following:
-    // 1. "target_base + elf.sym['read']"  <- `BaseOffsetExpr::create(elf, "sym", "read")`
-    // 2. "target_base + elf.got['read']"  <- `BaseOffsetExpr::create(elf, "got", "read")`
-    // 3. "target_base + elf.bss()"        <- `BaseOffsetExpr::create(elf, "bss")`
-    static ref<Expr> create(const ELF &elf,
-                            const std::string &base,
-                            const std::string &symbol = "") {
-        const std::string &prefix = elf.getVarPrefix();
-
+    //
+    // 1. "target_base + elf.sym['read']"
+    //    => BaseOffsetExpr::create<BaseType::SYM>(elf, "read");
+    //
+    // 2. "target_base + elf.got['read']"
+    //    => BaseOffsetExpr::create<BaseType::GOT>(elf, "read");
+    //
+    // 3. "target_base + elf.bss()"
+    //    => BaseOffsetExpr::create<BaseType::BSS>(elf);
+    template <BaseType T>
+    static ref<Expr> create(const ELF &elf, const std::string &symbol = "") {
         uint64_t offset = 0;
         std::string strOffset;
+        const std::string &prefix = elf.getVarPrefix();
 
-        if (base == "sym") {
+        if constexpr (T == BaseType::SYM) {
             const auto &symbolMap = elf.symbols();
             auto it = symbolMap.find(symbol);
             assert(it != symbolMap.end() && "Symbol doesn't exist in elf.sym");
             offset = it->second;
             strOffset = format("%s.sym['%s']", prefix.c_str(), symbol.c_str());
 
-        } else if (base == "got") {
+        } else if constexpr (T == BaseType::GOT) {
             const auto &gotMap = elf.got();
             auto it = gotMap.find(symbol);
             assert(it != gotMap.end() && "Symbol doesn't exist in elf.got");
             offset = it->second;
             strOffset = format("%s.got['%s']", prefix.c_str(), symbol.c_str());
 
-        } else if (base == "bss") {
+        } else if constexpr (T == BaseType::BSS) {
             offset = elf.bss();
             strOffset = format("%s.bss()", prefix.c_str());
 
         } else {
-            pabort("Unsupported type of `base`");
+            static_assert(always_false_v<T>, "Unsupported base type :(");
         }
 
         return create(elf.getBase(), offset, prefix + "_base", std::move(strOffset));

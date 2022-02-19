@@ -125,7 +125,7 @@ Ret2csu::getRopSubchains(const ref<Expr> &retAddr,
     }
 
     // If arg1 cannot fit within EDI, chain the gadgets to set RDI.
-    if (evaluate<uint64_t>(arg1) >= (static_cast<uint64_t>(1) << 32)) {
+    if (hasExceeded32Bits(evaluate<uint64_t>(arg1))) {
         const Exploit &exploit = g_crax->getExploit();
         const ELF &elf = exploit.getElf();
         uint64_t gadgetAddr = exploit.resolveGadget(elf, "pop rdi ; ret");

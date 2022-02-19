@@ -73,6 +73,12 @@ public:
         invalidate();
     }
 
+    size_t estimateRopSubchainSize(uint64_t arg1) {
+        // XXX: Don't hardcode the integer literal...
+        size_t ret = m_ropSubchainTemplate[0].size();
+        return hasExceeded32Bits(arg1) ? ret + 2 : ret;
+    }
+
     static const std::string s_libcCsuInit;
     static const std::string s_libcCsuInitGadget1;
     static const std::string s_libcCsuInitGadget2;
@@ -83,6 +89,11 @@ private:
     void searchGadget2CallTarget(std::string funcName = "_fini");
     void buildRopSubchainTemplate() const;
     void invalidate() { m_isTemplateValid = false; }
+
+    static inline bool hasExceeded32Bits(uint64_t value) {
+        return value >= static_cast<uint64_t>(1) << 32;
+    }
+
 
     uint64_t m_retAddr;
     uint64_t m_arg1;

@@ -65,6 +65,7 @@ public:
         SYM,
         GOT,
         BSS,
+        VAR,
     };
 
     virtual ~BaseOffsetExpr() override = default;
@@ -84,24 +85,6 @@ public:
         return ref<Expr>(new BaseOffsetExpr(lce, rce, strBase, strOffset));
     }
 
-    // Create a BaseOffsetExpr that represents an offset from target_base,
-    // E.g. "target_base + 0x666"
-    static ref<Expr> create(const ELF &elf, uint64_t offset) {
-        return create(elf.getBase(), offset, elf.getVarPrefix() + "_base", "");
-    }
-
-    // Create a BaseOffsetExpr that represents an offset from target_base,
-    // where the offset is a variable declared in the exploit script's symbol table.
-    // E.g., "target_base + __libc_csu_init_gadget1"
-    static ref<Expr> create(const Exploit &exploit,
-                            const ELF &elf,
-                            std::string var = "") {
-        auto it = exploit.getSymtab().find(var);
-        assert(it != exploit.getSymtab().end() && "Var doesn't exist in script's symtab");
-
-        return create(elf.getBase(), it->second, elf.getVarPrefix() + "_base", var);
-    }
-
     // Create a BaseOffsetExpr that represents one of the following:
     //
     // 1. "target_base + elf.sym['read']"
@@ -112,6 +95,9 @@ public:
     //
     // 3. "target_base + elf.bss()"
     //    => BaseOffsetExpr::create<BaseType::BSS>(elf);
+    //
+    // 4. "target_base + __libc_csu_init_gadget1"
+    //    => BaseOffsetExpr::create<BaseType::VAR>(elf, "__libc_csu_init_gadget1")
     template <BaseType T>
     static ref<Expr> create(const ELF &elf, const std::string &symbol = "") {
         uint64_t offset = 0;
@@ -136,11 +122,26 @@ public:
             offset = elf.bss();
             strOffset = format("%s.bss()", prefix.c_str());
 
+        } else if constexpr (T == BaseType::VAR) {
+            const Exploit &exploit = elf.getExploit();
+            auto it = exploit.getSymtab().find(symbol);
+            assert(it != exploit.getSymtab().end() && "Var doesn't exist in script's symtab");
+            offset = it->second;
+            strOffset = symbol;
+
         } else {
             static_assert(always_false_v<T>, "Unsupported base type :(");
         }
 
         return create(elf.getBase(), offset, prefix + "_base", std::move(strOffset));
+    }
+
+    // Create a BaseOffsetExpr that represents an offset from `elf.getBase()`,
+    // E.g. "target_base + 0x666"
+    template <BaseType T>
+    static ref<Expr> create(const ELF &elf, uint64_t offset) {
+        static_assert(T == BaseType::VAR);
+        return create(elf.getBase(), offset, elf.getVarPrefix() + "_base", "");
     }
 
     // Method for support type inquiry through isa, cast, and dyn_cast.

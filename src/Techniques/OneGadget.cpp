@@ -89,12 +89,12 @@ std::vector<RopSubchain> OneGadget::getRopSubchains() const {
 
     // Set all the required registers to the desired value.
     for (const auto &gadget : m_oneGadget.gadgets) {
-        ret.push_back(BaseOffsetExpr::create(exploit, libc, Exploit::toVarName(gadget.first)));
+        ret.push_back(BaseOffsetExpr::create<BaseType::VAR>(libc, Exploit::toVarName(gadget.first)));
         ret.push_back(gadget.second);
     }
 
     // Return to the gadget, spawning a shell.
-    ret.push_back(BaseOffsetExpr::create(libc, m_oneGadget.offset));
+    ret.push_back(BaseOffsetExpr::create<BaseType::VAR>(libc, m_oneGadget.offset));
     return { ret };
 }
 
@@ -186,7 +186,7 @@ OneGadget::GadgetValuePair OneGadget::parseConstraint(const std::string &constra
         uint64_t offset = elf.checksec.hasPIE ? 8 : 0x400008;
 
         ret.first = format("pop %s ; ret", reg.c_str());
-        ret.second = BaseOffsetExpr::create(elf, offset);
+        ret.second = BaseOffsetExpr::create<BaseType::VAR>(elf, offset);
 
     } else if (std::regex_match(constraintStr, match, reg3)) {
         // e.g., [x+0x40] == NULL or [x-0x32] == NULL
@@ -204,7 +204,7 @@ OneGadget::GadgetValuePair OneGadget::parseConstraint(const std::string &constra
         offset += isRegOffsetPositive ? -regOffset : regOffset;
 
         ret.first = format("pop %s ; ret", reg.c_str());
-        ret.second = BaseOffsetExpr::create(elf, offset);
+        ret.second = BaseOffsetExpr::create<BaseType::VAR>(elf, offset);
 
     } else if (std::regex_match(constraintStr, match, reg4)) {
         // e.g., x is the GOT address of libc

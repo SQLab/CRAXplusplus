@@ -39,11 +39,10 @@ Ret2syscall::Ret2syscall()
 
     if (exploit.resolveGadget(elf, gadgetAsm)) {
         m_requiredGadgets.push_back(std::make_pair(&elf, gadgetAsm));
-        m_syscallGadget = BaseOffsetExpr::create(exploit, elf, Exploit::toVarName(gadgetAsm));
+        m_syscallGadget = BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(gadgetAsm));
 
     } else if (!elf.checksec.hasFullRELRO &&
                elf.symbols().find("read") != elf.symbols().end()) {
-        using BaseType = BaseOffsetExpr::BaseType;
         m_syscallGadget = BaseOffsetExpr::create<BaseType::SYM>(elf, "read");
     }
 }
@@ -54,8 +53,6 @@ bool Ret2syscall::checkRequirements() const {
 }
 
 std::vector<RopSubchain> Ret2syscall::getRopSubchains() const {
-    using BaseType = BaseOffsetExpr::BaseType;
-
     const Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 

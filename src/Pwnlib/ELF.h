@@ -30,6 +30,9 @@
 
 namespace s2e::plugins::crax {
 
+// Forward declaration
+class Exploit;
+
 class ELF {
 public:
     using SymbolMap = std::map<std::string, uint64_t>;
@@ -59,6 +62,8 @@ public:
     const std::string &getVarPrefix() const { return m_varPrefix; }
     uint64_t getBase() const { return m_base; }
     void setBase(uint64_t base) { m_base = base; }
+
+    const Exploit &getExploit() const;
 
     const Checksec checksec;
 

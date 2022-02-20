@@ -37,6 +37,9 @@ using RopSubchain = std::vector<klee::ref<klee::Expr>>;
 // The abstract base class of all concrete exploitation techniques,
 // e.g., stack pivoting, ret2csu, orw, etc.
 class Technique {
+protected:
+    using BaseType = BaseOffsetExpr::BaseType;
+
 public:
     virtual ~Technique() = default;
 

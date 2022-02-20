@@ -131,7 +131,8 @@ Ret2csu::getRopSubchains(const ref<Expr> &retAddr,
         const ELF &elf = exploit.getElf();
         uint64_t gadgetAddr = exploit.resolveGadget(elf, "pop rdi ; ret");
 
-        ret.back() = BaseOffsetExpr::create(elf, gadgetAddr);
+        // XXX: Register "pop rdi ; ret" as an exploit script variable?
+        ret.back() = BaseOffsetExpr::create<BaseType::VAR>(elf, gadgetAddr);
         ret.push_back(arg1);
         ret.push_back(retAddr);
     }
@@ -256,7 +257,7 @@ void Ret2csu::buildRopSubchainTemplate() const {
     m_ropSubchainTemplate.resize(1);
 
     RopSubchain &rop = m_ropSubchainTemplate[0];
-    rop.push_back(BaseOffsetExpr::create(exploit, elf, s_libcCsuInitGadget1));
+    rop.push_back(BaseOffsetExpr::create<BaseType::VAR>(elf, s_libcCsuInitGadget1));
     for (int i = 0; i < 7; i++) {
         std::string content = transform[m_gadget1Regs[i]];
 
@@ -266,10 +267,10 @@ void Ret2csu::buildRopSubchainTemplate() const {
             uint64_t val = std::stoull(content, nullptr, 16);
             rop.push_back(ConstantExpr::create(val, Expr::Int64));
         } else {
-            rop.push_back(BaseOffsetExpr::create(exploit, elf, content));
+            rop.push_back(BaseOffsetExpr::create<BaseType::VAR>(elf, content));
         }
     }
-    rop.push_back(BaseOffsetExpr::create(exploit, elf, s_libcCsuInitGadget2));
+    rop.push_back(BaseOffsetExpr::create<BaseType::VAR>(elf, s_libcCsuInitGadget2));
     for (int i = 0; i < 7; i++) {
         rop.push_back(ConstantExpr::create(0x4141414141414141, Expr::Int64));
     }

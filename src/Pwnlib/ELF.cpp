@@ -91,6 +91,10 @@ uint64_t ELF::rebaseAddress(uint64_t address, uint64_t newBase) const {
     return newBase + address - m_base;
 }
 
+const Exploit &ELF::getExploit() const {
+    return g_crax->getExploit();
+}
+
 
 ELF::Checksec::Checksec(const std::string &filename)
     : hasCanary(),

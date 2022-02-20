@@ -174,6 +174,8 @@ void RopChainBuilder::doChainDirect(const std::vector<RopSubchain> &ropSubchains
 }
 
 void RopChainBuilder::maybeConcretizePlaceholderExpr(ref<Expr> &e) const {
+    using BaseType = BaseOffsetExpr::BaseType;
+
     auto phe = dyn_cast<PlaceholderExpr<uint64_t>>(e);
 
     if (!phe) {
@@ -185,7 +187,7 @@ void RopChainBuilder::maybeConcretizePlaceholderExpr(ref<Expr> &e) const {
     uint64_t offset = phe->getUserData();
 
     e = AddExpr::alloc(
-            BaseOffsetExpr::create(exploit, elf, "pivot_dest"),
+            BaseOffsetExpr::create<BaseType::VAR>(elf, "pivot_dest"),
             ConstantExpr::create(sizeof(uint64_t) + m_rspOffset + offset, Expr::Int64));
 }
 

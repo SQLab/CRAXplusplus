@@ -21,7 +21,7 @@
 #include <s2e/Plugins/CRAX/CRAX.h>
 #include <s2e/Plugins/CRAX/Exploit.h>
 #include <s2e/Plugins/CRAX/Techniques/Ret2csu.h>
-#include <s2e/Plugins/CRAX/Techniques/StackPivot.h>
+#include <s2e/Plugins/CRAX/Techniques/StackPivoting.h>
 #include <s2e/Plugins/CRAX/Techniques/GotPartialOverwrite.h>
 #include <s2e/Plugins/CRAX/Techniques/GotLeakLibc.h>
 #include <s2e/Plugins/CRAX/Techniques/OneGadget.h>
@@ -66,10 +66,10 @@ std::unique_ptr<Technique> Technique::create(const std::string &name) {
 
     if (name == "Ret2csu") {
         ret = std::make_unique<Ret2csu>();
-    } else if (name == "BasicStackPivot") {
-        ret = std::make_unique<BasicStackPivot>();
-    } else if (name == "AdvancedStackPivot") {
-        ret = std::make_unique<AdvancedStackPivot>();
+    } else if (name == "BasicStackPivoting") {
+        ret = std::make_unique<BasicStackPivoting>();
+    } else if (name == "AdvancedStackPivoting") {
+        ret = std::make_unique<AdvancedStackPivoting>();
     } else if (name == "GotPartialOverwrite") {
         ret = std::make_unique<GotPartialOverwrite>();
     } else if (name == "GotLeakLibc") {

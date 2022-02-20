@@ -18,46 +18,42 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef S2E_PLUGINS_CRAX_STACK_PIVOT_H
-#define S2E_PLUGINS_CRAX_STACK_PIVOT_H
+#ifndef S2E_PLUGINS_CRAX_STACK_PIVOTING_H
+#define S2E_PLUGINS_CRAX_STACK_PIVOTING_H
 
-#include <s2e/Plugins/CRAX/API/Disassembler.h>
 #include <s2e/Plugins/CRAX/Techniques/Technique.h>
 
-#include <map>
 #include <set>
-#include <string>
-#include <vector>
 
 namespace s2e::plugins::crax {
 
-class StackPivot : public Technique {
+class StackPivoting : public Technique {
 public:
-    StackPivot() : Technique() {}
-    virtual ~StackPivot() override = default;
+    StackPivoting() : Technique() {}
+    virtual ~StackPivoting() override = default;
 
     virtual void resolveRequiredGadgets() override;
 };
 
-class BasicStackPivot : public StackPivot {
+class BasicStackPivoting : public StackPivoting {
 public:
-    BasicStackPivot();
-    virtual ~BasicStackPivot() override = default;
+    BasicStackPivoting();
+    virtual ~BasicStackPivoting() override = default;
 
-    virtual std::string toString() const override { return "BasicStackPivot"; }
+    virtual std::string toString() const override { return "BasicStackPivoting"; }
 
     virtual std::vector<RopSubchain> getRopSubchains() const override;
     virtual RopSubchain getExtraRopSubchain() const override;
 };
 
-class AdvancedStackPivot : public StackPivot {
+class AdvancedStackPivoting : public StackPivoting {
 public:
-    AdvancedStackPivot();
-    virtual ~AdvancedStackPivot() override = default;
+    AdvancedStackPivoting();
+    virtual ~AdvancedStackPivoting() override = default;
 
     virtual void initialize() override;
     virtual bool checkRequirements() const override;
-    virtual std::string toString() const override { return "AdvancedStackPivot"; }
+    virtual std::string toString() const override { return "AdvancedStackPivoting"; }
 
     virtual std::vector<RopSubchain> getRopSubchains() const override;
     virtual RopSubchain getExtraRopSubchain() const override { return {}; }
@@ -97,4 +93,4 @@ private:
 
 }  // namespace s2e::plugins::crax
 
-#endif  // S2E_PLUGINS_CRAX_STACK_PIVOT_H
+#endif  // S2E_PLUGINS_CRAX_STACK_PIVOTING_H

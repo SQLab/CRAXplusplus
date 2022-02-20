@@ -20,6 +20,7 @@
 
 #include <s2e/Plugins/CRAX/CRAX.h>
 #include <s2e/Plugins/CRAX/Exploit.h>
+#include <s2e/Plugins/CRAX/API/Disassembler.h>
 #include <s2e/Plugins/CRAX/Modules/DynamicRop/DynamicRop.h>
 #include <s2e/Plugins/CRAX/Techniques/Ret2csu.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
@@ -27,13 +28,13 @@
 #include <cassert>
 #include <memory>
 
-#include "StackPivot.h"
+#include "StackPivoting.h"
 
 using namespace klee;
 
 namespace s2e::plugins::crax {
 
-void StackPivot::resolveRequiredGadgets() {
+void StackPivoting::resolveRequiredGadgets() {
     Technique::resolveRequiredGadgets();
 
     // Register pivot destination as a script's variable.
@@ -42,7 +43,7 @@ void StackPivot::resolveRequiredGadgets() {
 }
 
 
-BasicStackPivot::BasicStackPivot() : StackPivot() {
+BasicStackPivoting::BasicStackPivoting() : StackPivoting() {
     const Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
@@ -52,7 +53,7 @@ BasicStackPivot::BasicStackPivot() : StackPivot() {
 
 
 
-std::vector<RopSubchain> BasicStackPivot::getRopSubchains() const {
+std::vector<RopSubchain> BasicStackPivoting::getRopSubchains() const {
     using BaseType = BaseOffsetExpr::BaseType;
 
     const Exploit &exploit = g_crax->getExploit();
@@ -89,14 +90,14 @@ std::vector<RopSubchain> BasicStackPivot::getRopSubchains() const {
     return { ret };
 }
 
-RopSubchain BasicStackPivot::getExtraRopSubchain() const {
+RopSubchain BasicStackPivoting::getExtraRopSubchain() const {
     return { ConstantExpr::create(0, Expr::Int64) };  // RBP
 }
 
 
 
-AdvancedStackPivot::AdvancedStackPivot()
-    : StackPivot(),
+AdvancedStackPivoting::AdvancedStackPivoting()
+    : StackPivoting(),
       m_offsetToRetAddr(),
       m_readCallSites() {
     const Exploit &exploit = g_crax->getExploit();
@@ -105,32 +106,32 @@ AdvancedStackPivot::AdvancedStackPivot()
     m_requiredGadgets.push_back(std::make_pair(&elf, "pop rsi ; pop r15 ; ret"));
 
     g_crax->beforeInstruction.connect(
-            sigc::mem_fun(*this, &AdvancedStackPivot::maybeInterceptReadCallSites));
+            sigc::mem_fun(*this, &AdvancedStackPivoting::maybeInterceptReadCallSites));
 
     g_crax->beforeExploitGeneration.connect(
-            sigc::mem_fun(*this, &AdvancedStackPivot::beforeExploitGeneration));
+            sigc::mem_fun(*this, &AdvancedStackPivoting::beforeExploitGeneration));
 }
 
 
-void AdvancedStackPivot::initialize() {
+void AdvancedStackPivoting::initialize() {
     Technique::initialize();
 
     initDynamicRopConstraintsOnce();
 }
 
-bool AdvancedStackPivot::checkRequirements() const {
+bool AdvancedStackPivoting::checkRequirements() const {
     const ELF &elf = g_crax->getExploit().getElf();
 
-    return StackPivot::checkRequirements() &&
+    return StackPivoting::checkRequirements() &&
            elf.symbols().find("read") != elf.symbols().end() &&
            m_readCallSites.size();
 }
 
-std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
+std::vector<RopSubchain> AdvancedStackPivoting::getRopSubchains() const {
     using BaseType = BaseOffsetExpr::BaseType;
 
     assert(m_readCallSites.size() &&
-           "AdvancedStackPivot requires at least one call site of read@libc");
+           "AdvancedStackPivoting requires at least one call site of read@libc");
 
     const Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
@@ -210,8 +211,8 @@ std::vector<RopSubchain> AdvancedStackPivot::getRopSubchains() const {
 }
 
 
-void AdvancedStackPivot::maybeInterceptReadCallSites(S2EExecutionState *state,
-                                                     const Instruction &i) {
+void AdvancedStackPivoting::maybeInterceptReadCallSites(S2EExecutionState *state,
+                                                        const Instruction &i) {
     if (g_crax->isCallSiteOf(i.address, "read")) {
         uint64_t buf = reg().readConcrete(Register::X64::RSI);
         uint64_t len = reg().readConcrete(Register::X64::RDX);
@@ -219,20 +220,20 @@ void AdvancedStackPivot::maybeInterceptReadCallSites(S2EExecutionState *state,
     }
 }
 
-void AdvancedStackPivot::beforeExploitGeneration(S2EExecutionState *state) {
+void AdvancedStackPivoting::beforeExploitGeneration(S2EExecutionState *state) {
     assert(m_readCallSites.size() &&
-           "AdvancedStackPivot requires at least one call site of read().");
+           "AdvancedStackPivoting requires at least one call site of read().");
 
     uint64_t rsp = reg().readConcrete(Register::X64::RSP);
     m_offsetToRetAddr = rsp - (*m_readCallSites.rbegin()).buf - 16;
 }
 
-void AdvancedStackPivot::initDynamicRopConstraintsOnce() const {
+void AdvancedStackPivoting::initDynamicRopConstraintsOnce() const {
     const Exploit &exploit = g_crax->getExploit();
     S2EExecutionState *state = g_crax->getCurrentState();
 
     auto __dynRop = g_crax->getModule<DynamicRop>();
-    assert(__dynRop && "AdvancedStackPivot relies on DynamicRop module");
+    assert(__dynRop && "AdvancedStackPivoting relies on DynamicRop module");
     auto &dynRop = *__dynRop;
 
     auto modState = g_crax->getModuleState(state, &dynRop);
@@ -276,8 +277,8 @@ void AdvancedStackPivot::initDynamicRopConstraintsOnce() const {
     dynRop.applyNextConstraintGroup(*state);
 }
 
-uint64_t AdvancedStackPivot::determineRetAddr(uint64_t readCallSiteAddr,
-                                              int &rbpOffset) const {
+uint64_t AdvancedStackPivoting::determineRetAddr(uint64_t readCallSiteAddr,
+                                                 int &rbpOffset) const {
     std::string symbol = g_crax->getBelongingSymbol(readCallSiteAddr);
     uint64_t symbolAddr = g_crax->getExploit().getElf().getRuntimeAddress(symbol);
     assert(symbolAddr <= readCallSiteAddr);

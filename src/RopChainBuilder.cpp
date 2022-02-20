@@ -21,7 +21,7 @@
 #include <s2e/Plugins/CRAX/CRAX.h>
 #include <s2e/Plugins/CRAX/Expr/BinaryExprEvaluator.h>
 #include <s2e/Plugins/CRAX/Techniques/Technique.h>
-#include <s2e/Plugins/CRAX/Techniques/StackPivot.h>
+#include <s2e/Plugins/CRAX/Techniques/StackPivoting.h>
 
 #include <cassert>
 
@@ -194,7 +194,7 @@ bool RopChainBuilder::shouldSwitchToDirectMode(const Technique *t) const {
     // such as read@plt to write the 2nd stage rop payload to bss,
     // so after stack pivoting our rop chain can be built without
     // solving ROP constraints.
-    return dynamic_cast<const StackPivot *>(t);
+    return dynamic_cast<const StackPivoting *>(t);
 }
 
 bool RopChainBuilder::buildStage1Payload() {

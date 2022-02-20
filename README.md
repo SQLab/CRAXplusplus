@@ -18,28 +18,27 @@ CRAX++ is maintained by:
 * Custom exploitation techniques (ROP formulae) support
 * ...
 
-## Quick Start
-
-This section is currently WIP, but we're working very hard to get this section done. Please come back later.
+## Quick Start \[WIP]
 
 Introduction
 
-* [Installation](Documentation/BUILD.md) - outdated
-* [Usage]()
-* [What is a Module?]()
-* [What is a Technique?]()
+* [Building CRAX++](Documentation/Build.md)
+* Usage
+* Reproducing experiments from the `examples` directory
+* What is a Module?
+* What is a Technique?
 
 Extending CRAX++
 
-* signals in S2E (libfsigc++)
-* (before/after) Instruction hooks
-* (before/after) Syscall hooks
-* Register API
-* Memory API
-* Disassembler API (capstone)
-* Virtual Memory Map API
-* [How to add a Module]()
-* [How to add a Technique]()
+* [Register API](Documentation/API.md#register)
+* [Memory API](Documentation/API.md#memory)
+* [Virtual Memory Map API](Documentation/API.md#virtual-memory-map)
+* [Disassembler API](Documentation/API.md#disassembler)
+* [Logging API](Documentation/API.md#logging)
+* Instruction hooks
+* Syscall hooks
+* [How to add a Module](Documentation/Module.md)
+* How to add a Technique
 
 ## Quick Example
 

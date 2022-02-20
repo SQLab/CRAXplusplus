@@ -85,8 +85,8 @@ bool Memory::writeSymbolic(uint64_t virtAddr, const ref<Expr> &value) {
     return success;
 }
 
-bool Memory::writeConcrete(uint64_t virtAddr, uint64_t value) {
-    bool success = m_state->mem()->write(virtAddr, &value, sizeof(value));
+bool Memory::writeConcrete(uint64_t virtAddr, const std::vector<uint8_t> &bytes) {
+    bool success = m_state->mem()->write(virtAddr, bytes.data(), bytes.size());
     if (!success) {
         log<WARN>() << "Cannot write concrete data to memory: " << hexval(virtAddr) << '\n';
     }

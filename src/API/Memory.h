@@ -53,7 +53,7 @@ public:
     bool writeSymbolic(uint64_t virtAddr, const klee::ref<klee::Expr> &value);
 
     // Write concrete data to memory.
-    bool writeConcrete(uint64_t virtAddr, uint64_t value);
+    bool writeConcrete(uint64_t virtAddr, const std::vector<uint8_t> &bytes);
 
     // Determine if the given virtual memory address is mapped.
     [[nodiscard]]

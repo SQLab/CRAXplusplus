@@ -403,9 +403,9 @@ pluginsConfig.CRAX = {
     -- The exploitaion techniques that your exploit will use.
     techniques = {
         "Ret2csu",
-        --"BasicStackPivot",
-        "AdvancedStackPivot",
-        --"GotPartialOverwrite",
+        --"BasicStackPivoting",
+        "AdvancedStackPivoting",
+        --"Ret2syscall",
         "GotLeakLibc",
         "OneGadget"
     },

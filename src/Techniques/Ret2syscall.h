@@ -18,28 +18,39 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef S2E_PLUGINS_CRAX_GOT_PARTIAL_OVERWRITE_H
-#define S2E_PLUGINS_CRAX_GOT_PARTIAL_OVERWRITE_H
+#ifndef S2E_PLUGINS_CRAX_RET2SYSCALL_H
+#define S2E_PLUGINS_CRAX_RET2SYSCALL_H
 
 #include <s2e/Plugins/CRAX/Techniques/Technique.h>
 
 namespace s2e::plugins::crax {
 
-class GotPartialOverwrite : public Technique {
+class Ret2syscall : public Technique {
 public:
-    GotPartialOverwrite();
-    virtual ~GotPartialOverwrite() override = default;
+    Ret2syscall();
+    virtual ~Ret2syscall() override = default;
 
     virtual bool checkRequirements() const override;
-    virtual std::string toString() const override { return "GotPartialOverwrite"; }
+    virtual std::string toString() const override { return "Ret2syscall"; }
 
     virtual std::vector<RopSubchain> getRopSubchains() const override;
     virtual RopSubchain getExtraRopSubchain() const override { return {}; }
 
+    ref<Expr> getSyscallGadget() const {
+        return m_syscallGadget;
+    }
+
+    void setSyscallGadget(const ref<Expr> &syscallGadget) {
+        m_syscallGadget = syscallGadget;
+    }
+
 private:
     uint8_t getLsbOfReadSyscall() const;
+
+    // The location of the syscall gadget.
+    ref<Expr> m_syscallGadget;
 };
 
 }  // namespace s2e::plugins::crax
 
-#endif  // S2E_PLUGINS_CRAX_GOT_PARTIAL_OVERWRITE_H
+#endif  // S2E_PLUGINS_CRAX_RET2SYSCALL_H

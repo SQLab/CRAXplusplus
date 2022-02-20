@@ -49,7 +49,7 @@ public:
     virtual RopSubchain getExtraRopSubchain() const = 0;
 
     static std::unique_ptr<Technique> create(const std::string &name);
-    static std::map<std::type_index, Technique*> s_mapper;
+    static std::map<std::type_index, Technique *> s_mapper;
 
 protected:
     Technique() : m_requiredGadgets() {}

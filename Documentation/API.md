@@ -5,6 +5,14 @@ This file documents the application programming interfaces (API) of CRAX++.
 * Author: [@aesophor](https://github.com/aesophor)
 * Last updated: Feb 20, 2022
 
+## Table of Contents
+
+* [Register](#register)
+* [Memory](#memory)
+* [Virtual Memory Map](#virtual-memory-map)
+* [Disassembler](#disassembler)
+* [Logging](#logging)
+
 ## Register
 
 All x86_64 registers are defined in `src/API/Register.h`, whose values matches the values from `libcpu/include/cpu/i386/defs.h`.

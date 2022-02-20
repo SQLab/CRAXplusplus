@@ -23,9 +23,6 @@
 
 #include <s2e/Plugins/CRAX/Techniques/Technique.h>
 
-#include <string>
-#include <vector>
-
 namespace s2e::plugins::crax {
 
 class GotLeakLibc : public Technique {

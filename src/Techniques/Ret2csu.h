@@ -26,8 +26,6 @@
 
 #include <exception>
 #include <map>
-#include <string>
-#include <vector>
 
 namespace s2e::plugins::crax {
 

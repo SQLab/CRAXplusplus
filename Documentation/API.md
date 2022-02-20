@@ -150,15 +150,14 @@ std::vector<uint8_t> bytes = mem(state).readSymbolic(addr, size);
 
 #### Write concrete bytes to a guest memory region
 
-> FIXME
-
 ```cpp
 S2EExecutionState *state = ...;
 
 uint64_t addr = 0x402000;
-uint64_t value = 0x1337;
+std::string s = "/bin/sh";
+std::vector<uint8_t> bytes(s.begin(), s.end());
 
-bool ok = mem(state).writeConcrete(addr, value);
+bool ok = mem(state).writeConcrete(addr, bytes);
 ```
 
 #### Write symbolic bytes to a guest memory region

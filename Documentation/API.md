@@ -13,41 +13,51 @@ This file documents the application programming interfaces (API) of CRAX++.
 * [Disassembler](#disassembler)
 * [Logging](#logging)
 
-## Register
+## Before We Begin
 
-All x86_64 registers are defined in `src/API/Register.h`, whose values matches the values from `libcpu/include/cpu/i386/defs.h`.
-
-```
-enum X64 {
-    RAX,  // 0
-    RCX,  // 1
-    RDX,  // 2
-    RBX,  // 3
-    RSP,  // 4
-    RBP,  // 5
-    RSI,  // 6
-    RDI,  // 7
-    R8,   // 8
-    R9,   // 9
-    R10,  // 10
-    R11,  // 11
-    R12,  // 12
-    R13,  // 13
-    R14,  // 14
-    R15,  // 15
-    LAST,
-    RIP
-};
-```
-
-You'll notice that `RIP` is defined after `LAST`, this is because libcpu treats EIP/RIP differently than general purpose registers:
+In S2E:
 
 * to access EIP's value within X86CPUState: `CPU_OFFSET(eip)`
 * to access RAX's value within X86CPUState: `CPU_OFFSET(regs[R_EAX])`
 * to access RSP's value within X86CPUState: `CPU_OFFSET(regs[R_ESP])`
 * to access R12's value within X86CPUState: `CPU_OFFSET(regs[12])`
 
-This is why I wrote a wrapper for CPU interfaces, and here I'll show how things are simplified:
+As you can see, S2E's interfaces are not intuitive to use. Therefore, I wrote wrappers for S2E's CPU and Memory interfaces.
+
+## Register
+
+All x86_64 registers are defined in `src/API/Register.h`, whose values match the values from `libcpu/include/cpu/i386/defs.h`.
+
+You'll notice that `RIP` is defined after `LAST`, this is because libcpu treats EIP/RIP differently than general purpose registers.
+
+```
+// src/API/Register.h
+class Register {
+public:
+    // ...
+    enum X64 {
+        RAX,  // 0
+        RCX,  // 1
+        RDX,  // 2
+        RBX,  // 3
+        RSP,  // 4
+        RBP,  // 5
+        RSI,  // 6
+        RDI,  // 7
+        R8,   // 8
+        R9,   // 9
+        R10,  // 10
+        R11,  // 11
+        R12,  // 12
+        R13,  // 13
+        R14,  // 14
+        R15,  // 15
+        LAST,
+        RIP
+    };
+    // ...
+};
+```
 
 #### Read concrete data from a register
 
@@ -246,7 +256,7 @@ foreach2 (it, vmmap.begin(), vmmap.end()) {
     bool r = region->r;
     bool w = region->w;
     bool x = region->x;
-    bool name = region->moduleName;  // e.g., libc.so.6
+    std::string name = region->moduleName;  // e.g., libc.so.6
 }
 ```
 
@@ -335,7 +345,9 @@ if (insns.size()) {
 
 #### Examples
 
-Beware! Avoid using the logging APIs from constructor! If you really need to, make sure `g_crax` has been initialized, or just use iostream.
+Beware! Avoid using the logging APIs within the constructor of CRAX (and the constructors of CRAX's data members)!
+
+Make sure `g_crax` has been initialized.
 
 ```cpp
 S2EExecutionState *state = ...;

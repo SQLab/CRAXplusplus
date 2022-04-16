@@ -59,6 +59,7 @@ bool RopChainBuilder::chain(const Technique &technique) {
 const std::vector<RopSubchain> &RopChainBuilder::build() {
     if (m_isSymbolicMode) {
         buildStage1Payload();
+        m_ropChain.push_back({});
     }
     
     if (m_ropChain.size() && m_ropChain.back().empty()) {
@@ -100,6 +101,7 @@ bool RopChainBuilder::chainSymbolic(const Technique &technique) {
     } else if (!buildStage1Payload()) {
         return false;
     }
+    m_ropChain.push_back({});
 
     if (!shouldSwitchToDirectMode(&technique)) {
         return true;
@@ -111,7 +113,6 @@ bool RopChainBuilder::chainSymbolic(const Technique &technique) {
 
     // Chain the rest (i.e. ropSubchains[1..last]).
     if (ropSubchains.size() > 1) {
-        m_ropChain.push_back({});
         doChainDirect(ropSubchains, extraRopSubchain, 1);
     }
 
@@ -134,10 +135,6 @@ void RopChainBuilder::doChainDirect(const std::vector<RopSubchain> &ropSubchains
     // It should only be used for constructing the very first ROP subchain.
     if (!m_shouldSkipSavedRbp) {
         m_shouldSkipSavedRbp = true;
-    }
-
-    if (m_ropChain.empty()) {
-        m_ropChain.push_back({});
     }
 
     for (; i < ropSubchains.size(); i++, j = 0) {
@@ -209,7 +206,6 @@ bool RopChainBuilder::buildStage1Payload() {
     }
 
     m_ropChain.push_back({ ByteVectorExpr::create(payload) });
-    m_ropChain.push_back({});
     return true;
 }
 

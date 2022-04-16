@@ -72,7 +72,7 @@ Experimental Setup:
 
 * Binaries are compiled with gcc 9.3.0 (Ubuntu 9.3.0-17ubuntu1~20.04)
 * Binaries are concolically executed in S2E guest (Debian 9.2.1 x86_64, 4.9.3-s2e)
-* All generate exploit scripts are executed in host (Ubuntu 20.04.1 x86_64, 5.11.0-46-generic)
+* All generated exploit scripts are executed in host (Ubuntu 20.04.1 x86_64, 5.11.0-46-generic)
 
 We avoid using libc-sensitive exploitation techniques, i.e., the exploit scripts work across different versions of libc.
 

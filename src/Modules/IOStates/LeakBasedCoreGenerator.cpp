@@ -51,7 +51,7 @@ struct IOStateInfoVisitor {
     // Extra parameters
     Exploit &exploit;
     const ELF &elf;
-    const std::vector<RopSubchain> &ropChain;
+    const std::vector<RopPayload> &ropPayload;
     PseudoInputStream &inputStream;
     const IOStates::State &modState;
     const size_t i;  // the index of `stateInfo` in `modState.stateInfoList`
@@ -91,12 +91,12 @@ void IOStateInfoVisitor::operator()(const InputStateInfo &stateInfo) {
 
     handleStage1(stateInfo);
 
-    for (size_t j = 1; j < ropChain.size(); j++) {
-        if (auto le = dyn_cast<LambdaExpr>(ropChain[j][0])) {
-            assert(ropChain[j].size() == 1);
+    for (size_t j = 1; j < ropPayload.size(); j++) {
+        if (auto le = dyn_cast<LambdaExpr>(ropPayload[j][0])) {
+            assert(ropPayload[j].size() == 1);
             std::invoke(*le);
         } else {
-            for (const ref<Expr> &e : ropChain[j]) {
+            for (const ref<Expr> &e : ropPayload[j]) {
                 exploit.appendRopPayload(evaluate<std::string>(e));
             }
             exploit.flushRopPayload();
@@ -175,7 +175,7 @@ void IOStateInfoVisitor::operator()(const SleepStateInfo &stateInfo) {
 
 
 void LeakBasedCoreGenerator::generateMainFunction(S2EExecutionState *state,
-                                                  std::vector<RopSubchain> ropChain,
+                                                  std::vector<RopPayload> ropPayload,
                                                   std::vector<uint8_t> stage1) {
     Exploit &exploit = g_crax->getExploit();
     PseudoInputStream inputStream(stage1);
@@ -189,7 +189,7 @@ void LeakBasedCoreGenerator::generateMainFunction(S2EExecutionState *state,
     for (size_t i = 0; i < modState->stateInfoList.size(); i++) {
         exploit.writeline();
 
-        std::visit(IOStateInfoVisitor{exploit, exploit.getElf(), ropChain, inputStream, *modState, i},
+        std::visit(IOStateInfoVisitor{exploit, exploit.getElf(), ropPayload, inputStream, *modState, i},
                    modState->stateInfoList[i]);
     }
 }

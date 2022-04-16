@@ -42,8 +42,8 @@ public:
 
     virtual std::string toString() const override { return "BasicStackPivoting"; }
 
-    virtual std::vector<RopSubchain> getRopSubchains() const override;
-    virtual RopSubchain getExtraRopSubchain() const override;
+    virtual std::vector<RopPayload> getRopPayloadList() const override;
+    virtual RopPayload getExtraRopPayload() const override;
 };
 
 class AdvancedStackPivoting : public StackPivoting {
@@ -55,8 +55,8 @@ public:
     virtual bool checkRequirements() const override;
     virtual std::string toString() const override { return "AdvancedStackPivoting"; }
 
-    virtual std::vector<RopSubchain> getRopSubchains() const override;
-    virtual RopSubchain getExtraRopSubchain() const override { return {}; }
+    virtual std::vector<RopPayload> getRopPayloadList() const override;
+    virtual RopPayload getExtraRopPayload() const override { return {}; }
 
 private:
     struct ReadCallSiteInfo {

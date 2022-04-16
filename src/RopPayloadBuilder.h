@@ -18,8 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef S2E_PLUGINS_CRAX_ROP_CHAIN_BUILDER_H
-#define S2E_PLUGINS_CRAX_ROP_CHAIN_BUILDER_H
+#ifndef S2E_PLUGINS_CRAX_ROP_PAYLOAD_BUILDER_H
+#define S2E_PLUGINS_CRAX_ROP_PAYLOAD_BUILDER_H
 
 #include <klee/Expr.h>
 #include <s2e/Plugins/CRAX/API/Register.h>
@@ -30,7 +30,7 @@
 namespace s2e::plugins::crax {
 
 // To begin with, each exploitation technique can contain N * ROP subchains.
-// The task of RopChainBuilder is to concatenate the subchains of each
+// The task of RopPayloadBuilder is to concatenate the subchains of each
 // technique into a single complete ROP chain.
 //
 // CRAX supports two modes of ROP chain generation:
@@ -40,25 +40,25 @@ namespace s2e::plugins::crax {
 // Forward declaration
 class Technique;
 
-class RopChainBuilder {
+class RopPayloadBuilder {
     using ConcreteInput = std::vector<uint8_t>;
     using VarValuePair = std::pair<std::string, ConcreteInput>;
     using ConcreteInputs = std::vector<VarValuePair>;
 
 public:
-    RopChainBuilder();
-    ~RopChainBuilder() = default;
+    RopPayloadBuilder();
+    ~RopPayloadBuilder() = default;
 
     void reset();
 
     // Chain the ROP subchain from the given technique
-    // with `m_ropChain`, the ROP chain we've built so far.
+    // with `m_ropPayload`, the ROP chain we've built so far.
     [[nodiscard]]
     bool chain(const Technique &technique);
 
     // Finalizes and returns the full ROP chain.
     [[nodiscard]]
-    const std::vector<RopSubchain> &build();
+    const std::vector<RopPayload> &build();
 
     [[nodiscard]]
     uint32_t getRspOffset() const { return m_rspOffset; }
@@ -87,8 +87,8 @@ private:
     [[nodiscard]]
     bool chainDirect(const Technique &technique);
 
-    void doChainDirect(const std::vector<RopSubchain> &ropSubchains,
-                       const RopSubchain &extraRopSubchain,
+    void doChainDirect(const std::vector<RopPayload> &ropSubchains,
+                       const RopPayload &extraRopPayload,
                        size_t ropSubchainsBegin = 0);
 
     void maybeConcretizePlaceholderExpr(ref<Expr> &e) const;
@@ -102,9 +102,9 @@ private:
     bool m_isSymbolicMode;  // true: symbolic, false: direct
     bool m_shouldSkipSavedRbp;
     uint32_t m_rspOffset;
-    std::vector<RopSubchain> m_ropChain;
+    std::vector<RopPayload> m_ropPayload;
 };
 
 }  // namespace s2e::plugins::crax
 
-#endif  // S2E_PLUGINS_CRAX_ROP_CHAIN_BUILDER_H
+#endif  // S2E_PLUGINS_CRAX_ROP_PAYLOAD_BUILDER_H

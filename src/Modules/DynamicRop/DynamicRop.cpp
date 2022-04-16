@@ -68,10 +68,10 @@ void DynamicRop::applyNextConstraintGroup(S2EExecutionState &state) {
         ref<Expr> rebasedExpr = ConstantExpr::create(rebasedAddr, Expr::Int64);
 
         if (auto mc = std::dynamic_pointer_cast<MemoryConstraint>(c)) {
-            ok = RopChainBuilder::addMemoryConstraint(state, mc->addr, rebasedExpr);
+            ok = RopPayloadBuilder::addMemoryConstraint(state, mc->addr, rebasedExpr);
             mem().writeSymbolic(mc->addr, c->expr);
         } else if (auto rc = std::dynamic_pointer_cast<RegisterConstraint>(c)) {
-            ok = RopChainBuilder::addRegisterConstraint(state, rc->reg, rebasedExpr);
+            ok = RopPayloadBuilder::addRegisterConstraint(state, rc->reg, rebasedExpr);
             reg().writeSymbolic(rc->reg, c->expr);
         }
 

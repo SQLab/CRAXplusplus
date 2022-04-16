@@ -30,7 +30,7 @@ public:
     virtual ~LeakBasedCoreGenerator() override = default;
 
     virtual void generateMainFunction(S2EExecutionState *state,
-                                      std::vector<RopSubchain> ropChain,
+                                      std::vector<RopPayload> ropPayload,
                                       std::vector<uint8_t> stage1) override;
 };
 

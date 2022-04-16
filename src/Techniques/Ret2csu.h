@@ -50,20 +50,20 @@ public:
     virtual void resolveRequiredGadgets() override;
     virtual std::string toString() const override { return "Ret2csu"; }
 
-    virtual std::vector<RopSubchain> getRopSubchains() const override;
-    virtual RopSubchain getExtraRopSubchain() const override { return {}; }
+    virtual std::vector<RopPayload> getRopPayloadList() const override;
+    virtual RopPayload getExtraRopPayload() const override { return {}; }
 
-    std::vector<RopSubchain>
-    getRopSubchains(const klee::ref<klee::Expr> &retAddr,
-                    const klee::ref<klee::Expr> &arg1,
-                    const klee::ref<klee::Expr> &arg2,
-                    const klee::ref<klee::Expr> &arg3) const;
+    std::vector<RopPayload>
+    getRopPayloadList(const klee::ref<klee::Expr> &retAddr,
+                      const klee::ref<klee::Expr> &arg1,
+                      const klee::ref<klee::Expr> &arg2,
+                      const klee::ref<klee::Expr> &arg3) const;
 
-    std::vector<RopSubchain>
-    getRopSubchains(uint64_t retAddr,
-                    uint64_t arg1,
-                    uint64_t arg2,
-                    uint64_t arg3) const;
+    std::vector<RopPayload>
+    getRopPayloadList(uint64_t retAddr,
+                      uint64_t arg1,
+                      uint64_t arg2,
+                      uint64_t arg3) const;
 
     // User-provided call target.
     void setGadget2CallTarget(uint64_t libcCsuInitCallTarget) {
@@ -71,7 +71,7 @@ public:
         invalidate();
     }
 
-    size_t estimateRopSubchainSize(uint64_t arg1) {
+    size_t estimateRopPayloadSize(uint64_t arg1) {
         // XXX: Don't hardcode the integer literal...
         size_t ret = m_ropSubchainTemplate[0].size();
         return hasExceeded32Bits(arg1) ? ret + 2 : ret;
@@ -85,7 +85,7 @@ public:
 private:
     void parseLibcCsuInit();
     void searchGadget2CallTarget(std::string funcName = "_fini");
-    void buildRopSubchainTemplate() const;
+    void buildRopPayloadTemplate() const;
     void invalidate() { m_isTemplateValid = false; }
 
     static inline bool hasExceeded32Bits(uint64_t value) {
@@ -113,7 +113,7 @@ private:
     // Rebuilding the entire ROP chain from scratch is expensive,
     // so we'll use a template as a cache, thereby declaring it mutable.
     mutable bool m_isTemplateValid;
-    mutable std::vector<RopSubchain> m_ropSubchainTemplate;
+    mutable std::vector<RopPayload> m_ropSubchainTemplate;
 };
 
 }  // namespace s2e::plugins::crax

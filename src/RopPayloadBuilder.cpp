@@ -25,30 +25,30 @@
 
 #include <cassert>
 
-#include "RopChainBuilder.h"
+#include "RopPayloadBuilder.h"
 
 using namespace klee;
 
 namespace s2e::plugins::crax {
 
-RopChainBuilder::RopChainBuilder()
+RopPayloadBuilder::RopPayloadBuilder()
     : m_isSymbolicMode(true),
       m_shouldSkipSavedRbp(),
       m_rspOffset(),
-      m_ropChain() {}
+      m_ropPayload() {}
 
 
-void RopChainBuilder::reset() {
+void RopPayloadBuilder::reset() {
     m_isSymbolicMode = true;
     m_shouldSkipSavedRbp = false;
     m_rspOffset = 0;
-    m_ropChain.clear();
+    m_ropPayload.clear();
 }
 
-bool RopChainBuilder::chain(const Technique &technique) {
+bool RopPayloadBuilder::chain(const Technique &technique) {
     // Not all exploitation techniques have a ROP formula,
     // so we'll return true here.
-    if (technique.getRopSubchains().empty()) {
+    if (technique.getRopPayloadList().empty()) {
         return true;
     }
 
@@ -56,24 +56,24 @@ bool RopChainBuilder::chain(const Technique &technique) {
                             : chainDirect(technique);
 }
 
-const std::vector<RopSubchain> &RopChainBuilder::build() {
+const std::vector<RopPayload> &RopPayloadBuilder::build() {
     if (m_isSymbolicMode) {
         buildStage1Payload();
-        m_ropChain.push_back({});
+        m_ropPayload.push_back({});
     }
     
-    if (m_ropChain.size() && m_ropChain.back().empty()) {
-        m_ropChain.pop_back();
+    if (m_ropPayload.size() && m_ropPayload.back().empty()) {
+        m_ropPayload.pop_back();
     }
 
-    return m_ropChain;
+    return m_ropPayload;
 }
 
-bool RopChainBuilder::chainSymbolic(const Technique &technique) {
+bool RopPayloadBuilder::chainSymbolic(const Technique &technique) {
     S2EExecutionState *state = g_crax->getCurrentState();
 
-    std::vector<RopSubchain> ropSubchains = technique.getRopSubchains();
-    RopSubchain extraRopSubchain = technique.getExtraRopSubchain();
+    std::vector<RopPayload> ropSubchains = technique.getRopPayloadList();
+    RopPayload extraRopPayload = technique.getExtraRopPayload();
 
     bool ok;
     uint64_t rsp = reg().readConcrete(Register::X64::RSP);
@@ -97,11 +97,11 @@ bool RopChainBuilder::chainSymbolic(const Technique &technique) {
     }
 
     if (ropSubchains[0].empty()) {
-        m_ropChain.push_back({});
+        m_ropPayload.push_back({});
     } else if (!buildStage1Payload()) {
         return false;
     }
-    m_ropChain.push_back({});
+    m_ropPayload.push_back({});
 
     if (!shouldSwitchToDirectMode(&technique)) {
         return true;
@@ -113,20 +113,20 @@ bool RopChainBuilder::chainSymbolic(const Technique &technique) {
 
     // Chain the rest (i.e. ropSubchains[1..last]).
     if (ropSubchains.size() > 1) {
-        doChainDirect(ropSubchains, extraRopSubchain, 1);
+        doChainDirect(ropSubchains, extraRopPayload, 1);
     }
 
     return true;
 }
 
-bool RopChainBuilder::chainDirect(const Technique &technique) {
-    doChainDirect(technique.getRopSubchains(), technique.getExtraRopSubchain());
+bool RopPayloadBuilder::chainDirect(const Technique &technique) {
+    doChainDirect(technique.getRopPayloadList(), technique.getExtraRopPayload());
     return true;
 }
 
-void RopChainBuilder::doChainDirect(const std::vector<RopSubchain> &ropSubchains,
-                                    const RopSubchain &extraRopSubchain,
-                                    size_t ropSubchainsBegin) {
+void RopPayloadBuilder::doChainDirect(const std::vector<RopPayload> &ropSubchains,
+                                      const RopPayload &extraRopPayload,
+                                      size_t ropSubchainsBegin) {
     size_t i = ropSubchainsBegin;
     size_t j = m_shouldSkipSavedRbp;
     uint64_t newRspOffset = m_rspOffset;
@@ -142,7 +142,7 @@ void RopChainBuilder::doChainDirect(const std::vector<RopSubchain> &ropSubchains
             continue;
         }
 
-        m_ropChain.back().reserve(ropSubchains[i].size());
+        m_ropPayload.back().reserve(ropSubchains[i].size());
 
         for (; j < ropSubchains[i].size(); j++) {
             ref<Expr> e = ropSubchains[i][j];
@@ -153,24 +153,24 @@ void RopChainBuilder::doChainDirect(const std::vector<RopSubchain> &ropSubchains
             // orders, resulting in a non-fixed offset.
             maybeConcretizePlaceholderExpr(e);
 
-            m_ropChain.back().push_back(e);
+            m_ropPayload.back().push_back(e);
             newRspOffset += e->getWidth() / 8;
         }
 
         if (i != ropSubchains.size() - 1) {
-            m_ropChain.push_back({});
+            m_ropPayload.push_back({});
         }
     }
 
-    if (extraRopSubchain.size()) {
-        m_ropChain.push_back(extraRopSubchain);
+    if (extraRopPayload.size()) {
+        m_ropPayload.push_back(extraRopPayload);
     }
 
-    m_ropChain.push_back({});
+    m_ropPayload.push_back({});
     m_rspOffset = newRspOffset;
 }
 
-void RopChainBuilder::maybeConcretizePlaceholderExpr(ref<Expr> &e) const {
+void RopPayloadBuilder::maybeConcretizePlaceholderExpr(ref<Expr> &e) const {
     using BaseType = BaseOffsetExpr::BaseType;
 
     auto phe = dyn_cast<PlaceholderExpr<uint64_t>>(e);
@@ -188,7 +188,7 @@ void RopChainBuilder::maybeConcretizePlaceholderExpr(ref<Expr> &e) const {
             ConstantExpr::create(sizeof(uint64_t) + m_rspOffset + offset, Expr::Int64));
 }
 
-bool RopChainBuilder::shouldSwitchToDirectMode(const Technique *t) const {
+bool RopPayloadBuilder::shouldSwitchToDirectMode(const Technique *t) const {
     // Currently we assume that we can find a decent write primitive
     // such as read@plt to write the 2nd stage rop payload to bss,
     // so after stack pivoting our rop chain can be built without
@@ -196,7 +196,7 @@ bool RopChainBuilder::shouldSwitchToDirectMode(const Technique *t) const {
     return dynamic_cast<const StackPivoting *>(t);
 }
 
-bool RopChainBuilder::buildStage1Payload() {
+bool RopPayloadBuilder::buildStage1Payload() {
     S2EExecutionState *state = g_crax->getCurrentState();
     ConcreteInput payload = getOneConcreteInput(*state);
 
@@ -205,14 +205,14 @@ bool RopChainBuilder::buildStage1Payload() {
         return false;
     }
 
-    m_ropChain.push_back({ ByteVectorExpr::create(payload) });
+    m_ropPayload.push_back({ ByteVectorExpr::create(payload) });
     return true;
 }
 
 
-bool RopChainBuilder::addRegisterConstraint(S2EExecutionState &state,
-                                            Register::X64 r,
-                                            const ref<Expr> &e) {
+bool RopPayloadBuilder::addRegisterConstraint(S2EExecutionState &state,
+                                              Register::X64 r,
+                                              const ref<Expr> &e) {
     assert(e);
 
     // Concretize the given expression.
@@ -230,9 +230,9 @@ bool RopChainBuilder::addRegisterConstraint(S2EExecutionState &state,
     return state.addConstraint(constraint, true);
 }
 
-bool RopChainBuilder::addMemoryConstraint(S2EExecutionState &state,
-                                          uint64_t addr,
-                                          const ref<Expr> &e) {
+bool RopPayloadBuilder::addMemoryConstraint(S2EExecutionState &state,
+                                            uint64_t addr,
+                                            const ref<Expr> &e) {
     assert(e);
 
     // Concretize the given expression.
@@ -250,8 +250,8 @@ bool RopChainBuilder::addMemoryConstraint(S2EExecutionState &state,
     return state.addConstraint(constraint, true);
 }
 
-RopChainBuilder::ConcreteInputs
-RopChainBuilder::getConcreteInputs(S2EExecutionState &state) {
+RopPayloadBuilder::ConcreteInputs
+RopPayloadBuilder::getConcreteInputs(S2EExecutionState &state) {
     // FIXME: To integrate tl455047's adaptive symbolic input selection with this,
     // replace the use of `getSymbolicSolution()` with TestCaseGenerator.
     // See: testcase_generator_register_concrete_file().
@@ -260,8 +260,8 @@ RopChainBuilder::getConcreteInputs(S2EExecutionState &state) {
     return ret;
 }
 
-RopChainBuilder::ConcreteInput
-RopChainBuilder::getOneConcreteInput(S2EExecutionState &state) {
+RopPayloadBuilder::ConcreteInput
+RopPayloadBuilder::getOneConcreteInput(S2EExecutionState &state) {
     ConcreteInputs inputs = getConcreteInputs(state);
     return inputs.size() ? inputs[0].second : ConcreteInput {};
 }

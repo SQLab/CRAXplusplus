@@ -32,7 +32,7 @@
 
 namespace s2e::plugins::crax {
 
-using RopSubchain = std::vector<klee::ref<klee::Expr>>;
+using RopPayload = std::vector<klee::ref<klee::Expr>>;
 
 // The abstract base class of all concrete exploitation techniques,
 // e.g., stack pivoting, ret2csu, orw, etc.
@@ -48,8 +48,8 @@ public:
     virtual void resolveRequiredGadgets();
     virtual std::string toString() const = 0;
 
-    virtual std::vector<RopSubchain> getRopSubchains() const = 0;
-    virtual RopSubchain getExtraRopSubchain() const = 0;
+    virtual std::vector<RopPayload> getRopPayloadList() const = 0;
+    virtual RopPayload getExtraRopPayload() const = 0;
 
     static std::unique_ptr<Technique> create(const std::string &name);
     static std::map<std::type_index, Technique *> s_mapper;

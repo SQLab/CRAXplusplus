@@ -81,28 +81,28 @@ void Ret2csu::resolveRequiredGadgets() {
 }
 
 
-std::vector<RopSubchain> Ret2csu::getRopSubchains() const {
+std::vector<RopPayload> Ret2csu::getRopPayloadList() const {
     if (!m_retAddr) {
         return {};
     }
 
-    auto ret = getRopSubchains(m_retAddr, m_arg1, m_arg2, m_arg3);
+    auto ret = getRopPayloadList(m_retAddr, m_arg1, m_arg2, m_arg3);
     ret[0].insert(ret[0].begin(), ConstantExpr::create(0x4141414141414141, Expr::Int64));
     return ret;
 }
 
 
-std::vector<RopSubchain>
-Ret2csu::getRopSubchains(const ref<Expr> &retAddr,
+std::vector<RopPayload>
+Ret2csu::getRopPayloadList(const ref<Expr> &retAddr,
                          const ref<Expr> &arg1,
                          const ref<Expr> &arg2,
                          const ref<Expr> &arg3) const {
-    RopSubchain ret;
+    RopPayload ret;
 
     // If the template is invalid, rebuild it now.
     if (!m_isTemplateValid) {
         m_isTemplateValid = true;
-        buildRopSubchainTemplate();
+        buildRopPayloadTemplate();
     }
 
     for (const ref<Expr> &e : m_ropSubchainTemplate[0]) {
@@ -140,12 +140,12 @@ Ret2csu::getRopSubchains(const ref<Expr> &retAddr,
     return { ret };
 }
 
-std::vector<RopSubchain>
-Ret2csu::getRopSubchains(uint64_t retAddr,
+std::vector<RopPayload>
+Ret2csu::getRopPayloadList(uint64_t retAddr,
                          uint64_t arg1,
                          uint64_t arg2,
                          uint64_t arg3) const {
-    return getRopSubchains(
+    return getRopPayloadList(
         ConstantExpr::create(retAddr, Expr::Int64),
         ConstantExpr::create(arg1, Expr::Int64),
         ConstantExpr::create(arg2, Expr::Int64),
@@ -239,7 +239,7 @@ void Ret2csu::searchGadget2CallTarget(std::string funcName) {
     m_libcCsuInitCallTarget = candidates[0] - elf.getBase();
 }
 
-void Ret2csu::buildRopSubchainTemplate() const {
+void Ret2csu::buildRopPayloadTemplate() const {
     const Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
@@ -256,7 +256,7 @@ void Ret2csu::buildRopSubchainTemplate() const {
     m_ropSubchainTemplate.clear();
     m_ropSubchainTemplate.resize(1);
 
-    RopSubchain &rop = m_ropSubchainTemplate[0];
+    RopPayload &rop = m_ropSubchainTemplate[0];
     rop.push_back(BaseOffsetExpr::create<BaseType::VAR>(elf, s_libcCsuInitGadget1));
     for (int i = 0; i < 7; i++) {
         std::string content = transform[m_gadget1Regs[i]];

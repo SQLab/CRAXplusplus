@@ -34,15 +34,15 @@ public:
     virtual void resolveRequiredGadgets() override;
     virtual std::string toString() const override { return "GotLeakLibc"; }
 
-    virtual std::vector<RopSubchain> getRopSubchains() const override;
-    virtual RopSubchain getExtraRopSubchain() const override { return {}; }
+    virtual std::vector<RopPayload> getRopPayloadList() const override;
+    virtual RopPayload getExtraRopPayload() const override { return {}; }
 
 private:
-    std::vector<RopSubchain>
-    getRopSubchainsForPrintf(const std::string &targetSym) const;
+    std::vector<RopPayload>
+    getRopPayloadListForPrintf(const std::string &targetSym) const;
 
-    std::vector<RopSubchain>
-    getRopSubchainsForPuts(const std::string &targetSym) const;
+    std::vector<RopPayload>
+    getRopPayloadListForPuts(const std::string &targetSym) const;
 };
 
 }  // namespace s2e::plugins::crax

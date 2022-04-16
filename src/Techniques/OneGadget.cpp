@@ -80,11 +80,11 @@ bool OneGadget::checkRequirements() const {
     return Technique::checkRequirements();
 }
 
-std::vector<RopSubchain> OneGadget::getRopSubchains() const {
+std::vector<RopPayload> OneGadget::getRopPayloadList() const {
     Exploit &exploit = g_crax->getExploit();
     ELF &libc = exploit.getLibc();
 
-    RopSubchain ret;
+    RopPayload ret;
     ret.push_back(ConstantExpr::create(0, Expr::Int64));  // RBP
 
     // Set all the required registers to the desired value.

@@ -41,8 +41,8 @@ public:
     virtual bool checkRequirements() const override;
     virtual std::string toString() const override { return "OneGadget"; }
 
-    virtual std::vector<RopSubchain> getRopSubchains() const override;
-    virtual RopSubchain getExtraRopSubchain() const override { return {}; }
+    virtual std::vector<RopPayload> getRopPayloadList() const override;
+    virtual RopPayload getExtraRopPayload() const override { return {}; }
 
 private:
     using GadgetValuePair = std::pair<std::string, klee::ref<klee::Expr>>;

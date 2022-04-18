@@ -89,7 +89,7 @@ std::vector<RopPayload> OneGadget::getRopPayloadList() const {
 
     // Set all the required registers to the desired value.
     for (const auto &gadget : m_oneGadget.gadgets) {
-        ret.push_back(BaseOffsetExpr::create<BaseType::VAR>(libc, Exploit::toVarName(gadget.first)));
+        ret.push_back(BaseOffsetExpr::create<BaseType::VAR>(libc, Exploit::toVarName(libc, gadget.first)));
         ret.push_back(gadget.second);
     }
 

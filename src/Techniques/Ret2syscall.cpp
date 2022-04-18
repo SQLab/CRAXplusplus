@@ -39,7 +39,7 @@ Ret2syscall::Ret2syscall()
 
     if (exploit.resolveGadget(elf, gadgetAsm)) {
         m_requiredGadgets.push_back(std::make_pair(&elf, gadgetAsm));
-        m_syscallGadget = BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(gadgetAsm));
+        m_syscallGadget = BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, gadgetAsm));
 
     } else if (!elf.checksec.hasFullRELRO &&
                elf.symbols().find("read") != elf.symbols().end()) {

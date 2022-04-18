@@ -131,7 +131,7 @@ GotLeakLibc::getRopPayloadListForPrintf(const std::string &targetSym) const {
 
     // Set RSI to elf.got['read'], returning to `pop rdi ; ret`.
     RopPayload part3 = ret2csu->getRopPayloadList(
-        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName("pop rdi ; ret")),
+        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, "pop rdi ; ret")),
         ConstantExpr::create(0, Expr::Int64),
         BaseOffsetExpr::create<BaseType::GOT>(elf, targetSym),
         ConstantExpr::create(0, Expr::Int64))[0];
@@ -177,7 +177,7 @@ GotLeakLibc::getRopPayloadListForPuts(const std::string &targetSym) const {
     assert(ret2csu);
 
     RopPayload part1 = {
-        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName("pop rdi ; ret")),
+        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, "pop rdi ; ret")),
         BaseOffsetExpr::create<BaseType::GOT>(elf, targetSym),
         BaseOffsetExpr::create<BaseType::SYM>(elf, "puts")
     };

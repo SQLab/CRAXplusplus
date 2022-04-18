@@ -56,8 +56,10 @@ void Technique::resolveRequiredGadgets() {
         const ELF &elf = *entry.first;
         const std::string &gadget = entry.second;
 
-        std::string varName = Exploit::toVarName(entry.second);
-        exploit.registerSymbol(varName, exploit.resolveGadget(elf, gadget));
+        std::string varName = Exploit::toVarName(elf, entry.second);
+        uint64_t offset = exploit.resolveGadget(elf, gadget);
+
+        exploit.registerSymbol(varName, offset);
     }
 }
 

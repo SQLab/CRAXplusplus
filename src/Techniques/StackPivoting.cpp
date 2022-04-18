@@ -75,9 +75,9 @@ std::vector<RopPayload> BasicStackPivoting::getRopPayloadList() const {
 
     // Perform stack pivoting.
     RopPayload part3 = {
-        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName("pop rbp ; ret")),
+        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, "pop rbp ; ret")),
         BaseOffsetExpr::create<BaseType::VAR>(elf, "pivot_dest"),
-        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName("leave ; ret"))
+        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, "leave ; ret"))
     };
 
     RopPayload ret;
@@ -144,7 +144,7 @@ std::vector<RopPayload> AdvancedStackPivoting::getRopPayloadList() const {
     RopPayload part1;
     for (size_t i = 0; i < 6; i++) {
         ref<Expr> e0 = BaseOffsetExpr::create<BaseType::VAR>(
-                elf, Exploit::toVarName("pop rsi ; pop r15 ; ret"));
+                elf, Exploit::toVarName(elf, "pop rsi ; pop r15 ; ret"));
 
         ref<Expr> e1 = AddExpr::alloc(
                 BaseOffsetExpr::create<BaseType::VAR>(elf, "pivot_dest"),

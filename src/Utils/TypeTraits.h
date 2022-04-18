@@ -26,7 +26,7 @@
 namespace s2e::plugins::crax {
 
 template <typename T>
-inline constexpr bool always_false_v = false;
+inline constexpr bool dependent_false_v = false;
 
 }  // namespace s2e::plugins::crax
 

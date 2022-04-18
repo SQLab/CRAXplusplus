@@ -35,7 +35,7 @@
 #include <utility>
 
 using s2e::plugins::crax::format;
-using s2e::plugins::crax::always_false_v;
+using s2e::plugins::crax::dependent_false_v;
 
 namespace klee {
 
@@ -98,31 +98,31 @@ public:
     //
     // 4. "target_base + __libc_csu_init_gadget1"
     //    => BaseOffsetExpr::create<BaseType::VAR>(elf, "__libc_csu_init_gadget1")
-    template <BaseType T>
+    template <BaseType BT>
     static ref<Expr> create(const ELF &elf, const std::string &symbol = "") {
         uint64_t offset = 0;
         std::string strOffset;
         const std::string &prefix = elf.getVarPrefix();
 
-        if constexpr (T == BaseType::SYM) {
+        if constexpr (BT == BaseType::SYM) {
             const auto &symbolMap = elf.symbols();
             auto it = symbolMap.find(symbol);
             assert(it != symbolMap.end() && "Symbol doesn't exist in elf.sym");
             offset = it->second;
             strOffset = format("%s.sym['%s']", prefix.c_str(), symbol.c_str());
 
-        } else if constexpr (T == BaseType::GOT) {
+        } else if constexpr (BT == BaseType::GOT) {
             const auto &gotMap = elf.got();
             auto it = gotMap.find(symbol);
             assert(it != gotMap.end() && "Symbol doesn't exist in elf.got");
             offset = it->second;
             strOffset = format("%s.got['%s']", prefix.c_str(), symbol.c_str());
 
-        } else if constexpr (T == BaseType::BSS) {
+        } else if constexpr (BT == BaseType::BSS) {
             offset = elf.bss();
             strOffset = format("%s.bss()", prefix.c_str());
 
-        } else if constexpr (T == BaseType::VAR) {
+        } else if constexpr (BT == BaseType::VAR) {
             const Exploit &exploit = elf.getExploit();
             auto it = exploit.getSymtab().find(symbol);
             assert(it != exploit.getSymtab().end() && "Var doesn't exist in script's symtab");
@@ -130,7 +130,8 @@ public:
             strOffset = symbol;
 
         } else {
-            static_assert(always_false_v<T>, "Unsupported base type :(");
+            // XXX: Uncomment the following line when S2E upstream upgrades to clang > 13.0.1
+            //static_assert(dependent_false_v<BT>, "Unsupported base type :(");
         }
 
         return create(elf.getBase(), offset, prefix + "_base", std::move(strOffset));

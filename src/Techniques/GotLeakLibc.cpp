@@ -112,7 +112,7 @@ GotLeakLibc::getRopPayloadListForPrintf(const std::string &targetSym) const {
 
     // Write "%s\n\x00" to somewhere in .bss, so that we can
     // leak 8 bytes from an entry of GOT with printf().
-    // read(0, elf_base + elf.bss() + n, 3)
+    // read(0, elf_base + got_leak_libc_fmt_str, 4)
     std::string fmtStr = "%s\n";
     fmtStr.push_back('\x00');
 

@@ -45,7 +45,10 @@ public:
     }
 
 private:
-    uint8_t getLsbOfReadSyscall() const;
+    std::vector<RopPayload> getRopPayloadListUsingLibcRop() const;
+    std::vector<RopPayload> getRopPayloadListUsingGotHijacking() const;
+
+    uint8_t getLibcReadSyscallOffsetLsb() const;
 
     // The location of the syscall gadget.
     ref<Expr> m_syscallGadget;

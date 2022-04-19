@@ -31,8 +31,9 @@ namespace s2e::plugins::crax {
 
 class RopGadgetResolver {
 public:
-    RopGadgetResolver() : m_ropGadgetCache() {}
-    ~RopGadgetResolver() = default;
+    RopGadgetResolver()
+        : m_ropGadgetOutputCache(),
+          m_ropGadgetCache() {}
 
     // Look for an exact match of the gadget specified by `gadgetAsm` within `elf`.
     // If found, then the offset of the gadget will be returned, and zero otherwise.
@@ -69,6 +70,7 @@ private:
         mutable std::recursive_mutex m_mutex;
     };
 
+    mutable std::map<const ELF *, std::string> m_ropGadgetOutputCache;
     mutable RopGadgetCache m_ropGadgetCache;
 };
 

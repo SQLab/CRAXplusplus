@@ -29,36 +29,41 @@ using namespace klee;
 namespace s2e::plugins::crax {
 
 uint64_t RopGadgetResolver::resolveGadget(const ELF &elf, const std::string &gadgetAsm) const {
+    // If we have an exact match in m_ropGadgetCache, use it.
     if (auto cachedAddr = m_ropGadgetCache.lookup(&elf, gadgetAsm)) {
         return cachedAddr;
     }
 
-    // Get the output of `ROPgadget --binary <m_elfFilename> | grep <keyword>`
-    // and store it in `output`.
-    subprocess::popen ropGadget("ROPgadget", {"--binary", elf.getFilename()});
-    ropGadget.close();
+    // If we have already run `ROPgadget` on the given ELF file, reuse the cached output.
+    std::string *output = nullptr;
+    auto it = m_ropGadgetOutputCache.find(&elf);
 
-    // Example entry:
-    // 0x000000000040117d : pop rbp ; ret
-    const std::string keyword = " : " + gadgetAsm;
-    subprocess::popen grep("grep", { keyword });
-    grep.stdin() << ropGadget.stdout().rdbuf();
-    grep.close();
+    if (it != m_ropGadgetOutputCache.end()) {
+        output = &(it->second);
+    } else {
+        // Get the output of `ROPgadget --binary <m_elfFilename>` and store it in `output`.
+        subprocess::popen ropGadget("ROPgadget", {"--binary", elf.getFilename()});
+        ropGadget.close();
 
-    std::string output = streamToString(grep.stdout());
+        m_ropGadgetOutputCache.insert(std::make_pair(&elf, streamToString(ropGadget.stdout())));
+        output = &m_ropGadgetOutputCache[&elf];
+    }
 
-    for (const auto &line : split(output, '\n')) {
+    for (const auto &line : split(*output, '\n')) {
         size_t firstSpaceIdx = line.find_first_of(" ");
         size_t asmBeginIdx = firstSpaceIdx + 3;  // skips " : "
 
-        std::string addrStr = line.substr(0, firstSpaceIdx);
-        std::string asmStr = line.substr(asmBeginIdx);
+        std::string_view addrStr = std::string_view(line).substr(0, firstSpaceIdx);
+        std::string_view asmStr = std::string_view(line).substr(asmBeginIdx);
 
         // Look for an exact match.
+        // Example entry:
+        // 0x000000000040117d : pop rbp ; ret
         if (asmStr == gadgetAsm) {
-            uint64_t addr = std::stoull(addrStr, nullptr, 0);
+            uint64_t addr = std::stoull(std::string(addrStr), nullptr, 0);
             m_ropGadgetCache.insert(&elf, gadgetAsm, addr);
-            log<INFO>() << format("Resolved gadget: [0x%x] %s\n", addr, asmStr.c_str());
+
+            log<INFO>() << format("Resolved gadget: [0x%x] %s\n", addr, asmStr.data());
             return addr;
         }
     }

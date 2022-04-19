@@ -125,7 +125,6 @@ std::vector<uint64_t> Memory::search(const std::vector<uint8_t> &needle) const {
             continue;
         }
 
-        //uint64_t offset = static_cast<uint64_t>(its.first - haystack.begin());
         ret.push_back((its.first - haystack.begin()) + start);
     }
 

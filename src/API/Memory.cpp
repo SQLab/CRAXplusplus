@@ -54,22 +54,10 @@ std::vector<uint8_t> Memory::readConcrete(uint64_t virtAddr,
             // Read the underlying concrete bytes, but don't concretize them.
             if (isSymbolic(virtAddr + i, 1)) {
                 if (!m_state->mem()->read(virtAddr + i, &ret[i], VirtualAddress, false)) {
-                    ret.clear();
-                    log<WARN>()
-                        << "Non-concretizing read() from memory failed: "
-                        << hexval(virtAddr + i)
-                        << "\n";
-                    break;
+                    ret[i] = 0;
                 }
-                continue;
-            }
-            if (!m_state->mem()->read(virtAddr + i, &ret[i], 1)) {
-                ret.clear();
-                log<WARN>()
-                    << "Cannot read concrete data from memory: "
-                    << hexval(virtAddr + i)
-                    << '\n';
-                break;
+            } else if (!m_state->mem()->read(virtAddr + i, &ret[i], 1)) {
+                ret[i] = 0;
             }
          }
     }

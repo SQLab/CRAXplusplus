@@ -29,11 +29,12 @@
 
 namespace s2e::plugins::crax {
 
-// To begin with, each exploitation technique can contain N * ROP subchains.
-// The task of RopPayloadBuilder is to concatenate the subchains of each
-// technique into a single complete ROP chain.
+// To begin with, each exploitation technique contains a ROP payload formula
+// which is a std::vector<std::vector<klee::ref<klee::Expr>>>. The task of
+// RopPayloadBuilder is to chain the ROP payload formulae of the specified
+// techniques into a single complete ROP payload formula.
 //
-// CRAX supports two modes of ROP chain generation:
+// CRAX supports two modes of ROP payload generation:
 // 1. Symbolic mode (usually used before stack pivoting)
 // 2. Direct mode (usually used after stack pivoting)
 

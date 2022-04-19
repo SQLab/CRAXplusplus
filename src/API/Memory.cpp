@@ -19,7 +19,8 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
-#include <s2e/Plugins/CRAX/Utils/Algorithm.h>
+
+#include <boost/algorithm/searching/knuth_morris_pratt.hpp>
 
 #include "Memory.h"
 
@@ -50,16 +51,19 @@ std::vector<uint8_t> Memory::readConcrete(uint64_t virtAddr,
     } else {
         // XXX: The performance seems fast enough even though I bruteforce it byte by byte,
         // but maybe we can optimize it directly in libs2ecore at some point.
+        bool ok = false;
         for (uint64_t i = 0; i < size; i++) {
-            // Read the underlying concrete bytes, but don't concretize them.
             if (isSymbolic(virtAddr + i, 1)) {
-                if (!m_state->mem()->read(virtAddr + i, &ret[i], VirtualAddress, false)) {
-                    ret[i] = 0;
-                }
-            } else if (!m_state->mem()->read(virtAddr + i, &ret[i], 1)) {
+                // Read the underlying concrete bytes, but don't concretize them.
+                ok = m_state->mem()->read(virtAddr + i, &ret[i], VirtualAddress, false);
+            } else {
+                ok = m_state->mem()->read(virtAddr + i, &ret[i], 1);
+            }
+
+            if (!ok) {
                 ret[i] = 0;
             }
-         }
+        }
     }
 
     return ret;
@@ -112,16 +116,17 @@ std::vector<uint64_t> Memory::search(const std::vector<uint8_t> &needle) const {
         // and use kmp algorithm to search all the occurences of `needle`.
         std::vector<uint8_t> haystack = readConcrete(start, end - start, /*concretize=*/false);
 
-        std::vector<uint64_t> localResult = kmp(haystack, needle);
+        auto its = boost::algorithm::knuth_morris_pratt_search(haystack.begin(),
+                                                               haystack.end(),
+                                                               needle.begin(),
+                                                               needle.end());
 
-        // `localResult` contains the offset within `haystack`, so adding
-        // `region.start` to each element will turn them into valid virtual addresses.
-        for (auto &r : localResult) {
-            r += start;
+        if (its.first == haystack.end() && its.second == haystack.end()) {
+            continue;
         }
 
-        // Append `localResult` to `ret`.
-        ret.insert(ret.end(), localResult.begin(), localResult.end());
+        //uint64_t offset = static_cast<uint64_t>(its.first - haystack.begin());
+        ret.push_back((its.first - haystack.begin()) + start);
     }
 
     return ret;

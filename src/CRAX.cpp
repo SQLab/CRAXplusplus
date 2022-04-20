@@ -21,6 +21,8 @@
 #include <s2e/S2E.h>
 #include <s2e/ConfigFile.h>
 
+#include <filesystem>
+
 #include "CRAX.h"
 
 #define __CRAX_CONFIG_GET_T(Type, key, defaultValue) \
@@ -32,8 +34,8 @@
 #define CRAX_CONFIG_GET_INT(key, defaultValue) \
     __CRAX_CONFIG_GET_T(Int, key, defaultValue)
 
-#define CRAX_CONFIG_GET_STRING(key) \
-    __CRAX_CONFIG_GET_T(String, key, "")
+#define CRAX_CONFIG_GET_STRING(key, defaultValue) \
+    __CRAX_CONFIG_GET_T(String, key, defaultValue)
 
 using namespace klee;
 
@@ -66,8 +68,9 @@ CRAX::CRAX(S2E *s2e)
       m_register(),
       m_memory(),
       m_disassembler(),
-      m_exploit(CRAX_CONFIG_GET_STRING(".elfFilename"),
-                CRAX_CONFIG_GET_STRING(".libcFilename")),
+      m_exploit(CRAX_CONFIG_GET_STRING(".elfFilename", DEFAULT_BINARY_FILENAME),
+                CRAX_CONFIG_GET_STRING(".libcFilename", DEFAULT_LIBC_FILENAME),
+                CRAX_CONFIG_GET_STRING(".ldFilename", DEFAULT_LD_FILENAME)),
       m_exploitGenerator(),
       m_modules(),
       m_techniques(),
@@ -91,6 +94,14 @@ void CRAX::initialize() {
 
     s2e()->getCorePlugin()->onStateForkDecide.connect(
             sigc::mem_fun(*this, &CRAX::onStateForkDecide));
+
+    // Run `ROPgadget <elf>` on the following ELF files in a worker thread
+    // and cache their outputs.
+    std::vector<const ELF *> elfFiles = {
+        &m_exploit.getElf(),
+        &m_exploit.getLibc()
+    };
+    m_exploitGenerator.getRopGadgetResolver().buildRopGadgetOutputCacheAsync(elfFiles);
 
     // Initialize modules.
     ConfigFile *cfg = s2e()->getConfig();
@@ -152,7 +163,9 @@ void CRAX::onProcessLoad(S2EExecutionState *state,
 
     log<WARN>() << "onProcessLoad: " << imageFileName << '\n';
 
-    if (imageFileName.find(m_exploit.getElf().getFilename()) != imageFileName.npos) {
+    // If the user provides "./target" instead of "target" as the elf filename,
+    // then we use std::filesystem::path to discard the leading "./"
+    if (imageFileName == std::filesystem::path(m_exploit.getElf().getFilename()).filename()) {
         m_targetProcessPid = pid;
 
         m_linuxMonitor->onModuleLoad.connect(

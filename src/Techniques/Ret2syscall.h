@@ -30,7 +30,6 @@ public:
     Ret2syscall();
     virtual ~Ret2syscall() override = default;
 
-    virtual bool checkRequirements() const override;
     virtual std::string toString() const override { return "Ret2syscall"; }
 
     virtual std::vector<RopPayload> getRopPayloadList() const override;

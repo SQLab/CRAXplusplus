@@ -21,14 +21,11 @@
 #ifndef S2E_PLUGINS_CRAX_ONE_GADGET_H
 #define S2E_PLUGINS_CRAX_ONE_GADGET_H
 
-#include <klee/Expr.h>
 #include <s2e/Plugins/CRAX/Techniques/Technique.h>
 
-#include <atomic>
 #include <regex>
 #include <string>
 #include <vector>
-#include <utility>
 
 namespace s2e::plugins::crax {
 
@@ -37,8 +34,6 @@ public:
     OneGadget();
     virtual ~OneGadget() override = default;
 
-    virtual void initialize() override;
-    virtual bool checkRequirements() const override;
     virtual std::string toString() const override { return "OneGadget"; }
 
     virtual std::vector<RopPayload> getRopPayloadList() const override;
@@ -53,10 +48,6 @@ private:
         std::vector<GadgetValuePair> gadgets;
     };
 
-    // Parses the output of one_gadget and checks the constraints
-    // of each candidate until a feasible one is found.
-    void populateRequiredGadgets();
-
     // Parses the output of `one_gadget <libc_path>` 
     std::vector<LibcOneGadget> parseOneGadget() const;
 
@@ -64,19 +55,6 @@ private:
     // Input:  "r15 == NULL"
     // Output: ["pop r15 ; ret", r15_value]
     GadgetValuePair parseConstraint(const std::string &constraintStr) const;
-
-    // Blocks the main thread until the worker thread has completed.
-    [[gnu::always_inline]]
-    inline void blockUntilWorkerDone() const {
-        if (m_isWorkerDone) {
-            return;
-        }
-        log<WARN>() << "OneGadget is still running, please wait...\n";
-        while (!m_isWorkerDone) {}
-    }
-
-
-    std::atomic<bool> m_isWorkerDone;
 
     // The "one" gadget which will be used during the actual exploitation.
     LibcOneGadget m_oneGadget;

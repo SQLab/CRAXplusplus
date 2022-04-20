@@ -22,13 +22,31 @@
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 #include <s2e/Plugins/CRAX/Utils/Subprocess.h>
 
+#include <string_view>
+#include <thread>
+
 #include "RopGadgetResolver.h"
 
 using namespace klee;
 
 namespace s2e::plugins::crax {
 
+void RopGadgetResolver::buildRopGadgetOutputCacheAsync(const std::vector<const ELF *> &elfFiles) {
+    std::thread([this, elfFiles]() {
+        for (const auto elf : elfFiles) {
+            subprocess::popen ropGadget("ROPgadget", {"--binary", elf->getFilename()});
+            ropGadget.close();
+
+            m_ropGadgetOutputCache.insert(
+                    std::make_pair(elf, streamToString(ropGadget.stdout())));
+        }
+        m_hasBuiltRopGadgetOutputCache = true;
+    }).detach();
+}
+
 uint64_t RopGadgetResolver::resolveGadget(const ELF &elf, const std::string &gadgetAsm) const {
+    while (!m_hasBuiltRopGadgetOutputCache) {}
+
     // If we have an exact match in m_ropGadgetCache, use it.
     if (auto cachedAddr = m_ropGadgetCache.lookup(&elf, gadgetAsm)) {
         return cachedAddr;

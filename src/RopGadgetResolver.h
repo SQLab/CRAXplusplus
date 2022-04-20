@@ -23,8 +23,9 @@
 
 #include <s2e/Plugins/CRAX/Pwnlib/ELF.h>
 
+#include <atomic>
 #include <map>
-#include <mutex>
+#include <shared_mutex>
 #include <string>
 
 namespace s2e::plugins::crax {
@@ -32,11 +33,19 @@ namespace s2e::plugins::crax {
 class RopGadgetResolver {
 public:
     RopGadgetResolver()
-        : m_ropGadgetOutputCache(),
-          m_ropGadgetCache() {}
+        : m_hasBuiltRopGadgetOutputCache(),
+          m_ropGadgetCache(),
+          m_ropGadgetOutputCache() {}
+
+    // Given a list of ELF objects, for each ELF, cache the output of
+    // `ROPgadget <elf>` in m_ropGadgetOutputCache.
+    void buildRopGadgetOutputCacheAsync(const std::vector<const ELF *> &elfFiles);
 
     // Look for an exact match of the gadget specified by `gadgetAsm` within `elf`.
     // If found, then the offset of the gadget will be returned, and zero otherwise.
+    //
+    // NOTE: by default, we cache the output of `ROPgadget <elf>` at the beginning,
+    // and resolveGadget() will block until the output cacue has been fully built.
     uint64_t resolveGadget(const ELF &elf, const std::string &gadgetAsm) const;
 
 private:
@@ -49,14 +58,13 @@ private:
         RopGadgetCache() : m_map(), m_mutex() {}
 
         void insert(const ELF *const elf, const std::string &gadgetAsm, uint64_t addr) {
-            const std::lock_guard<std::recursive_mutex> lock(m_mutex);
+            const std::unique_lock<std::shared_mutex> writerLock(m_mutex);
 
-            assert(!lookup(elf, gadgetAsm));
             m_map[std::make_pair(elf, gadgetAsm)] = addr;
         }
 
         uint64_t lookup(const ELF *const elf, const std::string &gadgetAsm) const {
-            const std::lock_guard<std::recursive_mutex> lock(m_mutex);
+            const std::shared_lock<std::shared_mutex> readerLock(m_mutex);
 
             auto it = m_map.find(std::make_pair(elf, gadgetAsm));
             return it != m_map.end() ? it->second : 0;
@@ -67,11 +75,12 @@ private:
         using ValueType = uint64_t;
 
         std::map<KeyType, ValueType> m_map;
-        mutable std::recursive_mutex m_mutex;
+        mutable std::shared_mutex m_mutex;
     };
 
-    mutable std::map<const ELF *, std::string> m_ropGadgetOutputCache;
+    std::atomic<bool> m_hasBuiltRopGadgetOutputCache;
     mutable RopGadgetCache m_ropGadgetCache;
+    mutable std::map<const ELF *, std::string> m_ropGadgetOutputCache;
 };
 
 }  // namespace s2e::plugins::crax

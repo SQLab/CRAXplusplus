@@ -24,6 +24,7 @@
 #include <llvm/ADT/SmallVector.h>
 #include <s2e/Plugins/CRAX/Expr/Expr.h>
 
+#include <atomic>
 #include <map>
 #include <memory>
 #include <string>
@@ -55,7 +56,23 @@ public:
     static std::map<std::type_index, Technique *> s_mapper;
 
 protected:
-    Technique() : m_requiredGadgets() {}
+    Technique()
+        : m_hasPopulatedRequiredGadgets(true),
+          m_requiredGadgets() {}
+
+    [[gnu::always_inline]]
+    inline void blockUntilRequiredGadgetsPopulated() const {
+        if (m_hasPopulatedRequiredGadgets) {
+            return;
+        }
+        log<WARN>() << toString() << " is still running, please wait...\n";
+        while (!m_hasPopulatedRequiredGadgets) {}
+    }
+
+    // Some techniques determines the required gadgets in a background thread.
+    // In such cases, this atomic bool must be set to false, and the
+    // background thread must set it back to true when it finishes.
+    std::atomic<bool> m_hasPopulatedRequiredGadgets;
 
     llvm::SmallVector<std::pair<const ELF *, std::string>, 8> m_requiredGadgets;
 };

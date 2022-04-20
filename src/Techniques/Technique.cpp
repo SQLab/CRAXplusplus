@@ -36,11 +36,15 @@ namespace s2e::plugins::crax {
 std::map<std::type_index, Technique*> Technique::s_mapper;
 
 void Technique::initialize() {
+    blockUntilRequiredGadgetsPopulated();
+
     resolveRequiredGadgets();
 }
 
 bool Technique::checkRequirements() const {
     const Exploit &exploit = g_crax->getExploit();
+
+    blockUntilRequiredGadgetsPopulated();
 
     return std::all_of(m_requiredGadgets.begin(),
                        m_requiredGadgets.end(),

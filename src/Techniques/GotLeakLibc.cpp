@@ -21,8 +21,8 @@
 #include <s2e/Plugins/CRAX/CRAX.h>
 #include <s2e/Plugins/CRAX/Exploit.h>
 #include <s2e/Plugins/CRAX/API/Disassembler.h>
+#include <s2e/Plugins/CRAX/Pwnlib/Util.h>
 #include <s2e/Plugins/CRAX/Techniques/Ret2csu.h>
-#include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
 #include <cassert>
 #include <algorithm>
@@ -59,34 +59,12 @@ std::vector<RopPayload> GotLeakLibc::getRopPayloadList() const {
     const ELF &elf = exploit.getElf();
     const ELF &libc = exploit.getLibc();
 
-    // A symbol is blacklisted usually because its runtime address
-    // won't be resolved under normal circumstances. For example,
-    // __stack_chk_fail shouldn't be called at all, otherwise we
-    // won't be able to reach the exploitable state.
-    static const std::vector<std::string> blacklistedSyms = {
-        "__stack_chk_fail",
-    };
-
-    assert(elf.plt().size() && "PLT is empty ?_?");
-    std::string targetSym;
-
-    for (const auto &entry : elf.plt()) {
-        // Only use this PLT entry if its symbol is not blacklisted.
-        if (std::none_of(blacklistedSyms.begin(),
-                         blacklistedSyms.end(),
-                         [&entry](const std::string &s) { return entry.first == s; })) {
-            targetSym = entry.first;
-            break;
-        }
-    }
-
-    assert(targetSym.size() && "No suitable candiate for leaking libc base from GOT?");
-
     std::vector<RopPayload> ret;
+    std::string targetSym = getTargetSymbol();
 
-    if (elf.plt().find("puts") != elf.plt().end()) {
+    if (elf.hasSymbol("puts")) {
         ret = getRopPayloadListForPuts(targetSym);
-    } else if (elf.plt().find("printf") != elf.plt().end()) {
+    } else if (elf.hasSymbol("printf")) {
         ret = getRopPayloadListForPrintf(targetSym);
     }
     assert(ret.size() && "GotLeakLibc: no supported read primitive :(");
@@ -212,6 +190,31 @@ GotLeakLibc::getRopPayloadListForPrintf(const std::string &targetSym) const {
     ret1.insert(ret1.end(), part5.begin(), part5.end());
 
     return { ret1, ret2 };
+}
+
+
+std::string GotLeakLibc::getTargetSymbol() const {
+    Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
+    const ELF &libc = exploit.getLibc();
+
+    const auto &vmmap = mem().vmmap();
+    std::string ret;
+
+    assert(elf.plt().size() && "PLT is empty ?_?");
+
+    for (const auto &entry : elf.got()) {
+        uint64_t entryAddr = elf.getBase() + entry.second;
+        uint64_t value = u64(mem().readConcrete(entryAddr, 8));
+
+        if (vmmap.getModuleBaseAddress(value) == libc.getBase()) {
+            ret = entry.first;
+            break;
+        }
+    }
+
+    assert(ret.size() && "No suitable candiate for leaking libc base from GOT?");
+    return ret;
 }
 
 }  // namespace s2e::plugins::crax

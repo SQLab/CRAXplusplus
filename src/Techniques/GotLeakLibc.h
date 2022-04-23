@@ -43,6 +43,9 @@ private:
 
     std::vector<RopPayload>
     getRopPayloadListForPrintf(const std::string &targetSym) const;
+
+    // Find a symbol in GOT whose runtime address has already been resolved.
+    std::string getTargetSymbol() const;
 };
 
 }  // namespace s2e::plugins::crax

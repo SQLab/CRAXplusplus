@@ -24,6 +24,8 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/BinaryByteStream.h>
 
+#include <algorithm>
+
 namespace s2e::plugins::crax {
 
 // InputStream is a read-only, non-owning reference to a byte stream.
@@ -47,6 +49,7 @@ public:
     [[nodiscard]]
     llvm::ArrayRef<uint8_t> read(uint64_t n) {
         llvm::ArrayRef<uint8_t> ret;
+        n = std::min(n, getNrBytesRemaining());
         if (auto EC = readBytes(getNrBytesConsumed(), n, ret)) {
             return {};
         }

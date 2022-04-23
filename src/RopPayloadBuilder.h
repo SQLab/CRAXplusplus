@@ -62,6 +62,9 @@ public:
     const std::vector<RopPayload> &build();
 
     [[nodiscard]]
+    bool isSymbolicMode() const { return m_isSymbolicMode; }
+
+    [[nodiscard]]
     uint32_t getRspOffset() const { return m_rspOffset; }
 
 

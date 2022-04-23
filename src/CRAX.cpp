@@ -344,19 +344,17 @@ void CRAX::onStateForkDecide(S2EExecutionState *state,
 }
 
 
-bool CRAX::isCallSiteOf(uint64_t instructionAddr,
-                        const std::string &symbol) const {
-    std::optional<Instruction> i = m_disassembler.disasm(instructionAddr);
-    assert(i && "Unable to disassemble the instruction");
+bool CRAX::isCallSiteOf(const Instruction &i, const std::string &symbol) const {
+    const ELF &elf = m_exploit.getElf();
 
-    if (i->mnemonic != "call") {
+    if (i.mnemonic != "call" || !elf.hasSymbol(symbol)) {
         return false;
     }
 
     const uint64_t symbolPlt = m_exploit.getElf().getRuntimeAddress(symbol);
     uint64_t operand = 0;
     try {
-        operand = std::stoull(i->opStr, nullptr, 16);
+        operand = std::stoull(i.opStr, nullptr, 16);
     } catch (...) {
         // This can happen when `i` is something like `call r13`,
         // which is legit, so let's just silently swallow it...

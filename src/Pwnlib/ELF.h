@@ -54,9 +54,13 @@ public:
     const SymbolMap &got() const { return m_got; }
     const FunctionMap &functions() const { return m_functions; }
     uint64_t bss() const;
+
     uint64_t getRuntimeAddress(uint64_t offset) const;
     uint64_t getRuntimeAddress(const std::string &symbol) const;
     uint64_t rebaseAddress(uint64_t address, uint64_t newBase) const;
+    inline bool hasSymbol(const std::string &symbol) const {
+        return m_symbols.find(symbol) != m_symbols.end();
+    }
 
     const std::string &getFilename() const { return m_filename; }
     const std::string &getVarPrefix() const { return m_varPrefix; }

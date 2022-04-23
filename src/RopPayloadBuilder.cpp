@@ -213,7 +213,9 @@ bool RopPayloadBuilder::buildStage1Payload() {
 bool RopPayloadBuilder::addRegisterConstraint(S2EExecutionState &state,
                                               Register::X64 r,
                                               const ref<Expr> &e) {
-    assert(e);
+    if (!e) {
+        return true;
+    }
 
     // Concretize the given expression.
     uint64_t value = evaluate<uint64_t>(e);
@@ -233,7 +235,9 @@ bool RopPayloadBuilder::addRegisterConstraint(S2EExecutionState &state,
 bool RopPayloadBuilder::addMemoryConstraint(S2EExecutionState &state,
                                             uint64_t addr,
                                             const ref<Expr> &e) {
-    assert(e);
+    if (!e) {
+        return true;
+    }
 
     // Concretize the given expression.
     uint64_t value = evaluate<uint64_t>(e);

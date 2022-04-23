@@ -141,6 +141,9 @@ private:
     void maybeInterceptStackCanary(S2EExecutionState *state,
                                    const Instruction &i);
 
+    void maybeStubOutPrintf(S2EExecutionState *state,
+                            const Instruction &i);
+
     void onStackChkFailed(S2EExecutionState *state,
                           const Instruction &i);
 

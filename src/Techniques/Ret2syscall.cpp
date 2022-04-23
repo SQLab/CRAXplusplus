@@ -47,8 +47,7 @@ Ret2syscall::Ret2syscall()
             m_syscallGadget
                 = BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, gadgetAsm));
 
-        } else if (!elf.checksec.hasFullRELRO &&
-                   elf.symbols().find("read") != elf.symbols().end()) {
+        } else if (!elf.checksec.hasFullRELRO && elf.hasSymbol("read")) {
             m_syscallGadget = BaseOffsetExpr::create<BaseType::SYM>(elf, "read");
 
         } else {

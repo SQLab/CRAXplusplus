@@ -46,6 +46,10 @@ uint64_t evaluate(const ref<Expr> &e) {
         return u64(bve->getBytes());
     }
 
+    if (auto phe = dyn_cast<PlaceholderExpr<uint64_t>>(e)) {
+        return 0;
+    }
+
     std::stack<ref<Expr>> stack;
 
     // Evaluates an expr to an integer constant.

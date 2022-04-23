@@ -94,9 +94,9 @@ std::vector<RopPayload> Ret2csu::getRopPayloadList() const {
 
 std::vector<RopPayload>
 Ret2csu::getRopPayloadList(const ref<Expr> &retAddr,
-                         const ref<Expr> &arg1,
-                         const ref<Expr> &arg2,
-                         const ref<Expr> &arg3) const {
+                           const ref<Expr> &arg1,
+                           const ref<Expr> &arg2,
+                           const ref<Expr> &arg3) const {
     RopPayload ret;
 
     // If the template is invalid, rebuild it now.
@@ -142,9 +142,9 @@ Ret2csu::getRopPayloadList(const ref<Expr> &retAddr,
 
 std::vector<RopPayload>
 Ret2csu::getRopPayloadList(uint64_t retAddr,
-                         uint64_t arg1,
-                         uint64_t arg2,
-                         uint64_t arg3) const {
+                           uint64_t arg1,
+                           uint64_t arg2,
+                           uint64_t arg3) const {
     return getRopPayloadList(
         ConstantExpr::create(retAddr, Expr::Int64),
         ConstantExpr::create(arg1, Expr::Int64),

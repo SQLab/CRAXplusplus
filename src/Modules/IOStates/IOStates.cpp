@@ -97,6 +97,9 @@ IOStates::IOStates()
                 sigc::mem_fun(*this, &IOStates::onStackChkFailed));
     }
 
+    g_crax->beforeInstruction.connect(
+            sigc::mem_fun(*this, &IOStates::maybeStubOutPrintf));
+
     // If either stack canary or PIE is enabled, install a hook
     // to suppress native S2E state forks in order to avoid state explosion.
     if (elf.checksec.hasCanary || elf.checksec.hasPIE) {
@@ -170,6 +173,13 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
     g_crax->setCurrentState(inputState);
     auto bufInfo = analyzeLeak(inputState, syscall.arg2, syscall.arg3);
 
+    auto modState = g_crax->getModuleState(inputState, this);
+
+    if (modState->currentLeakTargetIdx >= m_leakTargets.size()) {
+        //log<WARN>() << "No more leak targets :^)\n";
+        return;
+    }
+
     auto &os = log<WARN>();
     os << " ---------- Analyzing input state ----------\n";
     for (size_t i = 0; i < bufInfo.size(); i++) {
@@ -178,13 +188,6 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
             os << hexval(offset) << ' ';
         }
         os << '\n';
-    }
-
-    auto modState = g_crax->getModuleState(inputState, this);
-
-    if (modState->currentLeakTargetIdx >= m_leakTargets.size()) {
-        log<WARN>() << "No more leak targets :^)\n";
-        return;
     }
 
     IOStates::LeakType currentLeakType
@@ -358,6 +361,27 @@ void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
     }
 }
 
+void IOStates::maybeStubOutPrintf(S2EExecutionState *state,
+                                  const Instruction &i) {
+    if (!g_crax->isCallSiteOf(i, "printf")) {
+        return;
+    }
+
+    g_crax->setCurrentState(state);
+
+    auto modState = g_crax->getModuleState(state, this);
+
+    // All required information leaked.
+    if (modState->currentLeakTargetIdx >= m_leakTargets.size()) {
+        log<WARN>()
+            << "Skipping a call site of printf() at " << hexval(i.address) << '\n';
+
+        uint64_t rip = reg().readConcrete(Register::X64::RIP);
+        reg().writeConcrete(Register::X64::RIP, rip + 5);
+        throw CpuExitException();
+    }
+}
+
 void IOStates::onStackChkFailed(S2EExecutionState *state,
                                 const Instruction &i) {
     const uint64_t stackChkFailPlt
@@ -380,6 +404,7 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
     }
 
     g_crax->setCurrentState(state);
+    uint64_t rip = regs().readConcrete(Register::X64::RIP);
 
     // If the current branch instruction is the one before `call __stack_chk_fail@plt`,
     // then allow it to fork the current state.
@@ -387,12 +412,14 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
     // -> 401289:       74 05                   je     401290 <main+0xa2>
     //    40128b:       e8 20 fe ff ff          call   4010b0 <__stack_chk_fail@plt>
     //    401290:       c9                      leave
-    uint64_t pc = state->regs()->getPc();
-    std::optional<Instruction> i = disas().disasm(pc);  
-    assert(i && "Disassemble failed?");
+    std::optional<Instruction> i1 = disas().disasm(rip);  
+    assert(i1 && "Disassemble failed? (i1)");
+
+    std::optional<Instruction> i2 = disas().disasm(rip + i1->size);
+    assert(i2 && "Disassemble failed? (i2)");
 
     // Look ahead the next instruction.
-    if (!g_crax->isCallSiteOf(pc + i->size, "__stack_chk_fail")) {
+    if (!g_crax->isCallSiteOf(*i2, "__stack_chk_fail")) {
         allowForking = false;
         return;
     }

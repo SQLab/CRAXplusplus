@@ -404,7 +404,7 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
     }
 
     g_crax->setCurrentState(state);
-    uint64_t rip = regs().readConcrete(Register::X64::RIP);
+    uint64_t rip = reg().readConcrete(Register::X64::RIP);
 
     // If the current branch instruction is the one before `call __stack_chk_fail@plt`,
     // then allow it to fork the current state.

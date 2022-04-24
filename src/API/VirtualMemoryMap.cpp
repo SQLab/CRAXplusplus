@@ -91,6 +91,7 @@ void VirtualMemoryMap::rebuild(S2EExecutionState *state) {
     // However, since libc is loaded by ld.so instead of load_elf_binary(),
     // we won't be able  to know where libc resides in the (guest)
     // virtual address space of the target process, so we need to do it ourselves.
+    fillBssRegion(state);
     fillDynamicLoaderRegions(state);
     fillLibcRegions(state);
     fillRemainingSharedLibsRegions(state);
@@ -106,7 +107,10 @@ void VirtualMemoryMap::probeLibcRegion(S2EExecutionState *state) {
     static const char *s = "__libc_start_main";
 
     const ELF &elf = g_crax->getExploit().getElf();
-    assert(elf.got().size() && "Global offset table is empty?");
+
+    if (elf.got().empty()) {
+        return;
+    }
 
     // We assume that __libc_start_main@libc has been resolved,
     // and its runtime address has been filled in the GOT at this point...
@@ -155,6 +159,20 @@ void VirtualMemoryMap::probeStackRegion(S2EExecutionState *state) {
     m_stackRegion.second -= 1;
 }
 
+void VirtualMemoryMap::fillBssRegion(S2EExecutionState *state) {
+    const ELF &elf = g_crax->getExploit().getElf();
+    uint64_t elfBss = elf.bss();
+
+    foreach2 (it, begin(), end()) {
+        RegionDescriptorPtr region = *it;
+
+        if (it.start() <= elfBss && elfBss < it.stop() + 1) {
+            region->moduleName = s_elfLabel;
+        }
+    }
+
+}
+
 void VirtualMemoryMap::fillDynamicLoaderRegions(S2EExecutionState *state) {
     auto it1 = std::find_if(begin(),
                             end(),
@@ -163,6 +181,11 @@ void VirtualMemoryMap::fillDynamicLoaderRegions(S2EExecutionState *state) {
     auto rit2 = std::find_if(rbegin(),
                              rend(),
                              [](const auto &r) { return r->moduleName == s_ldsoLabel; });
+
+    if (it1 == end() && rit2 == rend()) {
+        log<WARN>() << "Loader not found, probably a statically-linked ELF.\n";
+        return;
+    }
 
     assert(it1 != end() && rit2 != rend());
     auto it2 = std::next(rit2).base();
@@ -175,7 +198,10 @@ void VirtualMemoryMap::fillDynamicLoaderRegions(S2EExecutionState *state) {
 }
 
 void VirtualMemoryMap::fillLibcRegions(S2EExecutionState *state) {
-    assert(m_libcRegion.first && m_libcRegion.second);
+    if (!m_libcRegion.first) {
+        log<WARN>() << "GOT not found, probably a statically-linked ELF.\n";
+        return;
+    }
 
     auto itLibcStart = find(m_libcRegion.first);
     auto itLibcEnd = find(m_libcRegion.second);

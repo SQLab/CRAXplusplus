@@ -80,6 +80,7 @@ private:
     void probeLibcRegion(S2EExecutionState *state);
     void probeStackRegion(S2EExecutionState *state);
 
+    void fillBssRegion(S2EExecutionState *state);
     void fillDynamicLoaderRegions(S2EExecutionState *state);
     void fillLibcRegions(S2EExecutionState *state);
     void fillRemainingSharedLibsRegions(S2EExecutionState *state);

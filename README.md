@@ -1,19 +1,15 @@
 # CRAXplusplus (CRAX++)
 
-Modular **Automatic Exploit Generator (AEG)** using selective symbolic execution.
+<a href="Documentation/thesis.png"><img src="Documentation/thesis.png" width="25%" align="right"></a>
 
-version: 0.1.1
+**current version: 0.2.1**
 
-CRAX++ is maintained by:
-
-* Marco Wang \<aesophor.cs09g@nctu.edu.tw\> 
-* Tim Yang \<tl455047.gcs09g@nctu.edu.tw\>
+CRAXplusplus is an **exploit generator** based on S2E. Given a binary program and a PoC input, our system leverages concolic execution to collect the path constraints determined by the PoC input, add exploit constraints to the crashing states, and query the constraint solver for exploit script generation. Our system supports custom exploitation techniques and modules with the aim of maximizing its extensibility. We implement several binary exploitation techniques in our system, and design two ROP payload chaining algorithms to build ROP payload from multiple techniques. In addition, we implement two modules: IOStates and DynamicRop. The former adapts the methodology of [LAEG](#laeg-2021-bypassing-aslr-with-dynamic-binary-analysis-for-automated-exploit-generation) to the multi-path execution environment in S2E, and the latter enables our system to dynamically perform ROP inside S2E as it adds exploit constraints. Our results show that provided the target binary contains an adequate amount of input and output states to perform information leak, CRAXplusplus can still generate a working exploit script even when all the exploit mitigations are enabled at the same time, and even in the presence of basic input transformations.
 
 ## Core Features
 
 * Leverages [S2E 2.0](https://github.com/S2E/s2e) to **concolically execute x86_64 linux binaries** and **generate exploit scripts**
 * Currently only supports CTF binaries
-* Robust against modern exploit mitigations (e.g., ASLR, NX, PIE, Canary)
 * Custom modules (plugins) support
 * Custom exploitation techniques (ROP formulae) support
 * ...
@@ -40,53 +36,15 @@ Extending CRAX++
 * [How to add a Module](Documentation/Module.md)
 * How to add a Technique
 
-## Quick Example
-
-* ASLR + NX + PIE + Canary + Full RELRO
-* Exploit script: [examples/aslr-nx-pie-canary-fullrelro/exploit_11.py](examples/aslr-nx-pie-canary-fullrelro/exploit_11.py)
-
-```c
-#include <stdio.h>
-#include <unistd.h>
-
-int main() {
-    char buf[0x18];
-
-    printf("what's your name: ");
-    fflush(stdout);
-    read(0, buf, 0x80);
-
-    printf("Hello, %s. Your comment: ", buf);
-    fflush(stdout);
-    read(0, buf, 0x80);
-
-    printf("Thanks! We've received it: %s\n", buf);
-    fflush(stdout);
-    read(0, buf, 0x30);
-}
-```
-
 ## Trophies
 
 Experimental Setup:
 
 * Binaries are compiled with gcc 9.3.0 (Ubuntu 9.3.0-17ubuntu1~20.04)
-* Binaries are concolically executed in S2E guest (Debian 9.2.1 x86_64, 4.9.3-s2e)
-* All generated exploit scripts are executed in host (Ubuntu 20.04.1 x86_64, 5.11.0-46-generic)
+* Binaries are concolically executed in S2E guest (Debian 9.2.1 x86_64, 4.9.3-s2e) using libc/ld 2.24
+* All generated exploit scripts are verified in host (Ubuntu 20.04.1 x86_64, 5.11.0-46-generic) using libc/ld 2.24
 
-We avoid using libc-sensitive exploitation techniques, i.e., the exploit scripts work across different versions of libc.
-
-| Binary | ASLR | NX | PIE | Canary | Full RELRO | Source | Exploit |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| [aslr-nx-pie-canary-fullrelro](examples/aslr-nx-pie-canary-fullrelro) | ✓ | ✓ | ✓ | ✓ | ✓ | [main.c](examples/aslr-nx-pie-canary-fullrelro/main.c) | [script](examples/aslr-nx-pie-canary-fullrelro/exploit_11.py) |
-| [aslr-nx-pie-canary](examples/aslr-nx-pie-canary) | ✓ | ✓ | ✓ | ✓ | | [main.c](examples/aslr-nx-pie-canary/main.c) | [script](examples/aslr-nx-pie-canary/exploit_9.py) |
-| [aslr-nx-pie](examples/aslr-nx-pie) | ✓ | ✓ | ✓ | | | [main.c](examples/aslr-nx-pie/main.c) | [script](examples/aslr-nx-pie/exploit_2.py) |
-| [aslr-nx-canary](examples/aslr-nx-canary) | ✓ | ✓ | | ✓ | | [main.c](examples/aslr-nx-canary/main.c) | [script](examples/aslr-nx-canary/exploit_2.py) |
-| [aslr-nx](examples/aslr-nx) | ✓ | ✓ | | |  | [main.c](examples/aslr-nx/main.c) | [script](examples/aslr-nx/exploit_0.py) |
-| [NTU Computer Security 2017 Fall: readme (150 pts)](examples/readme) | ✓ | ✓ | | |  | [main.c](examples/readme/main.c) | [script](examples/readme/exploit_0.py) |
-| [readme-alt1](examples/readme-alt1) | ✓ | ✓ | | |  | [main.c](examples/readme-alt1/main.c) | [script](examples/readme-alt1/exploit_0.py) |
-| [readme-alt2](examples/readme-alt2) | ✓ | ✓ | | |  | [main.c](examples/readme-alt2/main.c) | [script](examples/readme-alt2/exploit_0.py) |
-| [pwnable.tw: unexploitable (500 pts)](https://pwnable.tw/challenge/#20) | ✓ | ✓ | | | | [main.c](examples/unexploitable/main.c) | [script](examples/unexploitable/exploit_0.py) |
+![](Documentation/evaluation.png)
 
 ## Motivation
 

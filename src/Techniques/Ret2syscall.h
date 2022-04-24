@@ -44,13 +44,23 @@ public:
     }
 
 private:
+    enum class Strategy {
+        UNDEFINED,
+        STATIC_ROP,
+        LIBC_ROP,
+        GOT_HIJACKING_ROP,
+    };
+
+    std::vector<RopPayload> getRopPayloadListUsingStaticRop() const;
     std::vector<RopPayload> getRopPayloadListUsingLibcRop() const;
-    std::vector<RopPayload> getRopPayloadListUsingGotHijacking() const;
+    std::vector<RopPayload> getRopPayloadListUsingGotHijackingRop() const;
 
     uint8_t getLibcReadSyscallOffsetLsb() const;
 
     // The location of the syscall gadget.
     ref<Expr> m_syscallGadget;
+
+    Strategy m_strategy;
 };
 
 }  // namespace s2e::plugins::crax

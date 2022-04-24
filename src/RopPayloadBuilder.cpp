@@ -214,6 +214,7 @@ bool RopPayloadBuilder::addRegisterConstraint(S2EExecutionState &state,
                                               Register::X64 r,
                                               const ref<Expr> &e) {
     if (!e) {
+        log<INFO>() << "Leaving " << reg(&state).getName(r) << " unconstrained\n";
         return true;
     }
 
@@ -236,6 +237,7 @@ bool RopPayloadBuilder::addMemoryConstraint(S2EExecutionState &state,
                                             uint64_t addr,
                                             const ref<Expr> &e) {
     if (!e) {
+        log<INFO>() << "Leaving " << hexval(addr) << " unconstrained\n";
         return true;
     }
 

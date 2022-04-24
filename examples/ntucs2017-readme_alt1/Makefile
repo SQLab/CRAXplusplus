@@ -1,7 +1,7 @@
 CXX=gcc
 CXXFLAGS=-g -z lazy -no-pie -fno-stack-protector
 SRC=main.c
-BIN=readme-alt2
+BIN=ntucs2017-readme_alt1
 
 all:
 	$(CXX) -o $(BIN) $(SRC) $(CXXFLAGS)

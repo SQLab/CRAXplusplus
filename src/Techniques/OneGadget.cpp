@@ -174,7 +174,7 @@ OneGadget::GadgetValuePair OneGadget::parseConstraint(const std::string &constra
         assert(i != std::string::npos);
 
         std::string reg = constraintStr.substr(1, i - 1);
-        uint64_t offset = elf.checksec.hasPIE ? 8 : 0x400008;
+        uint64_t offset = elf.checksec.hasPIE ? 8 : ELF::getDefaultElfBase() + 8;
 
         ret.first = format("pop %s ; ret", reg.c_str());
         ret.second = BaseOffsetExpr::create<BaseType::VAR>(elf, offset);
@@ -191,7 +191,7 @@ OneGadget::GadgetValuePair OneGadget::parseConstraint(const std::string &constra
         uint64_t regOffset = std::stoull(regOffsetStr, nullptr, 16);
 
         bool isRegOffsetPositive = constraintStr[i] == '+';
-        uint64_t offset = elf.checksec.hasPIE ? 8 : 0x400008;
+        uint64_t offset = elf.checksec.hasPIE ? 8 : ELF::getDefaultElfBase() + 8;
         offset += isRegOffsetPositive ? -regOffset : regOffset;
 
         ret.first = format("pop %s ; ret", reg.c_str());

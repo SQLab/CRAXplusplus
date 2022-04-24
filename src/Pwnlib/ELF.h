@@ -69,6 +69,10 @@ public:
 
     const Exploit &getExploit() const;
 
+    static constexpr uint64_t getDefaultElfBase() {
+        return 0x400000;
+    }
+
     const Checksec checksec;
 
 private:

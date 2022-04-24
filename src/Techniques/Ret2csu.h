@@ -84,6 +84,7 @@ public:
 
 private:
     void parseLibcCsuInit();
+    std::vector<Instruction> searchLibcCsuInit();
     void searchGadget2CallTarget(std::string funcName = "_fini");
     void buildRopPayloadTemplate() const;
     void invalidate() { m_isTemplateValid = false; }

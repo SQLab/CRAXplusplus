@@ -65,10 +65,10 @@ void Ret2csu::initialize() {
 }
 
 bool Ret2csu::checkRequirements() const {
-   auto symbolMap = g_crax->getExploit().getElf().symbols();
+   //auto symbolMap = g_crax->getExploit().getElf().symbols();
 
-   return Technique::checkRequirements() && 
-          symbolMap.find(s_libcCsuInit) != symbolMap.end();
+   return Technique::checkRequirements();
+          //symbolMap.find(s_libcCsuInit) != symbolMap.end();
 }
 
 void Ret2csu::resolveRequiredGadgets() {
@@ -152,16 +152,75 @@ Ret2csu::getRopPayloadList(uint64_t retAddr,
         ConstantExpr::create(arg3, Expr::Int64));
 }
 
+std::vector<Instruction> Ret2csu::searchLibcCsuInit() {
+    const Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
+
+    // Let's check if this binary has the symbol "__libc_csu_init".
+    auto it = elf.symbols().find(s_libcCsuInit);
+    if (it != elf.symbols().end()) {
+        return disas().disasm(s_libcCsuInit);
+    }
+
+    // Not found? Maybe this is a stripped binary. In this case,
+    // we need to manually search the binary of __libc_csu_init().
+    std::vector<Instruction> insns;
+    uint64_t base = 0;
+
+    static const std::vector<uint8_t> keyOpCodes = {
+        u8('\x48'), u8('\x83'), u8('\xc4'), u8('\x08'),  // add  rsp, 8
+        u8('\x5b'),                                      // pop  rbx
+        u8('\x5d'),                                      // pop  rbp
+        u8('\x41'), u8('\x5c'),                          // pop  r12
+        u8('\x41'), u8('\x5d'),                          // pop  r13
+        u8('\x41'), u8('\x5e'),                          // pop  r14
+        u8('\x41'), u8('\x5f'),                          // pop  r15
+        u8('\xc3')                                       // ret
+    };
+
+    std::vector<uint64_t> possibleBases = mem().search(keyOpCodes);
+
+    for (size_t i = 0; i < possibleBases.size() && !base; i++) {
+        // Search backward until a 'pop r15' (\x41 \x57) is found.
+        uint64_t addr = possibleBases[i];
+        for (uint64_t i = addr - 2; ; i--) {
+            std::vector<uint8_t> bytes = mem().readConcrete(i, 2);
+            if (bytes[0] == '\x41' && bytes[1] == '\x57') {
+                base = i;
+                break;
+            }
+        }
+    }
+
+    if (!base) {
+        return {};
+    }
+
+    // Search forward from `base` until a 'ret' is found.
+    int i = 0;
+    while (true) {
+        std::optional<Instruction> insn = disas().disasm(base + i);
+        insns.push_back(*insn);
+        if (!insn || insn->mnemonic == "ret") {
+            break;
+        }
+        i += insn->size;
+    }
+
+    return insns;
+}
+
 void Ret2csu::parseLibcCsuInit() {
     const Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
     // Since there are several variants of __libc_csu_init(),
     // we'll manually disassemble it and parse the offsets of its two gadgets.
-    m_libcCsuInit = elf.symbols().at(s_libcCsuInit);
+    std::vector<Instruction> insns = searchLibcCsuInit();
+    assert(insns.size() && "This binary doesn't have __libc_csu_init?");
 
-    // Convert instruction generator into a list of instructions.
-    std::vector<Instruction> insns = disas().disasm(s_libcCsuInit);
+    m_libcCsuInit = insns[0].address - elf.getBase();
+    log<WARN>() << "Found __libc_csu_init() at " << hexval(m_libcCsuInit) << '\n';
 
     // Find the offset of gadget1,
     // and save the order of popped registers in gadget1 as a vector.
@@ -226,7 +285,21 @@ void Ret2csu::searchGadget2CallTarget(std::string funcName) {
     const Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
-    uint64_t funcAddr = g_crax->getExploit().getElf().getRuntimeAddress(funcName);
+    uint64_t funcAddr = 0;
+
+    if (elf.hasSymbol(funcName)) {
+        funcAddr = elf.getRuntimeAddress(funcName);
+    } else {
+        static const std::vector<uint8_t> keyOpCodes = {
+            u8('\x48'), u8('\x83'), u8('\xec'), u8('\x08'),  // sub    rsp,0x8
+            u8('\x48'), u8('\x83'), u8('\xc4'), u8('\x08'),  // add    rsp,0x8
+            u8('\xc3')                                       // ret
+        };
+
+        std::vector<uint64_t> candidates = mem().search(keyOpCodes);
+        funcAddr = candidates[0];
+    }
+
     std::vector<uint8_t> funcAddrBytes = p64(funcAddr);
     std::vector<uint64_t> candidates = mem().search(funcAddrBytes);
 

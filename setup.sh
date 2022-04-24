@@ -23,13 +23,13 @@ function check_dir_exists() {
 
 function install_crax_config_for_project() {
     # $1: project name (e.g. sym_stdin)
-    ln -sfv "$CRAX_ROOT"/config/s2e-config.template.lua \
+    ln -sfv "$CRAX_ROOT"/proxies/"$1"/s2e-config.template.lua \
             "$S2E_ROOT"/projects/"$1"/s2e-config.template.lua
 }
 
 function install_crax_scripts_for_project() {
     # $1: project name (e.g. sym_stdin)
-    ln -sfv "$CRAX_ROOT"/scripts/bootstrap.sh \
+    ln -sfv "$CRAX_ROOT"/proxies/"$1"/bootstrap.sh \
             "$S2E_ROOT"/projects/"$1"/bootstrap.sh
 
     ln -sfv "$CRAX_ROOT"/scripts/launch-crax.sh \
@@ -37,6 +37,15 @@ function install_crax_scripts_for_project() {
 
     ln -sfv "$CRAX_ROOT"/scripts/set-target.sh \
             "$S2E_ROOT"/projects/"$1"/set-target.sh
+}
+
+function install_libc_and_ld_for_project() {
+    # $1: project name (e.g. sym_stdin)
+    ln -sfv "$CRAX_ROOT/examples/libc-2.24.so" \
+            "$S2E_ROOT/projects/$1/libc-2.24.so"
+
+    ln -sfv "$CRAX_ROOT/examples/ld-2.24.so" \
+            "$S2E_ROOT/projects/$1/ld-2.24.so"
 }
 
 
@@ -71,6 +80,7 @@ if [ -d "$S2E_ROOT"/projects/sym_stdin ]; then
     echo -e "[*] Installing config and scripts for sym_stdin..."
     install_crax_config_for_project "sym_stdin"
     install_crax_scripts_for_project "sym_stdin"
+    install_libc_and_ld_for_project "sym_stdin"
 else
     echo -e "${YELLOW}[!] Skipping sym_stdin (not found)${RESET}"
 fi
@@ -80,8 +90,20 @@ if [ -d "$S2E_ROOT"/projects/sym_file ]; then
     echo -e "[*] Installing config and scripts for sym_file..."
     install_crax_config_for_project "sym_file"
     install_crax_scripts_for_project "sym_file"
+    install_libc_and_ld_for_project "sym_file"
 else
     echo -e "${YELLOW}[!] Skipping sym_file (not found)${RESET}"
 fi
+
+
+if [ -d "$S2E_ROOT"/projects/sym_env ]; then
+    echo -e "[*] Installing config and scripts for sym_env..."
+    install_crax_config_for_project "sym_env"
+    install_crax_scripts_for_project "sym_env"
+    install_libc_and_ld_for_project "sym_env"
+else
+    echo -e "${YELLOW}[!] Skipping sym_env (not found)${RESET}"
+fi
+
 
 echo -e "${GREEN}[*] Success! Now you can run 's2e build' again.${RESET}"

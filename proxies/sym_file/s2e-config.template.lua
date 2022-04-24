@@ -49,7 +49,7 @@ pluginsConfig.BaseInstructions = {
 add_plugin("HostFiles")
 pluginsConfig.HostFiles = {
     baseDirs = {
-        "/home/aesophor/s2e/projects/sym_stdin",
+        "/home/aesophor/s2e/projects/sym_file",
     },
     allowWrite = true,
 }
@@ -63,7 +63,7 @@ pluginsConfig.HostFiles = {
 add_plugin("Vmi")
 pluginsConfig.Vmi = {
     baseDirs = {
-        "/home/aesophor/s2e/projects/sym_stdin",
+        "/home/aesophor/s2e/projects/sym_file",
         "/home/aesophor/s2e/images/debian-9.2.1-x86_64/guestfs",
     },
 }
@@ -79,7 +79,7 @@ add_plugin("MemUtils")
 -- server that listens on an address:port configured by the S2E_QMP_SERVER
 -- environment variable.
 --
--- The "s2e run sym_stdin" command sets up such a server in order to display
+-- The "s2e run sym_file" command sets up such a server in order to display
 -- stats on the dashboard.
 --
 -- You may also want to use this plugin to integrate S2E into a larger
@@ -372,8 +372,9 @@ pluginsConfig.CRAX = {
     -- The filenames to the ELF and libc.so.6.
     -- The static analysis of binary programs is currently
     -- carried out in the host (instead of in the guest).
-    elfFilename = "target",
-    libcFilename = "/lib/x86_64-linux-gnu/libc.so.6",
+    elfFilename = "./target",
+    libcFilename = "./libc-2.24.so",
+    ldFilename = "./ld-2.24.so",
 
     -- Verbosity.
     showInstructions = false,
@@ -388,8 +389,8 @@ pluginsConfig.CRAX = {
 
     -- Modules of CRAX++ that you wish to load.
     modules = {
-        "DynamicRop",
-        "IOStates",
+        --"DynamicRop",
+        --"IOStates",
         --"SymbolicAddressMap",
     },
 
@@ -402,11 +403,13 @@ pluginsConfig.CRAX = {
 
     -- The exploitaion techniques that your exploit will use.
     techniques = {
+        --"Ret2stack",
         "Ret2csu",
-        --"BasicStackPivoting",
-        "AdvancedStackPivoting",
+        "BasicStackPivoting",
+        --"AdvancedStackPivoting",
         --"Ret2syscall",
         "GotLeakLibc",
-        "OneGadget"
+        --"OneGadget"
+        "Ret2syscall"
     },
 }

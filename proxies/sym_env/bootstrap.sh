@@ -147,20 +147,11 @@ function execute_target {
     shift
 
     S2E_SO="${TARGET_TOOLS64_ROOT}/s2e.so"
-    # sym_stdin is dynamically linked, so s2e.so has been preloaded to
+    # sym_env is dynamically linked, so s2e.so has been preloaded to
     # provide symbolic arguments to the target if required. You can do so by
     # using the ``S2E_SYM_ARGS`` environment variable as required
     #S2E_SYM_ARGS="" LD_PRELOAD="${S2E_SO}" "${TARGET}" "$@" > /dev/null 2> /dev/null
-
-    # Choose only one to use!!!
-
-    # 1. sym_stdin
-    #LD_PRELOAD="${S2E_SO}" ./sym_stdin -- ./target < ./poc >/dev/null 2>&1
-    #./sym_stdin --no-make-symbolic -- ./target < ./poc #>/dev/null 2>&1
-    ./sym_stdin -- ./target < ./poc #>/dev/null 2>&1
-
-    # 2. sym_file
-    #./sym_file ./poc ./target >/dev/null 2>&1
+    ./sym_env -- ./target 
 }
 
 # Nothing more to initialize on Linux
@@ -212,7 +203,7 @@ sudo swapoff -a
 target_init
 
 # Download the target file to analyze
-${S2EGET} "sym_stdin"
+${S2EGET} "sym_env"
 ${S2EGET} "target"
 ${S2EGET} "poc"
 
@@ -223,7 +214,7 @@ download_symbolic_files
 
 
 # Run the analysis
-TARGET_PATH='./sym_stdin'
+TARGET_PATH='./sym_env'
 
 
 

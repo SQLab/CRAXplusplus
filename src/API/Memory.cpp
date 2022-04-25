@@ -131,9 +131,39 @@ std::vector<uint64_t> Memory::search(const std::vector<uint8_t> &needle) const {
     return ret;
 }
 
-std::map<uint64_t, uint64_t>
-Memory::getSymbolicMemory(uint64_t start, uint64_t end) const {
-    return {};
+std::map<uint64_t, uint64_t> Memory::getSymbolicMemory() const {
+    // first:  start address of a consecutive symbolic data
+    // second: width of the symbolic data
+    std::map<uint64_t, uint64_t> ret;
+
+    const auto &__vmmap = vmmap();
+    bool isPreviousByteConstant = true;
+    uint64_t base = 0;
+    uint64_t size = 0;
+
+    foreach2 (it, __vmmap.begin(), __vmmap.end()) {
+        for (uint64_t addr = it.start(); addr <= it.stop(); addr++) {
+            if (isSymbolic(addr, 1)) {
+                // Start of a symbolic memory region.
+                if (isPreviousByteConstant) {
+                    base = addr;
+                    size = 1;
+                } else {
+                    size++;
+                }
+                isPreviousByteConstant = false;
+            } else {
+                // End of a symbolic memory region.
+                if (!isPreviousByteConstant) {
+                    ret.insert(std::make_pair(base, size));
+                }
+                isPreviousByteConstant = true;
+                continue;
+            }
+        }
+    }
+
+    return ret;
 }
 
 const VirtualMemoryMap &Memory::vmmap() const {

@@ -65,10 +65,8 @@ public:
     std::vector<uint64_t> search(const std::vector<uint8_t> &needle) const;
 
     // Returns the map<addr, size> of symbolic memory.
-    // XXX: currently not implemented.
     [[nodiscard]]
-    std::map<uint64_t, uint64_t>
-    getSymbolicMemory(uint64_t start, uint64_t end) const;
+    std::map<uint64_t, uint64_t> getSymbolicMemory() const;
 
     // Get all the mapped memory region.
     [[nodiscard]]

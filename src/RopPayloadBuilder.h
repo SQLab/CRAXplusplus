@@ -86,6 +86,10 @@ public:
 
 private:
     [[nodiscard]]
+    static klee::ref<klee::ConstantExpr>
+    concretizeExpr(const klee::ref<klee::Expr> &e);
+
+    [[nodiscard]]
     bool chainSymbolic(const Technique &technique);
 
     [[nodiscard]]

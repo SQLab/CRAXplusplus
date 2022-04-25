@@ -57,12 +57,7 @@ bool RopPayloadBuilder::chain(const Technique &technique) {
 }
 
 const std::vector<RopPayload> &RopPayloadBuilder::build() {
-    if (m_isSymbolicMode) {
-        buildStage1Payload();
-        m_ropPayload.push_back({});
-    }
-    
-    if (m_ropPayload.size() && m_ropPayload.back().empty()) {
+    while (m_ropPayload.back().empty()) {
         m_ropPayload.pop_back();
     }
 
@@ -80,7 +75,7 @@ bool RopPayloadBuilder::chainSymbolic(const Technique &technique) {
 
     // Treat S-Expr trees in ropoSubchains[0] as ROP constraints
     // and add them to the exploitable S2EExecutionState.
-    log<INFO>() << "Adding ROP constraints...\n";
+    log<INFO>() << "Adding exploit constraints...\n";
     for (size_t i = 0; i < ropSubchains[0].size(); i++) {
         if (i == 0) {
             ok = addRegisterConstraint(*state, Register::X64::RBP, ropSubchains[0][i]);
@@ -218,17 +213,14 @@ bool RopPayloadBuilder::addRegisterConstraint(S2EExecutionState &state,
         return true;
     }
 
-    // Concretize the given expression.
-    uint64_t value = evaluate<uint64_t>(e);
-    ref<ConstantExpr> ce = ConstantExpr::create(value, Expr::Int64);
-
     // Build the constraint.
-    auto constraint = EqExpr::create(reg(&state).readSymbolic(r), ce);
+    ref<ConstantExpr> value = concretizeExpr(e);
+    auto constraint = EqExpr::create(reg(&state).readSymbolic(r), value);
 
     log<INFO>()
         << "Constraining " << reg(&state).getName(r)
         << " to " << evaluate<std::string>(e)
-        << " (concretized=" << hexval(value) << ")\n";
+        << " (concretized=" << hexval(value->getZExtValue()) << ")\n";
 
     return state.addConstraint(constraint, true);
 }
@@ -241,19 +233,24 @@ bool RopPayloadBuilder::addMemoryConstraint(S2EExecutionState &state,
         return true;
     }
 
-    // Concretize the given expression.
-    uint64_t value = evaluate<uint64_t>(e);
-    ref<ConstantExpr> ce = ConstantExpr::create(value, Expr::Int64);
-
     // Build the constraint.
-    auto constraint = EqExpr::create(mem(&state).readSymbolic(addr, Expr::Int64), ce);
+    ref<ConstantExpr> value = concretizeExpr(e);
+    auto constraint = EqExpr::create(mem(&state).readSymbolic(addr, Expr::Int64), value);
 
     log<INFO>()
         << "Constraining " << hexval(addr)
         << " to " << evaluate<std::string>(e)
-        << " (concretized=" << hexval(value) << ")\n";
+        << " (concretized=" << hexval(value->getZExtValue()) << ")\n";
 
     return state.addConstraint(constraint, true);
+}
+
+ref<ConstantExpr> RopPayloadBuilder::concretizeExpr(const ref<Expr> &e) {
+    if (auto ce = dyn_cast<ConstantExpr>(e)) {
+        return ce;
+    } else {
+        return ConstantExpr::create(evaluate<uint64_t>(e), Expr::Int64);
+    }
 }
 
 RopPayloadBuilder::ConcreteInputs

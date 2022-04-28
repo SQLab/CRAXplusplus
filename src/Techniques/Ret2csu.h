@@ -111,7 +111,7 @@ private:
     std::string m_gadget2CallReg1;
     std::string m_gadget2CallReg2;
 
-    // Rebuilding the entire ROP chain from scratch is expensive,
+    // Rebuilding the entire ROP payload from scratch is expensive,
     // so we'll use a template as a cache, thereby declaring it mutable.
     mutable bool m_isTemplateValid;
     mutable std::vector<RopPayload> m_ropSubchainTemplate;

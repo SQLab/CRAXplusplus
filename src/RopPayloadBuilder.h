@@ -52,12 +52,12 @@ public:
 
     void reset();
 
-    // Chain the ROP subchain from the given technique
-    // with `m_ropPayload`, the ROP chain we've built so far.
+    // Chain the ROP payload from the given technique
+    // with `m_ropPayload`, the ROP payload we've built so far.
     [[nodiscard]]
     bool chain(const Technique &technique);
 
-    // Finalizes and returns the full ROP chain.
+    // Finalizes and returns the full ROP payload.
     [[nodiscard]]
     const std::vector<RopPayload> &build();
 
@@ -90,14 +90,17 @@ private:
     concretizeExpr(const klee::ref<klee::Expr> &e);
 
     [[nodiscard]]
-    bool chainSymbolic(const Technique &technique);
+    bool chainSymbolic(const std::vector<RopPayload> &ropPayloadList,
+                       const RopPayload &extraRopPayload,
+                       bool shouldSwitchMode);
 
     [[nodiscard]]
-    bool chainDirect(const Technique &technique);
+    bool chainDirect(const std::vector<RopPayload> &ropPayloadList,
+                     const RopPayload &extraRopPayload);
 
     void doChainDirect(const std::vector<RopPayload> &ropSubchains,
                        const RopPayload &extraRopPayload,
-                       size_t ropSubchainsBegin = 0);
+                       size_t ropPayloadListBegin = 0);
 
     void maybeConcretizePlaceholderExpr(ref<Expr> &e) const;
 

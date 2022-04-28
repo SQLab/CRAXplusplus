@@ -165,7 +165,7 @@ GotLeakLibc::getRopPayloadListForPrintf(const std::string &targetSym) const {
         BaseOffsetExpr::create<BaseType::SYM>(elf, "printf")
     };
 
-    // Prepare to chain the current subchain with the next one by calling
+    // Prepare to chain the current payload with the next one by calling
     // read(0, ropReadDstOffset, 0x400).
     uint64_t part5Size = ret2csu->estimateRopPayloadSize(/*arg1=*/0);
     uint64_t ropReadDstOffset

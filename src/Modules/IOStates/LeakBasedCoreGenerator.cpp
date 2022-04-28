@@ -87,7 +87,7 @@ void IOStateInfoVisitor::operator()(const InputStateInfo &stateInfo) {
         return;
     }
 
-    exploit.writeline("# input state (rop chain begin)");
+    exploit.writeline("# input state (ROP payload begins)");
 
     handleStage1(stateInfo);
 

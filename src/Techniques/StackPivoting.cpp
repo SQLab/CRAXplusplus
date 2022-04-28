@@ -143,7 +143,7 @@ std::vector<RopPayload> AdvancedStackPivoting::getRopPayloadList() const {
     // At this point, a stack-buffer overflow should take place inside libc,
     // and the weird machine shall not return from read@libc. Now we will
     // be able to perform ROP, but we don't have enough space to perform
-    // a huge read() via ret2csu. So here we'll build a self-extending ROP chain
+    // a huge read() via ret2csu. So here we'll build a self-extending ROP payload
     // which continuously calls read@plt until there's enough space to perform
     // ret2csu once.
     RopPayload part1;
@@ -191,13 +191,13 @@ std::vector<RopPayload> AdvancedStackPivoting::getRopPayloadList() const {
             ConstantExpr::create(0x400, Expr::Int64))[0];
 
 
-    // Symbolic ROP subchain
+    // Symbolic ROP payload
     // We're exploiting the overflow in libc's sys_read(),
     // so constraint solver isn't needed.
     std::vector<RopPayload> ret;
     ret.push_back({});
 
-    // Direct ROP subchain
+    // Direct ROP payload
     for (size_t i = 0; i < part1.size(); i += 6) {
         ret.push_back(RopPayload(part1.begin() + i, part1.begin() + i + 6));
     }

@@ -46,43 +46,45 @@ void RopPayloadBuilder::reset() {
 }
 
 bool RopPayloadBuilder::chain(const Technique &technique) {
+    std::vector<RopPayload> ropPayloadList = technique.getRopPayloadList();
+    RopPayload extraRopPayload = technique.getExtraRopPayload();
+    bool shouldSwitch = shouldSwitchToDirectMode(&technique);
+    
     // Not all exploitation techniques have a ROP formula,
     // so we'll return true here.
-    if (technique.getRopPayloadList().empty()) {
+    if (ropPayloadList.empty()) {
         return true;
     }
 
-    return m_isSymbolicMode ? chainSymbolic(technique)
-                            : chainDirect(technique);
+    return m_isSymbolicMode ? chainSymbolic(ropPayloadList, extraRopPayload, shouldSwitch)
+                            : chainDirect(ropPayloadList, extraRopPayload);
 }
 
 const std::vector<RopPayload> &RopPayloadBuilder::build() {
-    while (m_ropPayload.back().empty()) {
+    while (m_ropPayload.size() && m_ropPayload.back().empty()) {
         m_ropPayload.pop_back();
     }
 
     return m_ropPayload;
 }
 
-bool RopPayloadBuilder::chainSymbolic(const Technique &technique) {
-    S2EExecutionState *state = g_crax->getCurrentState();
-
-    std::vector<RopPayload> ropSubchains = technique.getRopPayloadList();
-    RopPayload extraRopPayload = technique.getExtraRopPayload();
-
+bool RopPayloadBuilder::chainSymbolic(const std::vector<RopPayload> &ropPayloadList,
+                                      const RopPayload &extraRopPayload,
+                                      bool shouldSwitchMode) {
     bool ok;
-    uint64_t rsp = reg().readConcrete(Register::X64::RSP);
+    S2EExecutionState *state = g_crax->getCurrentState();
+    uint64_t rsp = reg(state).readConcrete(Register::X64::RSP);
 
-    // Treat S-Expr trees in ropoSubchains[0] as ROP constraints
+    // Treat S-Expr trees in ropPayloadList[0] as ROP constraints
     // and add them to the exploitable S2EExecutionState.
     log<INFO>() << "Adding exploit constraints...\n";
-    for (size_t i = 0; i < ropSubchains[0].size(); i++) {
+    for (size_t i = 0; i < ropPayloadList[0].size(); i++) {
         if (i == 0) {
-            ok = addRegisterConstraint(*state, Register::X64::RBP, ropSubchains[0][i]);
+            ok = addRegisterConstraint(*state, Register::X64::RBP, ropPayloadList[0][i]);
         } else if (i == 1) {
-            ok = addRegisterConstraint(*state, Register::X64::RIP, ropSubchains[0][i]);
+            ok = addRegisterConstraint(*state, Register::X64::RIP, ropPayloadList[0][i]);
         } else {
-            ok = addMemoryConstraint(*state, rsp + m_rspOffset, ropSubchains[0][i]);
+            ok = addMemoryConstraint(*state, rsp + m_rspOffset, ropPayloadList[0][i]);
             m_rspOffset += sizeof(uint64_t);
         }
 
@@ -91,14 +93,14 @@ bool RopPayloadBuilder::chainSymbolic(const Technique &technique) {
         }
     }
 
-    if (ropSubchains[0].empty()) {
+    if (ropPayloadList[0].empty()) {
         m_ropPayload.push_back({});
     } else if (!buildStage1Payload()) {
         return false;
     }
     m_ropPayload.push_back({});
 
-    if (!shouldSwitchToDirectMode(&technique)) {
+    if (!shouldSwitchMode) {
         return true;
     }
 
@@ -106,44 +108,45 @@ bool RopPayloadBuilder::chainSymbolic(const Technique &technique) {
     m_isSymbolicMode = false;
     m_rspOffset = 0;
 
-    // Chain the rest (i.e. ropSubchains[1..last]).
-    if (ropSubchains.size() > 1) {
-        doChainDirect(ropSubchains, extraRopPayload, 1);
+    // Chain the rest (i.e. ropPayloadList[1..last]).
+    if (ropPayloadList.size() > 1) {
+        doChainDirect(ropPayloadList, extraRopPayload, 1);
     }
 
     return true;
 }
 
-bool RopPayloadBuilder::chainDirect(const Technique &technique) {
-    doChainDirect(technique.getRopPayloadList(), technique.getExtraRopPayload());
+bool RopPayloadBuilder::chainDirect(const std::vector<RopPayload> &ropPayloadList,
+                                    const RopPayload &extraRopPayload) {
+    doChainDirect(ropPayloadList, extraRopPayload);
     return true;
 }
 
-void RopPayloadBuilder::doChainDirect(const std::vector<RopPayload> &ropSubchains,
+void RopPayloadBuilder::doChainDirect(const std::vector<RopPayload> &ropPayloadList,
                                       const RopPayload &extraRopPayload,
-                                      size_t ropSubchainsBegin) {
-    size_t i = ropSubchainsBegin;
+                                      size_t ropPayloadListBegin) {
+    size_t i = ropPayloadListBegin;
     size_t j = m_shouldSkipSavedRbp;
     uint64_t newRspOffset = m_rspOffset;
 
-    // The first expr in ropSubchains[0] is saved RBP.
-    // It should only be used for constructing the very first ROP subchain.
+    // The first expr in ropPayloadList[0] is saved RBP.
+    // It should only be used for constructing the very first ROP payload.
     if (!m_shouldSkipSavedRbp) {
         m_shouldSkipSavedRbp = true;
     }
 
-    for (; i < ropSubchains.size(); i++, j = 0) {
-        if (ropSubchains[i].empty()) {
+    for (; i < ropPayloadList.size(); i++, j = 0) {
+        if (ropPayloadList[i].empty()) {
             continue;
         }
 
-        m_ropPayload.back().reserve(ropSubchains[i].size());
+        m_ropPayload.back().reserve(ropPayloadList[i].size());
 
-        for (; j < ropSubchains[i].size(); j++) {
-            ref<Expr> e = ropSubchains[i][j];
+        for (; j < ropPayloadList[i].size(); j++) {
+            ref<Expr> e = ropPayloadList[i][j];
 
             // If `e` is a PlaceholderExpr, turn it into a ConstantExpr.
-            // Sometimes an offset in the Rop chain cannot be hardcoded,
+            // Sometimes an offset in the ROP payload cannot be hardcoded,
             // because the user may chain different techniques in different
             // orders, resulting in a non-fixed offset.
             maybeConcretizePlaceholderExpr(e);
@@ -152,7 +155,7 @@ void RopPayloadBuilder::doChainDirect(const std::vector<RopPayload> &ropSubchain
             newRspOffset += e->getWidth() / 8;
         }
 
-        if (i != ropSubchains.size() - 1) {
+        if (i != ropPayloadList.size() - 1) {
             m_ropPayload.push_back({});
         }
     }
@@ -186,7 +189,7 @@ void RopPayloadBuilder::maybeConcretizePlaceholderExpr(ref<Expr> &e) const {
 bool RopPayloadBuilder::shouldSwitchToDirectMode(const Technique *t) const {
     // Currently we assume that we can find a decent write primitive
     // such as read@plt to write the 2nd stage rop payload to bss,
-    // so after stack pivoting our rop chain can be built without
+    // so after stack pivoting our ROP payload can be built without
     // solving ROP constraints.
     return dynamic_cast<const StackPivoting *>(t);
 }
@@ -196,7 +199,7 @@ bool RopPayloadBuilder::buildStage1Payload() {
     ConcreteInput payload = getOneConcreteInput(*state);
 
     if (payload.empty()) {
-        log<WARN>() << "Sorry, the ROP constraints are unsatisfiable :(\n";
+        log<WARN>() << "Sorry, the exploit constraints are unsatisfiable.\n";
         return false;
     }
 
@@ -214,8 +217,9 @@ bool RopPayloadBuilder::addRegisterConstraint(S2EExecutionState &state,
     }
 
     // Build the constraint.
+    ref<Expr> target = reg(&state).readSymbolic(r, e->getWidth());
     ref<ConstantExpr> value = concretizeExpr(e);
-    auto constraint = EqExpr::create(reg(&state).readSymbolic(r), value);
+    auto constraint = EqExpr::create(target, value);
 
     log<INFO>()
         << "Constraining " << reg(&state).getName(r)
@@ -234,8 +238,9 @@ bool RopPayloadBuilder::addMemoryConstraint(S2EExecutionState &state,
     }
 
     // Build the constraint.
+    ref<Expr> target = mem(&state).readSymbolic(addr, e->getWidth());
     ref<ConstantExpr> value = concretizeExpr(e);
-    auto constraint = EqExpr::create(mem(&state).readSymbolic(addr, Expr::Int64), value);
+    auto constraint = EqExpr::create(target, value);
 
     log<INFO>()
         << "Constraining " << hexval(addr)

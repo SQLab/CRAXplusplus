@@ -48,7 +48,7 @@ void RopPayloadBuilder::reset() {
 bool RopPayloadBuilder::chain(const Technique &technique) {
     std::vector<RopPayload> ropPayloadList = technique.getRopPayloadList();
     RopPayload extraRopPayload = technique.getExtraRopPayload();
-    bool shouldSwitch = shouldSwitchToDirectMode(&technique);
+    bool shouldSwitch = shouldSwitchToDirectMode(&technique, ropPayloadList);
     
     // Not all exploitation techniques have a ROP formula,
     // so we'll return true here.
@@ -186,12 +186,14 @@ void RopPayloadBuilder::maybeConcretizePlaceholderExpr(ref<Expr> &e) const {
             ConstantExpr::create(sizeof(uint64_t) + m_rspOffset + offset, Expr::Int64));
 }
 
-bool RopPayloadBuilder::shouldSwitchToDirectMode(const Technique *t) const {
+bool RopPayloadBuilder::shouldSwitchToDirectMode(const Technique *t,
+                                                 const std::vector<RopPayload> &ropPayloadList) const {
     // Currently we assume that we can find a decent write primitive
-    // such as read@plt to write the 2nd stage rop payload to bss,
+    // such as read@plt to write the 2nd stage ROP payload to bss,
     // so after stack pivoting our ROP payload can be built without
     // solving ROP constraints.
-    return dynamic_cast<const StackPivoting *>(t);
+    return dynamic_cast<const StackPivoting *>(t) ||
+           ropPayloadList.size() > 1;
 }
 
 bool RopPayloadBuilder::buildStage1Payload() {

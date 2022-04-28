@@ -105,7 +105,8 @@ private:
     void maybeConcretizePlaceholderExpr(ref<Expr> &e) const;
 
     [[nodiscard]]
-    bool shouldSwitchToDirectMode(const Technique *t) const;
+    bool shouldSwitchToDirectMode(const Technique *t,
+                                  const std::vector<RopPayload> &ropPayloadList) const;
 
     bool buildStage1Payload();
 

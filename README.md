@@ -4,7 +4,7 @@
 
 **current version: 0.2.1**
 
-CRAXplusplus is an **exploit generator** based on [S2E](http://s2e.systems/). Given a binary program and a PoC input, our system leverages [concolic execution](https://en.wikipedia.org/wiki/Concolic_testing) to collect the path constraints determined by the PoC input, add exploit constraints to the crashing states, and query the constraint solver for exploit script generation. Our system supports custom exploitation techniques and modules with the aim of maximizing its extensibility. We implement several binary exploitation techniques in our system, and design two ROP payload chaining algorithms to build ROP payload from multiple techniques. In addition, we implement two modules: IOStates and DynamicRop. The former adapts the methodology of [LAEG](#reference) to the multi-path execution environment in S2E, and the latter enables our system to dynamically perform ROP inside S2E as it adds exploit constraints. Our results show that provided the target binary contains an adequate amount of input and output states to perform information leak, CRAXplusplus can still generate a working exploit script even when all the exploit mitigations are enabled at the same time, and even in the presence of basic input transformations.
+CRAXplusplus is an **exploit generator** based on [S2E](http://s2e.systems/). Given a x86_64 binary program and a PoC input, our system leverages [concolic execution](https://en.wikipedia.org/wiki/Concolic_testing) to collect the path constraints determined by the PoC input, add exploit constraints to the crashing states, and query the constraint solver for exploit script generation. Our system supports custom exploitation techniques and modules with the aim of maximizing its extensibility. We implement several binary exploitation techniques in our system, and design two ROP payload chaining algorithms to build ROP payload from multiple techniques. In addition, we implement two modules: IOStates and DynamicRop. The former adapts the methodology of [LAEG](#reference) to the multi-path execution environment in S2E, and the latter enables our system to dynamically perform ROP inside S2E as it adds exploit constraints. Our results show that provided the target binary contains an adequate amount of input and output states to perform information leak, CRAXplusplus can still generate a working exploit script even when all the exploit mitigations are enabled at the same time, and even in the presence of basic input transformations.
 
 ## System Architecture
 
@@ -14,7 +14,7 @@ CRAXplusplus is an **exploit generator** based on [S2E](http://s2e.systems/). Gi
 
 Experimental Setup:
 
-* Binaries are compiled with gcc 9.3.0 (Ubuntu 9.3.0-17ubuntu1~20.04)
+* Binaries are compiled as 64-bit ELF with gcc 9.3.0 (Ubuntu 9.3.0-17ubuntu1~20.04)
 * Binaries are concolically executed in S2E guest (Debian 9.2.1 x86_64, 4.9.3-s2e) using libc/ld 2.24
 * All generated exploit scripts are verified in host (Ubuntu 20.04.1 x86_64, 5.11.0-46-generic) using libc/ld 2.24
 

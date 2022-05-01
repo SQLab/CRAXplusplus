@@ -28,10 +28,10 @@
 
 namespace s2e::plugins::crax {
 
-// When concolic execution proxies are used, ~/s2e/projects/*/serial.txt
-// will only contain the output from the proxy itself, not the output from
+// When a concolic execution proxy is used, ~/s2e/projects/*/serial.txt
+// will only contain the output of the proxy itself, not the output of
 // the target binary. This module hooks the write() and writev() syscalls
-// and prints the output from the target binary to host's stdout/stderr.
+// and prints the target binary's output to host's stdout/stderr.
 
 class GuestOutput : public Module {
 public:

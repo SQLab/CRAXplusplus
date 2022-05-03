@@ -132,14 +132,14 @@ std::vector<uint64_t> Memory::search(const std::vector<uint8_t> &needle) const {
 }
 
 std::map<uint64_t, uint64_t> Memory::getSymbolicMemory() const {
-    // first:  start address of a consecutive symbolic data
-    // second: width of the symbolic data
+    // first:  The base address of a consecutive symbolic data.
+    // second: The size of the symbolic data.
     std::map<uint64_t, uint64_t> ret;
 
-    const auto &__vmmap = vmmap();
     bool isPreviousByteConstant = true;
     uint64_t base = 0;
     uint64_t size = 0;
+    const auto &__vmmap = vmmap();
 
     foreach2 (it, __vmmap.begin(), __vmmap.end()) {
         for (uint64_t addr = it.start(); addr <= it.stop(); addr++) {

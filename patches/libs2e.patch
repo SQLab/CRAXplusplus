@@ -16,10 +16,10 @@ index 1bec5da..a8b9fe1 100644
      # TODO: look at libcpu compile options to figure this out
      find_package(LIBS2ECORE REQUIRED)
 diff --git a/libs2e/src/CMakeLists.txt b/libs2e/src/CMakeLists.txt
-index 6ababfd..aa00d40 100644
+index 633fc93..1898281 100644
 --- a/libs2e/src/CMakeLists.txt
 +++ b/libs2e/src/CMakeLists.txt
-@@ -64,7 +64,7 @@ if(WITH_TARGET MATCHES "s2e")
+@@ -65,7 +65,7 @@ if(WITH_TARGET MATCHES "s2e")
                       boost_regex)
  endif()
  

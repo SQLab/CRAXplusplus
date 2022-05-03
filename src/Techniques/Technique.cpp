@@ -23,6 +23,7 @@
 #include <s2e/Plugins/CRAX/Techniques/GotLeakLibc.h>
 #include <s2e/Plugins/CRAX/Techniques/OneGadget.h>
 #include <s2e/Plugins/CRAX/Techniques/Ret2csu.h>
+#include <s2e/Plugins/CRAX/Techniques/Ret2stack.h>
 #include <s2e/Plugins/CRAX/Techniques/Ret2syscall.h>
 #include <s2e/Plugins/CRAX/Techniques/StackPivoting.h>
 
@@ -82,6 +83,8 @@ std::unique_ptr<Technique> Technique::create(const std::string &name) {
         ret = std::make_unique<Ret2csu>();
     } else if (name == "Ret2syscall") {
         ret = std::make_unique<Ret2syscall>();
+    } else if (name == "Ret2stack") {
+        ret = std::make_unique<Ret2stack>();
     }
 
     assert(ret && "Technique::create() failed, incorrect technique name given in config?");

@@ -96,6 +96,16 @@ else
 fi
 
 
+if [ -d "$S2E_ROOT"/projects/sym_arg ]; then
+    echo -e "[*] Installing config and scripts for sym_arg..."
+    install_crax_config_for_project "sym_arg"
+    install_crax_scripts_for_project "sym_arg"
+    install_libc_and_ld_for_project "sym_arg"
+else
+    echo -e "${YELLOW}[!] Skipping sym_arg (not found)${RESET}"
+fi
+
+
 if [ -d "$S2E_ROOT"/projects/sym_env ]; then
     echo -e "[*] Installing config and scripts for sym_env..."
     install_crax_config_for_project "sym_env"

@@ -65,6 +65,7 @@ public:
 
     // Read symbolic data from the register file.
     klee::ref<klee::Expr> readSymbolic(Register::X64 reg,
+                                       klee::Expr::Width width = klee::Expr::Int64,
                                        bool verbose = true);
 
     // Read concrete data from the register file.

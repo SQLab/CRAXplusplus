@@ -39,16 +39,19 @@ const std::array<std::string, 18> Register::s_regs64 = {{
 
 
 bool Register::isSymbolic(Register::X64 reg) {
-    return !isa<ConstantExpr>(readSymbolic(reg, /*verbose=*/false));
+    return !isa<ConstantExpr>(readSymbolic(reg, Expr::Int64, /*verbose=*/false));
 }
 
-ref<Expr> Register::readSymbolic(Register::X64 reg, bool verbose) {
+ref<Expr> Register::readSymbolic(Register::X64 reg, Expr::Width width, bool verbose) {
     ref<Expr> ret = nullptr;
 
     if (reg == Register::X64::RIP && m_isRipSymbolic) {
         ret = m_ripExpr;
+        if (width != Expr::Int64) {
+            ret = ExtractExpr::create(ret, 0, width);
+        }
     } else {
-        ret = m_state->regs()->read(getOffset(reg), Expr::Int64);
+        ret = m_state->regs()->read(getOffset(reg), width);
     }
 
     if (verbose && isa<ConstantExpr>(ret)) {

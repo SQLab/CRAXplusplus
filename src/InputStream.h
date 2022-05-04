@@ -67,8 +67,8 @@ public:
     // Note that the user must explicitly check the error code.
     [[nodiscard]]
     llvm::Error ignore(uint64_t n) {
-        llvm::ArrayRef<uint8_t> 🐱;
-        if (auto EC = readBytes(getNrBytesConsumed(), n, 🐱)) {
+        llvm::ArrayRef<uint8_t> dummy;
+        if (auto EC = readBytes(getNrBytesConsumed(), n, dummy)) {
             return EC;
         }
         m_nrBytesIgnored += n;

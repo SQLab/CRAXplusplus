@@ -49,14 +49,14 @@ std::string format(const std::string &fmt, Args &&...args) {
 // A byte string is a sequence of bytes, such as b'\xef\xbe\xad\xde'
 // which represents 0xdeadbeef.
 // input:  {0xef, 0xbe, 0xad, 0xde}
-// output: "b'\xef\xbe\xad\xde'"
+// output: \xef\xbe\xad\xde
 template <typename InputIt>
 std::string toByteString(InputIt first, InputIt last) {
-    std::string ret("b'");
+    std::string ret;
     for (auto it = first; it != last; it++) {
         ret += format("\\x%02x", *it);
     }
-    return ret + '\'';
+    return ret;
 }
 
 template <typename T>

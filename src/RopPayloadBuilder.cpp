@@ -19,7 +19,7 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
-#include <s2e/Plugins/CRAX/Expr/BinaryExprEvaluator.h>
+#include <s2e/Plugins/CRAX/Expr/BinaryExprEval.h>
 #include <s2e/Plugins/CRAX/Techniques/Technique.h>
 #include <s2e/Plugins/CRAX/Techniques/StackPivoting.h>
 
@@ -47,14 +47,15 @@ void RopPayloadBuilder::reset() {
 
 bool RopPayloadBuilder::chain(const Technique &technique) {
     std::vector<RopPayload> ropPayloadList = technique.getRopPayloadList();
-    RopPayload extraRopPayload = technique.getExtraRopPayload();
-    bool shouldSwitch = shouldSwitchToDirectMode(&technique, ropPayloadList);
-    
+
     // Not all exploitation techniques have a ROP formula,
     // so we'll return true here.
     if (ropPayloadList.empty()) {
         return true;
     }
+
+    RopPayload extraRopPayload = technique.getExtraRopPayload();
+    bool shouldSwitch = shouldSwitchToDirectMode(&technique, ropPayloadList);
 
     return m_isSymbolicMode ? chainSymbolic(ropPayloadList, extraRopPayload, shouldSwitch)
                             : chainDirect(ropPayloadList, extraRopPayload);

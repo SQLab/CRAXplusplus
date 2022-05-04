@@ -122,7 +122,7 @@ bool IOStates::checkRequirements() const {
     return true;
 }
 
-std::unique_ptr<ICoreGenerator> IOStates::makeCoreGenerator() const {
+std::unique_ptr<CoreGenerator> IOStates::makeCoreGenerator() const {
     return std::make_unique<LeakBasedCoreGenerator>();
 }
 

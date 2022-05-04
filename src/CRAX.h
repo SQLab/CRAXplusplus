@@ -111,10 +111,19 @@ class CRAX : public Plugin, IPluginInvoker {
     S2E_PLUGIN
 
 public:
+    enum class Proxy {
+        NONE,
+        SYM_ARG,
+        SYM_ENV,
+        SYM_FILE,
+        SYM_STDIN,
+        LAST
+    };
+
+
     CRAX(S2E *s2e);
 
     void initialize();
-
 
     [[nodiscard, gnu::always_inline]]
     inline S2EExecutionState *fork(S2EExecutionState &state) {
@@ -176,6 +185,9 @@ public:
 
     [[nodiscard]]
     uint64_t getUserSpecifiedElfBase() const { return m_userSpecifiedElfBase; }
+
+    [[nodiscard]]
+    Proxy getProxy() { return m_proxy; }
 
     [[nodiscard]]
     Register &reg(S2EExecutionState *state = nullptr) {
@@ -283,6 +295,12 @@ public:
     static pybind11::scoped_interpreter s_pybind11;
     static pybind11::module s_pwnlib;
 
+    // Proxy binary names.
+    static const std::string s_symArg;
+    static const std::string s_symEnv;
+    static const std::string s_symFile;
+    static const std::string s_symStdin;
+
 private:
     // Allow the guest to communicate with this plugin using s2e_invoke_plugin
     virtual void handleOpcodeInvocation(S2EExecutionState *state,
@@ -343,6 +361,7 @@ private:
     uint64_t m_userSpecifiedElfBase;
 
     // CRAX's attributes.
+    Proxy m_proxy;
     Register m_register;
     Memory m_memory;
     Disassembler m_disassembler;

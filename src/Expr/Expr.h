@@ -35,6 +35,7 @@
 #include <utility>
 
 using s2e::plugins::crax::format;
+using s2e::plugins::crax::toByteString;
 using s2e::plugins::crax::dependent_false_v;
 
 namespace klee {
@@ -330,12 +331,8 @@ public:
     }
 
     std::string toString() const {
-        std::string ret = "b'";
-        for (auto __byte : m_bytes) {
-            ret += format("\\x%02x", __byte);
-        }
-        ret += '\'';
-        return ret;
+        std::string byteString = toByteString(m_bytes.begin(), m_bytes.end());
+        return format("b'%s'", byteString.c_str());
     }
 
 private:
@@ -347,7 +344,7 @@ private:
 };
 
 
-// A flexible expression which allows the caller to perform arbitrary action.
+// A flexible expression which allows the caller to perform arbitrary actions.
 class LambdaExpr : public Expr {
     using CallbackType = std::function<void ()>;
 

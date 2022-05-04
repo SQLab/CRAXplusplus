@@ -19,7 +19,6 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
-#include <s2e/Plugins/CRAX/Expr/BinaryExprEvaluator.h>
 
 #include <cassert>
 #include <memory>
@@ -30,8 +29,11 @@ using namespace klee;
 
 namespace s2e::plugins::crax {
 
-Ret2stack::Ret2stack()
-    : Technique() {}
+Ret2stack::Ret2stack() : Technique() {
+    Exploit &exploit = g_crax->getExploit();
+    Process &process = exploit.getProcess();
+    process.setAslrEnabled(false);
+}
 
 
 std::vector<RopPayload> Ret2stack::getRopPayloadList() const {

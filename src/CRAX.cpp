@@ -47,6 +47,11 @@ CRAX *g_crax = nullptr;
 S2E_DEFINE_PLUGIN(CRAX, "Modular Exploit Generation System", "",
                   "LinuxMonitor", "MemoryMap", "ModuleMap");
 
+const std::string CRAX::s_symArg = "sym_arg";
+const std::string CRAX::s_symEnv = "sym_env";
+const std::string CRAX::s_symFile = "sym_file";
+const std::string CRAX::s_symStdin = "sym_stdin";
+
 pybind11::scoped_interpreter CRAX::s_pybind11;
 pybind11::module CRAX::s_pwnlib(pybind11::module::import("pwnlib.elf"));
 
@@ -65,6 +70,7 @@ CRAX::CRAX(S2E *s2e)
       m_disableNativeForking(CRAX_CONFIG_GET_BOOL(".disableNativeForking", false)),
       m_userSpecifiedCanary(CRAX_CONFIG_GET_INT(".canary", 0)),
       m_userSpecifiedElfBase(CRAX_CONFIG_GET_INT(".elfBase", 0)),
+      m_proxy(CRAX::Proxy::NONE),
       m_register(),
       m_memory(),
       m_disassembler(),
@@ -162,6 +168,22 @@ void CRAX::onProcessLoad(S2EExecutionState *state,
     setCurrentState(state);
 
     log<WARN>() << "onProcessLoad: " << imageFileName << '\n';
+
+    if (m_proxy == CRAX::Proxy::NONE) {
+        // For SYM_ARG and SYM_ENV, the stage1 payload is sent as
+        // command-line argument(s) and environment variable(s).
+        if (imageFileName == s_symArg) {
+            m_proxy = Proxy::SYM_ARG;
+            g_crax->getExploit().getProcess().getArgv().push_back("payload");
+        } else if (imageFileName == s_symEnv) {
+            m_proxy = Proxy::SYM_ENV;
+            g_crax->getExploit().getProcess().getEnv().insert({"'placeholder'", "payload"});
+        } else if (imageFileName == s_symFile) {
+            m_proxy = Proxy::SYM_FILE;
+        } else if (imageFileName == s_symStdin) {
+            m_proxy = Proxy::SYM_STDIN;
+        }
+    }
 
     // If the user provides "./target" instead of "target" as the elf filename,
     // then we use std::filesystem::path to discard the leading "./"

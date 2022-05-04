@@ -22,6 +22,7 @@
 #define S2E_PLUGINS_CRAX_TECHNIQUE_H
 
 #include <llvm/ADT/SmallVector.h>
+#include <s2e/Plugins/CRAX/API/Logging.h>
 #include <s2e/Plugins/CRAX/Expr/Expr.h>
 
 #include <atomic>
@@ -39,7 +40,7 @@ using RopPayload = std::vector<klee::ref<klee::Expr>>;
 // e.g., stack pivoting, ret2csu, orw, etc.
 class Technique {
 protected:
-    using BaseType = BaseOffsetExpr::BaseType;
+    using BaseType = klee::BaseOffsetExpr::BaseType;
 
 public:
     virtual ~Technique() = default;

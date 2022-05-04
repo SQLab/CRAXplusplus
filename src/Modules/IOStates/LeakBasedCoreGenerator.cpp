@@ -19,8 +19,10 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
-#include <s2e/Plugins/CRAX/Expr/BinaryExprEvaluator.h>
 #include <s2e/Plugins/CRAX/PseudoInputStream.h>
+#include <s2e/Plugins/CRAX/Expr/BinaryExprEval.h>
+#include <s2e/Plugins/CRAX/Modules/IOStates/IOStates.h>
+#include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
 #include "LeakBasedCoreGenerator.h"
 
@@ -49,6 +51,7 @@ struct IOStateInfoVisitor {
     void handleStage1(const InputStateInfo &stateInfo);
 
     // Extra parameters
+    LeakBasedCoreGenerator &coreGenerator;
     Exploit &exploit;
     const ELF &elf;
     const std::vector<RopPayload> &ropPayload;
@@ -83,25 +86,14 @@ void IOStateInfoVisitor::operator()(const InputStateInfo &stateInfo) {
         llvm::ArrayRef<uint8_t> bytes = inputStream.read(stateInfo.offset);
         std::string byteString = toByteString(bytes.begin(), bytes.end());
 
-        exploit.writeline(format("proc.send(%s)", byteString.c_str()));
+        exploit.writeline(format("proc.send(b'%s')", byteString.c_str()));
         return;
     }
 
     exploit.writeline("# input state (ROP payload begins)");
-
     handleStage1(stateInfo);
-
-    for (size_t j = 1; j < ropPayload.size(); j++) {
-        if (auto le = dyn_cast<LambdaExpr>(ropPayload[j][0])) {
-            assert(ropPayload[j].size() == 1);
-            std::invoke(*le);
-        } else {
-            for (const ref<Expr> &e : ropPayload[j]) {
-                exploit.appendRopPayload(evaluate<std::string>(e));
-            }
-            exploit.flushRopPayload();
-        }
-    }
+    exploit.writeline("proc.recvrepeat(0)\n");
+    coreGenerator.handleStage2(ropPayload);
 }
 
 bool IOStateInfoVisitor::shouldSkipInputState() const {
@@ -175,9 +167,10 @@ void IOStateInfoVisitor::operator()(const SleepStateInfo &stateInfo) {
 
 
 void LeakBasedCoreGenerator::generateMainFunction(S2EExecutionState *state,
-                                                  std::vector<RopPayload> ropPayload,
-                                                  std::vector<uint8_t> stage1) {
+                                                  const std::vector<RopPayload> &ropPayload,
+                                                  const std::vector<uint8_t> &stage1) {
     Exploit &exploit = g_crax->getExploit();
+    Process &process = exploit.getProcess();
     PseudoInputStream inputStream(stage1);
 
     auto iostates = CRAX::getModule<IOStates>();
@@ -186,11 +179,16 @@ void LeakBasedCoreGenerator::generateMainFunction(S2EExecutionState *state,
     auto modState = g_crax->getModuleState(state, iostates);
     assert(modState);
 
+    exploit.writeline(process.toDeclStmt());
+
     for (size_t i = 0; i < modState->stateInfoList.size(); i++) {
         exploit.writeline();
 
-        std::visit(IOStateInfoVisitor{exploit, exploit.getElf(), ropPayload, inputStream, *modState, i},
-                   modState->stateInfoList[i]);
+        auto v = IOStateInfoVisitor{
+            *this, exploit, exploit.getElf(), ropPayload, inputStream, *modState, i
+        };
+
+        std::visit(v, modState->stateInfoList[i]);
     }
 }
 

@@ -56,7 +56,7 @@ void GuestOutput::onWrite(S2EExecutionState *state,
 
     g_crax->setCurrentState(state);
 
-    std::vector<uint8_t> bytes = mem().readConcrete(syscall.arg2, syscall.ret);
+    std::vector<uint8_t> bytes = mem().readConcrete(syscall.arg2, syscall.ret, /*concretize=*/false);
     write(syscall.arg1, bytes.data(), bytes.size());
 }
 
@@ -76,7 +76,7 @@ void GuestOutput::onWritev(S2EExecutionState *state,
         iovec *iov = reinterpret_cast<iovec *>(iovBytes.data());
         uint64_t addr = reinterpret_cast<uint64_t>(iov->iov_base);
 
-        std::vector<uint8_t> bytes = mem().readConcrete(addr, iov->iov_len);
+        std::vector<uint8_t> bytes = mem().readConcrete(addr, iov->iov_len, /*concretize=*/false);
         write(syscall.arg1, bytes.data(), bytes.size());
     }
 }

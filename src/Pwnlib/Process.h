@@ -18,54 +18,47 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef S2E_PLUGINS_CRAX_MODULE_H
-#define S2E_PLUGINS_CRAX_MODULE_H
+#ifndef S2E_PLUGINS_CRAX_PROCESS_H
+#define S2E_PLUGINS_CRAX_PROCESS_H
 
 #include <map>
-#include <memory>
 #include <string>
-#include <typeindex>
+#include <vector>
 
 namespace s2e::plugins::crax {
 
-// Forward declaration
-class CRAXState;
-class Module;
-class ModuleState;
-class CoreGenerator;
-
-using ModuleStateFactory = ModuleState *(*)(Module *, CRAXState *);
-
-// The abstract base class of all modules.
-//
-// The concept of "modules" in CRAX is similar to that of "plugins" in S2E.
-// Essentially, a module is an S2E-plugin's plugin.
-class Module {
+class Process {
 public:
-    Module() = default;
-    virtual ~Module() = default;
+    using Argv = std::vector<std::string>;
+    using Env = std::map<std::string, std::string>;
 
-    virtual bool checkRequirements() const { return true; }
-    virtual std::unique_ptr<CoreGenerator> makeCoreGenerator() const { return nullptr; }
-    virtual std::string toString() const = 0;
+    Process(const std::string &ldFilename,
+            const std::string &elfFilename,
+            const std::string &libcFilename);
 
-    ModuleState *getModuleState(CRAXState *state, ModuleStateFactory f) const;
-    std::string getConfigKey() const;
+    // Get a decl statement. This is used for exploit script generation.
+    // e.g., "proc = process(...)"
+    std::string toDeclStmt() const;
 
-    static std::unique_ptr<Module> create(const std::string &name);
-    static std::map<std::type_index, Module *> s_mapper;
-};
+    Argv &getArgv() { return m_argv; }
+    Env &getEnv() { return m_env; }
+    bool isAslrEnabled() const { return m_isAslrEnabled; }
+    void setAslrEnabled(bool enabled) { m_isAslrEnabled = enabled; }
 
+private:
+    Argv createDefaultArgv(const std::string &ldFilename,
+                           const std::string &elfFilename) const;
 
-// The per-state information of a CRAX's module.
-class ModuleState {
-public:
-    virtual ~ModuleState() = default;
-    virtual ModuleState *clone() const = 0;
+    Env createDefaultEnv(const std::string &libcFilename) const;
 
-    static ModuleState *factory(Module *, CRAXState *);
+    std::string argvToString() const;
+    std::string envToString() const;
+
+    Argv m_argv;
+    Env m_env;
+    bool m_isAslrEnabled;
 };
 
 }  // namespace s2e::plugins::crax
 
-#endif  // S2E_PLUGINS_CRAX_MODULE_H
+#endif  // S2E_PLUGINS_CRAX_PROCESS_H

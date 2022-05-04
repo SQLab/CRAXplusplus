@@ -18,24 +18,32 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef S2E_PLUGINS_CRAX_LEAK_BASED_CORE_GENERATOR_H
-#define S2E_PLUGINS_CRAX_LEAK_BASED_CORE_GENERATOR_H
+#ifndef S2E_PLUGINS_CRAX_CORE_GENERATOR_H
+#define S2E_PLUGINS_CRAX_CORE_GENERATOR_H
 
-#include <s2e/Plugins/CRAX/CoreGenerator.h>
+#include <s2e/Plugins/CRAX/Techniques/Technique.h>
+
+#include <vector>
 
 namespace s2e::plugins::crax {
 
-class LeakBasedCoreGenerator : public CoreGenerator {
-    friend struct IOStateInfoVisitor;
-
+// The ExploitGenerator generates the exploit script, whereas a
+// CoreGenerator generates the core logic, i.e., main() of the script.
+// To add your own core generator, make your class derive from
+// CoreGenerator and override `generateMainFunction()`.
+class CoreGenerator {
 public:
-    virtual ~LeakBasedCoreGenerator() override = default;
+    virtual ~CoreGenerator() = default;
 
     virtual void generateMainFunction(S2EExecutionState *state,
                                       const std::vector<RopPayload> &ropPayload,
-                                      const std::vector<uint8_t> &stage1) override;
+                                      const std::vector<uint8_t> &stage1);
+
+protected:
+    void handleStage1(const std::vector<RopPayload> &ropPayload);
+    void handleStage2(const std::vector<RopPayload> &ropPayload);
 };
 
 }  // namespace s2e::plugins::crax
 
-#endif  // S2E_PLUGINS_CRAX_LEAK_BASED_CORE_GENERATOR_H
+#endif  // S2E_PLUGINS_CRAX_CORE_GENERATOR_H

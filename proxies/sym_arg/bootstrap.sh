@@ -154,9 +154,7 @@ function execute_target {
     # provide symbolic arguments to the target if required. You can do so by
     # using the ``S2E_SYM_ARGS`` environment variable as required
     # S2E_SYM_ARGS="" LD_PRELOAD="${S2E_SO}" "${TARGET}" "$@" > /dev/null 2> /dev/null
-    #./sym_arg ./target AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-    ./sym_arg ./target AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-
+    ./sym_arg ./target `cat poc`
 }
 
 # Nothing more to initialize on Linux
@@ -210,7 +208,7 @@ target_init
 # Download the target file to analyze
 ${S2EGET} "sym_arg"
 ${S2EGET} "target"
-${S2EGET} "shellcode.bin"
+${S2EGET} "poc"
 
 
 

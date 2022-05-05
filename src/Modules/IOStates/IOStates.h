@@ -114,7 +114,12 @@ public:
     virtual std::string toString() const override { return "IOStates"; }
 
     uint64_t getCanary() const { return m_canary; }
-    const std::vector<LeakType> &getLeakTargets() const { return m_leakTargets; }
+    uint64_t getUserSpecifiedCanary() const { return m_userSpecifiedCanary; }
+    uint64_t getUserSpecifiedElfBase() const { return m_userSpecifiedElfBase; }
+
+    const std::vector<LeakType> &getLeakTargets() const {
+        return m_leakTargets;
+    }
 
     static std::string toString(LeakType leakType) {
         return s_leakTypes[leakType];
@@ -123,7 +128,7 @@ public:
     static const std::array<std::string, LeakType::LAST> s_leakTypes;
 
 private:
-    void initUserSpecifiedStateInfoList();
+    std::vector<StateInfo> initUserSpecifiedStateInfoList();
 
     void inputStateHookTopHalf(S2EExecutionState *inputState,
                                SyscallCtx &syscall);
@@ -136,7 +141,6 @@ private:
 
     void sleepStateHook(S2EExecutionState *sleepState,
                         const SyscallCtx &syscall);
-
 
     void maybeInterceptStackCanary(S2EExecutionState *state,
                                    const Instruction &i);
@@ -167,10 +171,15 @@ private:
     LeakType getLeakType(const std::string &image) const;
 
 
-    uint64_t m_canary;
-
     // The targets that must be leaked according to checksec.
     std::vector<LeakType> m_leakTargets;
+
+    // Intercepted canary (guest).
+    uint64_t m_canary;
+
+    // User-specified canary and ELF base (host).
+    uint64_t m_userSpecifiedCanary;
+    uint64_t m_userSpecifiedElfBase;
 
     // User-specified stateInfoList.
     // If the user has defined this in s2e-config.lua, then the

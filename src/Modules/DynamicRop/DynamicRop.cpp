@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
+#include <s2e/Plugins/CRAX/Modules/IOStates/IOStates.h>
 
 #include "DynamicRop.h"
 
@@ -29,6 +30,13 @@ namespace s2e::plugins::crax {
 DynamicRop::DynamicRop()
     : Module(),
       m_currentConstraintGroup() {
+    auto iostates = CRAX::getModule<IOStates>();
+
+    if (!iostates) {
+        log<WARN>() << "Please load IOStates before DynamicRop\n";
+        exit(1);
+    }
+
     g_crax->beforeExploitGeneration.connect(
             sigc::mem_fun(*this, &DynamicRop::beforeExploitGeneration));
 }
@@ -48,6 +56,9 @@ void DynamicRop::commitConstraints() {
 
 
 void DynamicRop::applyNextConstraintGroup(S2EExecutionState &state) {
+    auto iostates = CRAX::getModule<IOStates>();
+    assert(iostates);
+
     auto modState = g_crax->getModuleState(&state, this);
     assert(modState);
 
@@ -61,7 +72,7 @@ void DynamicRop::applyNextConstraintGroup(S2EExecutionState &state) {
         bool ok = false;
         auto ce = dyn_cast<ConstantExpr>(c->expr);
 
-        uint64_t userElfBase = g_crax->getUserSpecifiedElfBase();
+        uint64_t userElfBase = iostates->getUserSpecifiedElfBase();
         uint64_t rebasedAddr = maybeRebaseAddr(state, ce->getZExtValue(), userElfBase);
 
         ref<Expr> guestExpr = ce;

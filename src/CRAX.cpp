@@ -67,9 +67,8 @@ CRAX::CRAX(S2E *s2e)
       m_linuxMonitor(),
       m_showInstructions(CRAX_CONFIG_GET_BOOL(".showInstructions", false)),
       m_showSyscalls(CRAX_CONFIG_GET_BOOL(".showSyscalls", true)),
-      m_disableNativeForking(CRAX_CONFIG_GET_BOOL(".disableNativeForking", false)),
-      m_userSpecifiedCanary(CRAX_CONFIG_GET_INT(".canary", 0)),
-      m_userSpecifiedElfBase(CRAX_CONFIG_GET_INT(".elfBase", 0)),
+      m_concolicMode(CRAX_CONFIG_GET_BOOL(".concolicMode", false)),
+      m_exploitForm(CRAX::ExploitForm::SCRIPT),
       m_proxy(CRAX::Proxy::NONE),
       m_register(),
       m_memory(),
@@ -347,13 +346,13 @@ void CRAX::onStateForkDecide(S2EExecutionState *state,
                              const ref<Expr> &condition,
                              bool &allowForking) {
     // `allowForking` is true by default.
-    if (!m_disableNativeForking) {
+    if (!m_concolicMode) {
         return;
     }
 
     setCurrentState(state);
 
-    // The user sets `m_disableNativeForking` to true,
+    // The user sets `m_concolicMode` to true,
     // so we should disallow this fork by default.
     allowForking = false;
 

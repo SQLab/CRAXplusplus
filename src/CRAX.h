@@ -111,6 +111,12 @@ class CRAX : public Plugin, IPluginInvoker {
     S2E_PLUGIN
 
 public:
+    enum class ExploitForm {
+        SCRIPT,
+        DATA,
+        LAST
+    };
+
     enum class Proxy {
         NONE,
         SYM_ARG,
@@ -127,7 +133,7 @@ public:
 
     [[nodiscard, gnu::always_inline]]
     inline S2EExecutionState *fork(S2EExecutionState &state) {
-        if (m_disableNativeForking) {
+        if (m_concolicMode) {
             m_allowedForkingStates.insert(&state);
         }
 
@@ -178,13 +184,14 @@ public:
     void setShowSyscalls(bool showSyscalls) { m_showSyscalls = showSyscalls; }
 
     [[nodiscard]]
-    bool isNativeForkingDisabled() const { return m_disableNativeForking; }
+    bool isConcolicModeEnabled() const { return m_concolicMode; }
+
+    void setConcolicMode(bool enabled) { m_concolicMode = enabled; }
 
     [[nodiscard]]
-    uint64_t getUserSpecifiedCanary() const { return m_userSpecifiedCanary; }
+    ExploitForm getExploitForm() { return m_exploitForm; }
 
-    [[nodiscard]]
-    uint64_t getUserSpecifiedElfBase() const { return m_userSpecifiedElfBase; }
+    void setExploitForm(ExploitForm exploitForm) { m_exploitForm = exploitForm; }
 
     [[nodiscard]]
     Proxy getProxy() { return m_proxy; }
@@ -237,14 +244,16 @@ public:
     [[nodiscard]]
     static M *getModule() {
         auto it = Module::s_mapper.find(typeid(M));
-        return (it != Module::s_mapper.end()) ? static_cast<M *>(it->second) : nullptr;
+        return (it != Module::s_mapper.end()) ? static_cast<M *>(it->second)
+                                              : nullptr;
     }
 
     template <typename T>
     [[nodiscard]]
     static T *getTechnique() {
         auto it = Technique::s_mapper.find(typeid(T));
-        return (it != Technique::s_mapper.end()) ? static_cast<T *>(it->second) : nullptr;
+        return (it != Technique::s_mapper.end()) ? static_cast<T *>(it->second)
+                                                 : nullptr;
     }
 
 
@@ -356,11 +365,10 @@ private:
     // CRAX's config options.
     bool m_showInstructions;
     bool m_showSyscalls;
-    bool m_disableNativeForking;
-    uint64_t m_userSpecifiedCanary;
-    uint64_t m_userSpecifiedElfBase;
+    bool m_concolicMode;
 
     // CRAX's attributes.
+    ExploitForm m_exploitForm;
     Proxy m_proxy;
     Register m_register;
     Memory m_memory;

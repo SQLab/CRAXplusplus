@@ -55,11 +55,12 @@ const std::array<std::string, IOStates::LeakType::LAST> IOStates::s_leakTypes = 
 
 IOStates::IOStates()
     : Module(),
-      m_canary(),
       m_leakTargets(),
-      m_userSpecifiedStateInfoList() {
-    // Try to initialize user-specified state info list from the config.
-    initUserSpecifiedStateInfoList();
+      m_canary(),
+      m_userSpecifiedCanary(g_s2e->getConfig()->getInt(getConfigKey() + ".canary", 0)),
+      m_userSpecifiedElfBase(g_s2e->getConfig()->getInt(getConfigKey() + ".elfBase", 0)),
+      m_userSpecifiedStateInfoList(initUserSpecifiedStateInfoList()) {
+    const ELF &elf = g_crax->getExploit().getElf();
 
     // Install input state syscall hook.
     g_crax->beforeSyscall.connect(
@@ -76,39 +77,41 @@ IOStates::IOStates()
     g_crax->afterSyscall.connect(
             sigc::mem_fun(*this, &IOStates::sleepStateHook));
 
+    g_crax->beforeInstruction.connect(
+            sigc::mem_fun(*this, &IOStates::maybeStubOutPrintf));
+
+    g_crax->beforeExploitGeneration.connect(
+            sigc::mem_fun(*this, &IOStates::beforeExploitGeneration));
+
+    if (m_userSpecifiedCanary || m_userSpecifiedElfBase) {
+        g_crax->setExploitForm(CRAX::ExploitForm::DATA);
+    }
+
+    // If either stack canary or PIE is enabled, then enable concolic mode
+    // to avoid state explosion.
+    if (elf.checksec.hasCanary || elf.checksec.hasPIE) {
+        log<WARN>() << "IOStates loaded, forcing concolic mode.\n";
+        g_crax->setConcolicMode(true);
+
+        g_crax->onStateForkModuleDecide.connect(
+                sigc::mem_fun(*this, &IOStates::onStateForkModuleDecide));
+    }
+
     // Determine which base address(es) must be leaked
     // according to checksec of the target binary.
-    const ELF &elf = g_crax->getExploit().getElf();
-
-    if (elf.checksec.hasCanary) {
-        m_leakTargets.push_back(IOStates::LeakType::CANARY);
-    }
-
-    if (elf.checksec.hasPIE) {
-        m_leakTargets.push_back(IOStates::LeakType::CODE);
-    }
-
-    // If stack canary is enabled, install a hook to intercept canary values.
     if (elf.checksec.hasCanary) {
         g_crax->afterInstruction.connect(
                 sigc::mem_fun(*this, &IOStates::maybeInterceptStackCanary));
 
         g_crax->beforeInstruction.connect(
                 sigc::mem_fun(*this, &IOStates::onStackChkFailed));
+
+        m_leakTargets.push_back(IOStates::LeakType::CANARY);
     }
 
-    g_crax->beforeInstruction.connect(
-            sigc::mem_fun(*this, &IOStates::maybeStubOutPrintf));
-
-    // If either stack canary or PIE is enabled, install a hook
-    // to suppress native S2E state forks in order to avoid state explosion.
-    if (elf.checksec.hasCanary || elf.checksec.hasPIE) {
-        g_crax->onStateForkModuleDecide.connect(
-                sigc::mem_fun(*this, &IOStates::onStateForkModuleDecide));
+    if (elf.checksec.hasPIE) {
+        m_leakTargets.push_back(IOStates::LeakType::CODE);
     }
-
-    g_crax->beforeExploitGeneration.connect(
-            sigc::mem_fun(*this, &IOStates::beforeExploitGeneration));
 }
 
 bool IOStates::checkRequirements() const {
@@ -127,14 +130,16 @@ std::unique_ptr<CoreGenerator> IOStates::makeCoreGenerator() const {
 }
 
 
-void IOStates::initUserSpecifiedStateInfoList() {
+std::vector<IOStates::StateInfo> IOStates::initUserSpecifiedStateInfoList() {
     std::string str = g_s2e->getConfig()->getString(getConfigKey() + ".stateInfoList");
 
     if (str.empty()) {
-        return;
+        return {};
     }
 
+    // Initialize user-specified state info list from the config.
     log<INFO>() << "User-specified StateInfoList: " << str << '\n';
+    std::vector<StateInfo> ret;
 
     // Parse the string into state info list.
     for (const auto &s : split(str, ',')) {
@@ -142,7 +147,7 @@ void IOStates::initUserSpecifiedStateInfoList() {
             assert(s.size() > 1);
             InputStateInfo stateInfo;
             stateInfo.offset = std::stoull(s.substr(1));
-            m_userSpecifiedStateInfoList.push_back(std::move(stateInfo));
+            ret.push_back(std::move(stateInfo));
 
         } else if (s[0] == 'o') {
             OutputStateInfo stateInfo;
@@ -150,18 +155,20 @@ void IOStates::initUserSpecifiedStateInfoList() {
             if (s.size() > 1) {
                 stateInfo.bufIndex = std::stoull(s.substr(1));
             }
-            m_userSpecifiedStateInfoList.push_back(std::move(stateInfo));
+            ret.push_back(std::move(stateInfo));
 
         } else if (s[0] == 's') {
             assert(s.size() > 1);
             SleepStateInfo stateInfo;
             stateInfo.sec = std::stoull(s.substr(1));
-            m_userSpecifiedStateInfoList.push_back(std::move(stateInfo));
+            ret.push_back(std::move(stateInfo));
 
         } else {
             pabort("Corrupted stateInfoList provided.");
         }
     }
+
+    return ret;
 }
 
 void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
@@ -397,9 +404,9 @@ void IOStates::onStackChkFailed(S2EExecutionState *state,
 void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
                                        const ref<Expr> &__condition,
                                        bool &allowForking) {
-    // If S2E native forking is enabled, then it will automatically fork
-    // at canary check.
-    if (!g_crax->isNativeForkingDisabled()) {
+    // If normal symbolic execution is used, then it will automatically fork
+    // at canary-checking branches.
+    if (!g_crax->isConcolicModeEnabled()) {
         return;
     }
 
@@ -427,9 +434,9 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
     log<WARN>() << "Allowing fork before __stack_chk_fail@plt\n";
     allowForking = true;
 
-    if (uint64_t canary = g_crax->getUserSpecifiedCanary()) {
+    if (m_userSpecifiedCanary) {
         log<WARN>()
-            << "Constraining canary to " << hexval(canary)
+            << "Constraining canary to " << hexval(m_userSpecifiedCanary)
             << " as requested.\n";
 
         // Hijack branch condition.
@@ -438,7 +445,7 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
 
         uint64_t rbp = reg().readConcrete(Register::X64::RBP);
         condition = EqExpr::create(mem().readSymbolic(rbp - 8, Expr::Int64),
-                                   ConstantExpr::create(canary, Expr::Int64));
+                                   ConstantExpr::create(m_userSpecifiedCanary, Expr::Int64));
     }
 }
 

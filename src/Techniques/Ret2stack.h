@@ -23,6 +23,8 @@
 
 #include <s2e/Plugins/CRAX/Techniques/Technique.h>
 
+#include <cstdlib>
+
 namespace s2e::plugins::crax {
 
 class Ret2stack : public Technique {
@@ -36,7 +38,31 @@ public:
     virtual RopPayload getExtraRopPayload() const override { return {}; }
 
 private:
-    uint64_t addShellcodeConstraints() const;
+    void generateExploit(S2EExecutionState &state,
+                         uint64_t symBlockBase,
+                         uint64_t symBlockSize) const;
+
+    klee::ref<klee::Expr>
+    generateExploitConstraints(S2EExecutionState &state,
+                               uint64_t shellcodeAddr,
+                               uint64_t nopAttempt,
+                               uint64_t failedPivot,
+                               uint64_t successPivot) const;
+
+    inline bool isOverlapped(uint64_t x, uint64_t y) const {
+        return ((x == y) || (std::abs((int64_t) (x - y)) == 1));
+    }
+
+
+    klee::ref<klee::Expr> injectShellcodeAt(uint64_t addr) const;
+
+    klee::ref<klee::Expr> injectNopSledBetween(uint64_t lowerbound,
+                                               uint64_t upperbound) const;
+
+    klee::ref<klee::Expr> setRipBetween(uint64_t lowerbound,
+                                        uint64_t upperbound) const;
+
+    static std::string s_shellcode;
 };
 
 }  // namespace s2e::plugins::crax

@@ -68,6 +68,10 @@ void Technique::resolveRequiredGadgets() {
     }
 }
 
+std::string Technique::getConfigKey() const {
+    return g_crax->getConfigKey() + ".techniquesConfig." + toString();
+}
+
 std::unique_ptr<Technique> Technique::create(const std::string &name) {
     std::unique_ptr<Technique> ret;
 

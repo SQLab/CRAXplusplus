@@ -53,6 +53,8 @@ public:
     virtual std::vector<RopPayload> getRopPayloadList() const = 0;
     virtual RopPayload getExtraRopPayload() const = 0;
 
+    std::string getConfigKey() const;
+
     static std::unique_ptr<Technique> create(const std::string &name);
     static std::map<std::type_index, Technique *> s_mapper;
 

@@ -46,8 +46,7 @@ public:
         bool hasPIE;
     };
 
-    explicit
-    ELF(const std::string &filename); 
+    explicit ELF(const std::string &filename); 
 
     const SymbolMap &symbols() const { return m_symbols; }
     const SymbolMap &plt() const { return m_plt; }

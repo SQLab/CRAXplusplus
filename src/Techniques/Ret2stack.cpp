@@ -22,7 +22,6 @@
 #include <s2e/Plugins/CRAX/Expr/ConstraintBuilder.h>
 
 #include <cassert>
-#include <fstream>
 #include <memory>
 
 #include "Ret2stack.h"
@@ -47,46 +46,67 @@ std::vector<RopPayload> Ret2stack::getRopPayloadList() const {
     S2EExecutionState *state = g_crax->getCurrentState();
 
     std::map<uint64_t, uint64_t> symbolicMemoryMap = mem().getSymbolicMemory();
+    ref<Expr> mainExploitConstraint = nullptr;
 
+    // Analyze the symbolic blocks in reverse order because this gives
+    // higher chance of success.
     for (auto it = symbolicMemoryMap.rbegin(); it != symbolicMemoryMap.rend(); it++) {
-        const auto &region = *it;
-        generateExploit(*state, /*base=*/region.first, /*size=*/region.second);
+        ref<Expr> exploitConstraint = analyzeSymbolicBlock(*state, it->first, it->second);
+
+        if (!mainExploitConstraint && !exploitConstraint->isZero()) {
+            mainExploitConstraint = exploitConstraint;
+        }
     }
 
+    // Use the first generated exploit constraint to generate an exploit script.
+    // The remaining exploit constraints are generated as data (exploit-*.bin).
+    if (mainExploitConstraint) {
+        bool ok = state->addConstraint(mainExploitConstraint, true);
+        assert(ok);
+
+        // We need to make the ROP payload list non-empty so that an exploit script
+        // will be generated. This will leave RBP unconstrained, which is fine.
+        return {{ nullptr }};
+    }
+
+    // The ROP payload list is empty, so no exploit scripts will be generated.
     return {};
 }
 
-void Ret2stack::generateExploit(S2EExecutionState &state,
-                                uint64_t symBlockBase,
-                                uint64_t symBlockSize) const {
+ref<Expr> Ret2stack::analyzeSymbolicBlock(S2EExecutionState &state,
+                                          uint64_t symBlockBase,
+                                          uint64_t symBlockSize) const {
+    ref<Expr> falseExpr = ConstantExpr::create(false, Expr::Bool);
+
+    // This symbolic memory block is not large enough to inject shellcode.
     if (symBlockSize < s_shellcode.size()) {
-        return;
+        return falseExpr;
     }
 
     log<INFO>()
         << "Analyzing symbolic block @" << hexval(symBlockBase)
         << ", size = " << hexval(symBlockSize) << '\n';
 
-    ConstraintBuilder exploitConstraints;
-    bool isTrue = false;
-
+    ConstraintBuilder cb;
+    ref<Expr> exploitConstraint = nullptr;
     uint64_t shellcodeAddr = symBlockBase + symBlockSize - s_shellcode.size();
 
     while (shellcodeAddr >= symBlockBase) {
         // Use binary search to find the longest NOP sled.
         uint64_t l = symBlockBase;
         uint64_t r = symBlockBase + symBlockSize - 1;
+        bool isTrue = false;
 
         while (!isOverlapped(l, r)) {
             uint64_t m = l + (r - l) / 2;
 
-            exploitConstraints.clear();
-            exploitConstraints.And(injectShellcodeAt(shellcodeAddr));
-            exploitConstraints.And(injectNopSledBetween(m, shellcodeAddr - 1));
-            exploitConstraints.And(setRipBetween(m, shellcodeAddr));
+            cb.clear();
+            cb.And(injectShellcodeAt(shellcodeAddr));
+            cb.And(injectNopSledBetween(m, shellcodeAddr - 1));
+            cb.And(setRipBetween(m, shellcodeAddr));
+            exploitConstraint = cb.build();
 
-            state.solver()->mayBeTrue(
-                    Query(state.constraints(), exploitConstraints.build()), isTrue);
+            state.solver()->mayBeTrue(Query(state.constraints(), exploitConstraint), isTrue);
 
             if (isTrue) {
                 r = m;
@@ -96,29 +116,19 @@ void Ret2stack::generateExploit(S2EExecutionState &state,
         }
 
         if (isTrue) {
-            std::unique_ptr<S2EExecutionState> clonedState(
-                    static_cast<S2EExecutionState *>(state.clone()));
-
-            clonedState->concolics = Assignment::create(state.concolics);
-            isTrue = clonedState->addConstraint(exploitConstraints.build(), true);
-            assert(isTrue);
-
-            std::vector<uint8_t> bytes
-                = RopPayloadBuilder::getOneConcreteInput(*clonedState);
-
-            if (bytes.size()) {
-                std::string filename = format("exploit-%llx.bin", symBlockBase);
-                std::ofstream ofs(filename, std::ios::binary);
-                ofs.write(reinterpret_cast<const char *>(bytes.data()), bytes.size());
-                log<WARN>() << "Generated exploit: " << filename << '\n';
-                return;
-            }
+            std::string filename = format("exploit-%llx.bin", symBlockBase);
+            generateExploit(state, exploitConstraint, filename);
+            return exploitConstraint;
         }
 
         shellcodeAddr--;
     }
 
-    log<WARN>() << "Could not generate any exploit for: " << hexval(symBlockBase) << '\n';
+    log<WARN>()
+        << "Could not generate any exploit for: "
+        << hexval(symBlockBase) << '\n';
+
+    return falseExpr;
 }
 
 
@@ -157,6 +167,26 @@ ref<Expr> Ret2stack::setRipBetween(uint64_t lowerbound,
 
     return AndExpr::create(UgeExpr::create(rip, ripLowerbound),
                            UleExpr::create(rip, ripUpperbound));
+}
+
+void Ret2stack::generateExploit(S2EExecutionState &state,
+                                const ref<Expr> &constraints,
+                                std::string filename) const {
+    // Clone a new state to avoid directly modifying the original state.
+    std::unique_ptr<S2EExecutionState> clonedState(
+            static_cast<S2EExecutionState *>(state.clone()));
+
+    clonedState->concolics = Assignment::create(state.concolics);
+
+    // Add the given (exploit) constraints to the cloned state.
+    bool ok = clonedState->addConstraint(constraints, true);
+    assert(ok);
+
+    // Query the solver for an exploit.
+    std::vector<uint8_t> bytes = RopPayloadBuilder::getOneConcreteInput(*clonedState);
+
+    // Write the exploit (data) to the file.
+    g_crax->getExploitGenerator().generateExploit(bytes, filename);
 }
 
 }  // namespace s2e::plugins::crax

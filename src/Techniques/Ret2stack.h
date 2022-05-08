@@ -38,16 +38,12 @@ public:
     virtual RopPayload getExtraRopPayload() const override { return {}; }
 
 private:
-    void generateExploit(S2EExecutionState &state,
-                         uint64_t symBlockBase,
-                         uint64_t symBlockSize) const;
-
-    klee::ref<klee::Expr>
-    generateExploitConstraints(S2EExecutionState &state,
-                               uint64_t shellcodeAddr,
-                               uint64_t nopAttempt,
-                               uint64_t failedPivot,
-                               uint64_t successPivot) const;
+    // Attempts to inject shellcode into the specified symbolic memory block
+    // with the longest NOP sled possible. Returns the exploit constraint
+    // on success, otherwise a false klee::Expr.
+    klee::ref<klee::Expr> analyzeSymbolicBlock(S2EExecutionState &state,
+                                               uint64_t symBlockBase,
+                                               uint64_t symBlockSize) const;
 
     inline bool isOverlapped(uint64_t x, uint64_t y) const {
         return ((x == y) || (std::abs((int64_t) (x - y)) == 1));
@@ -61,6 +57,10 @@ private:
 
     klee::ref<klee::Expr> setRipBetween(uint64_t lowerbound,
                                         uint64_t upperbound) const;
+
+    void generateExploit(S2EExecutionState &state,
+                         const klee::ref<klee::Expr> &constraints,
+                         std::string filename) const;
 
     static std::string s_shellcode;
 };

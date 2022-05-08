@@ -39,7 +39,8 @@ const std::string Ret2stack::s_defaultShellcode
 
 Ret2stack::Ret2stack()
     : Technique(),
-      m_shellcode(initShellcode()) {
+      m_shellcode(initShellcode()),
+      m_exploitConstraint() {
     // Generate exploit scripts that start the target process with ASLR disabled.
     g_crax->getExploit().getProcess().setAslrEnabled(false);
 }
@@ -63,26 +64,29 @@ std::vector<uint8_t> Ret2stack::initShellcode() {
                                 std::istreambuf_iterator<char>());
 }
 
-std::vector<RopPayload> Ret2stack::getRopPayloadList() const {
-    S2EExecutionState *state = g_crax->getCurrentState();
+void Ret2stack::initialize() {
+    m_exploitConstraint = nullptr;
 
+    S2EExecutionState *state = g_crax->getCurrentState();
     std::map<uint64_t, uint64_t> symbolicMemoryMap = mem().getSymbolicMemory();
-    ref<Expr> mainExploitConstraint = nullptr;
 
     // Analyze the symbolic blocks in reverse order because this gives
     // higher chance of success.
     for (auto it = symbolicMemoryMap.rbegin(); it != symbolicMemoryMap.rend(); it++) {
         ref<Expr> exploitConstraint = analyzeSymbolicBlock(*state, it->first, it->second);
 
-        if (!mainExploitConstraint && !exploitConstraint->isZero()) {
-            mainExploitConstraint = exploitConstraint;
+        // Save the first generated exploit constraint in `m_exploitConstraint`.
+        if (!m_exploitConstraint && !exploitConstraint->isZero()) {
+            m_exploitConstraint = exploitConstraint;
         }
     }
+}
 
+std::vector<RopPayload> Ret2stack::getRopPayloadList() const {
     // Use the first generated exploit constraint to generate an exploit script.
     // The remaining exploit constraints are generated as data (exploit-*.bin).
-    if (mainExploitConstraint) {
-        bool ok = state->addConstraint(mainExploitConstraint, true);
+    if (m_exploitConstraint) {
+        bool ok = g_crax->getCurrentState()->addConstraint(m_exploitConstraint, true);
         assert(ok);
 
         // We need to make the ROP payload list non-empty so that an exploit script

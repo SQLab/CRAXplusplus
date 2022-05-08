@@ -32,6 +32,7 @@ public:
     Ret2stack();
     virtual ~Ret2stack() override = default;
 
+    virtual void initialize() override;
     virtual std::string toString() const override { return "Ret2stack"; }
 
     virtual std::vector<RopPayload> getRopPayloadList() const override;
@@ -66,7 +67,9 @@ private:
 
 
     static const std::string s_defaultShellcode;
+
     std::vector<uint8_t> m_shellcode;
+    klee::ref<klee::Expr> m_exploitConstraint;
 };
 
 }  // namespace s2e::plugins::crax

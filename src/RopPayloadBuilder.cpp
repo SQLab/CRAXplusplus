@@ -32,13 +32,15 @@ using namespace klee;
 namespace s2e::plugins::crax {
 
 RopPayloadBuilder::RopPayloadBuilder()
-    : m_isSymbolicMode(true),
+    : m_hasAddedConstraints(),
+      m_isSymbolicMode(true),
       m_shouldSkipSavedRbp(),
       m_rspOffset(),
       m_ropPayload() {}
 
 
 void RopPayloadBuilder::reset() {
+    m_hasAddedConstraints = false;
     m_isSymbolicMode = true;
     m_shouldSkipSavedRbp = false;
     m_rspOffset = 0;
@@ -62,6 +64,10 @@ bool RopPayloadBuilder::chain(const Technique &technique) {
 }
 
 const std::vector<RopPayload> &RopPayloadBuilder::build() {
+    if (m_isSymbolicMode) {
+        buildStage1Payload();
+    }
+
     while (m_ropPayload.size() && m_ropPayload.back().empty()) {
         m_ropPayload.pop_back();
     }
@@ -94,18 +100,17 @@ bool RopPayloadBuilder::chainSymbolic(const std::vector<RopPayload> &ropPayloadL
         }
     }
 
-    if (ropPayloadList[0].empty()) {
-        m_ropPayload.push_back({});
-    } else if (!buildStage1Payload()) {
-        return false;
-    }
-    m_ropPayload.push_back({});
+    m_hasAddedConstraints = true;
 
     if (!shouldSwitchMode) {
         return true;
     }
 
     log<INFO>() << "Switching to direct mode...\n";
+    if (!buildStage1Payload()) {
+        return false;
+    }
+    m_ropPayload.push_back({});
     m_isSymbolicMode = false;
     m_rspOffset = 0;
 
@@ -198,6 +203,11 @@ bool RopPayloadBuilder::shouldSwitchToDirectMode(const Technique *t,
 }
 
 bool RopPayloadBuilder::buildStage1Payload() {
+    // No constraints have been added, so there's no need to proceed.
+    if (!m_hasAddedConstraints) {
+        return false;
+    }
+
     S2EExecutionState *state = g_crax->getCurrentState();
     ConcreteInput payload = getOneConcreteInput(*state);
 
@@ -275,6 +285,13 @@ RopPayloadBuilder::ConcreteInput
 RopPayloadBuilder::getOneConcreteInput(S2EExecutionState &state) {
     ConcreteInputs inputs = getConcreteInputs(state);
     return inputs.size() ? inputs[0].second : ConcreteInput {};
+}
+
+const RopPayloadBuilder::ConcreteInput &
+RopPayloadBuilder::getStage1Payload(const std::vector<RopPayload> &ropPayload) {
+    auto bve = dyn_cast<ByteVectorExpr>(ropPayload[0][0]);
+    assert(bve);
+    return bve->getBytes();
 }
 
 }  // namespace s2e::plugins::crax

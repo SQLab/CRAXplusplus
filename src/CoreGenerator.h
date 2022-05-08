@@ -36,8 +36,7 @@ public:
     virtual ~CoreGenerator() = default;
 
     virtual void generateMainFunction(S2EExecutionState *state,
-                                      const std::vector<RopPayload> &ropPayload,
-                                      const std::vector<uint8_t> &stage1);
+                                      const std::vector<RopPayload> &ropPayload);
 
 protected:
     void handleStage1(const std::vector<RopPayload> &ropPayload);

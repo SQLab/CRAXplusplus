@@ -29,8 +29,7 @@ using namespace klee;
 namespace s2e::plugins::crax {
 
 void CoreGenerator::generateMainFunction(S2EExecutionState *state,
-                                         const std::vector<RopPayload> &ropPayload,
-                                         const std::vector<uint8_t> &stage1) {
+                                         const std::vector<RopPayload> &ropPayload) {
     handleStage1(ropPayload);
     g_crax->getExploit().writeline("proc.recvrepeat(0)\n");
     handleStage2(ropPayload);

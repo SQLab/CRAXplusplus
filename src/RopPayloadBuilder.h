@@ -84,6 +84,10 @@ public:
     [[nodiscard]]
     static ConcreteInput getOneConcreteInput(S2EExecutionState &state);
 
+    [[nodiscard]]
+    static const ConcreteInput &
+    getStage1Payload(const std::vector<RopPayload> &ropPayload);
+
 private:
     [[nodiscard]]
     static klee::ref<klee::ConstantExpr>
@@ -111,6 +115,7 @@ private:
     bool buildStage1Payload();
 
 
+    bool m_hasAddedConstraints;
     bool m_isSymbolicMode;  // true: symbolic, false: direct
     bool m_shouldSkipSavedRbp;
     uint32_t m_rspOffset;

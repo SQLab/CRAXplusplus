@@ -32,8 +32,7 @@ public:
     virtual ~LeakBasedCoreGenerator() override = default;
 
     virtual void generateMainFunction(S2EExecutionState *state,
-                                      const std::vector<RopPayload> &ropPayload,
-                                      const std::vector<uint8_t> &stage1) override;
+                                      const std::vector<RopPayload> &ropPayload) override;
 };
 
 }  // namespace s2e::plugins::crax

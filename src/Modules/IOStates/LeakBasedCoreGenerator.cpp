@@ -167,11 +167,9 @@ void IOStateInfoVisitor::operator()(const SleepStateInfo &stateInfo) {
 
 
 void LeakBasedCoreGenerator::generateMainFunction(S2EExecutionState *state,
-                                                  const std::vector<RopPayload> &ropPayload,
-                                                  const std::vector<uint8_t> &stage1) {
+                                                  const std::vector<RopPayload> &ropPayload) {
     Exploit &exploit = g_crax->getExploit();
     Process &process = exploit.getProcess();
-    PseudoInputStream inputStream(stage1);
 
     auto iostates = CRAX::getModule<IOStates>();
     assert(iostates);
@@ -179,6 +177,7 @@ void LeakBasedCoreGenerator::generateMainFunction(S2EExecutionState *state,
     auto modState = g_crax->getModuleState(state, iostates);
     assert(modState);
 
+    PseudoInputStream inputStream(RopPayloadBuilder::getStage1Payload(ropPayload));
     exploit.writeline(process.toDeclStmt());
 
     for (size_t i = 0; i < modState->stateInfoList.size(); i++) {

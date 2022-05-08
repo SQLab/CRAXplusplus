@@ -38,6 +38,8 @@ public:
     virtual RopPayload getExtraRopPayload() const override { return {}; }
 
 private:
+    std::vector<uint8_t> initShellcode();
+
     // Attempts to inject shellcode into the specified symbolic memory block
     // with the longest NOP sled possible. Returns the exploit constraint
     // on success, otherwise a false klee::Expr.
@@ -62,7 +64,9 @@ private:
                          const klee::ref<klee::Expr> &constraints,
                          std::string filename) const;
 
-    static std::string s_shellcode;
+
+    static const std::string s_defaultShellcode;
+    std::vector<uint8_t> m_shellcode;
 };
 
 }  // namespace s2e::plugins::crax

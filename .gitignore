@@ -1,2 +1,4 @@
+/proxies/sym_arg/sym_arg
+/proxies/sym_env/sym_env
 /proxies/sym_file/sym_file
 /proxies/sym_stdin/sym_stdin

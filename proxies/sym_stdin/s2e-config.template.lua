@@ -397,14 +397,21 @@ pluginsConfig.CRAX = {
         },
     },
 
+    -- Technique config
+    techniquesConfig = {
+        Ret2stack = {
+            --shellcodeFile = "shell.bin",
+        },
+    },
+
     -- The exploitaion techniques that your exploit will use
     techniques = {
         --"Ret2stack",
         "Ret2csu",
-        --"BasicStackPivoting",
-        "AdvancedStackPivoting",
+        "BasicStackPivoting",
+        --"AdvancedStackPivoting",
         --"Ret2syscall",
-        "GotLeakLibc",
+        --"GotLeakLibc",
         --"OneGadget"
         "Ret2syscall"
     },

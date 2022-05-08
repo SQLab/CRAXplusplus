@@ -20,8 +20,6 @@
 
 #include <s2e/s2e.h>
 
-#include <getopt.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,14 +28,15 @@
 #include <unistd.h>
 
 #define POC_NAME_SIZE 32
-#define POC_BUF_SIZE 4096
+#define POC_VALUE_SIZE 4096
+#define POC_BUF_SIZE (POC_NAME_SIZE + 1 + POC_VALUE_SIZE)
+
+char name[POC_NAME_SIZE] = {0};
+char value[POC_VALUE_SIZE] = {0};
+char buf[POC_BUF_SIZE] = {0};
 
 void usage(const char *prog_name) {
     printf("Usage: %s [options...] binary [binary_args...]\n", prog_name);
-    printf("\n");
-    printf("Program Options:\n");
-    printf("  -n  --no-make-symbolic      Don't mark the input bytes as symbolic\n");
-    printf("  -?  --help                  This message\n");
     printf("\n");
     printf("Copyright (C) 2021-2022 Software Quality Laboratory, NYCU.\n");
     printf("This is free software, see the source for copying conditions. There is no\n");
@@ -45,33 +44,9 @@ void usage(const char *prog_name) {
 }
 
 int main(int argc, char *argv[], char *envp[]) {
-    bool should_make_symbolic = true;
-    int opt;
-    int n;
-    char name[POC_NAME_SIZE];
-    char buf[POC_BUF_SIZE];
-
-    struct option long_options[] = {
-        {"help",             0, NULL, 'h'},
-        {"no-make-symbolic", 0, NULL, 'n'},
-        {0, 0, 0, 0}  // sentinel
-    };
-
     if (argc < 2) {
         usage(argv[0]);
         return EXIT_FAILURE;
-    }
-
-    // Parse command-line options.
-    while ((opt = getopt_long(argc, argv, "h:n", long_options, NULL)) != EOF) {
-        switch (opt) {
-            case 'n':
-                should_make_symbolic = false;
-                break;
-            default:
-                usage(argv[0]);
-                return EXIT_FAILURE;
-        }
     }
 
     puts("Give me env var name: ");
@@ -79,25 +54,27 @@ int main(int argc, char *argv[], char *envp[]) {
     name[strcspn(name, "\n")] = 0;
 
     puts("Give me env var value: ");
-    fgets(buf, POC_BUF_SIZE, stdin);
-    buf[strcspn(buf, "\n")] = 0;
-
-    //printf("%s=%s\n", name, buf);
-
-    if (should_make_symbolic) {
-        n = strnlen(buf, POC_BUF_SIZE);
-        s2e_make_symbolic(buf, n, "CRAX");
-    }
+    fgets(value, POC_VALUE_SIZE, stdin);
+    value[strcspn(value, "\n")] = 0;
 
     // Prepare the argv for execve().
-    // The command-line arguments starts at `optind` (an extern int defined by getopt).
-    size_t new_argc = argc - optind + 1;
-    char *args[new_argc];
+    char *args[argc - 1];
     int i;
-    for (i = 0; i < new_argc; i++) {
-        args[i] = argv[optind + i];
+    for (i = 0; i < argc - 1; i++) {
+        args[i] = argv[i + 1];
     }
     args[i] = NULL;
+
+    // Prepare symbolic envp
+    char *envs[] = { buf, NULL };
+    strncat(buf, name, POC_NAME_SIZE);
+    strcat(buf, "=");
+    strncat(buf, value, POC_VALUE_SIZE);
+    printf("%s\n", buf);
+
+    int n = strnlen(buf, POC_BUF_SIZE);
+    int value_begin_idx = strchr(buf, '=') - buf + 1;
+    s2e_make_symbolic(buf + value_begin_idx, n - value_begin_idx, "CRAX");
 
     // Start the target program.
     pid_t pid;
@@ -106,11 +83,11 @@ int main(int argc, char *argv[], char *envp[]) {
             perror("failed to fork child process");
             return EXIT_FAILURE;
         case 0:  // child
-            setenv(name, buf, /*overwrite=*/1);
-            execve(args[0], args, envp);
+            execve(args[0], args, envs);
             break;
         default:  // parent
             wait(NULL);
+            puts("terminating state");
             s2e_kill_state(0, "program terminated");
             break;
     }

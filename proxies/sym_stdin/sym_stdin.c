@@ -20,7 +20,6 @@
 
 #include <s2e/s2e.h>
 
-#include <getopt.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,12 +31,10 @@
 #define POC_BUF_SIZE 4096
 #define LD_PRELOAD_PATH_MAX_SIZE 64
 
+char buf[POC_BUF_SIZE];
+
 void usage(const char *prog_name) {
     printf("Usage: %s [options...] binary [binary_args...]\n", prog_name);
-    printf("\n");
-    printf("Program Options:\n");
-    printf("  -n  --no-make-symbolic      Don't mark the input bytes as symbolic\n");
-    printf("  -?  --help                  This message\n");
     printf("\n");
     printf("Copyright (C) 2021-2022 Software Quality Laboratory, NYCU.\n");
     printf("This is free software, see the source for copying conditions. There is no\n");
@@ -45,35 +42,12 @@ void usage(const char *prog_name) {
 }
 
 int main(int argc, char *argv[], char *envp[]) {
-    bool should_make_symbolic = true;
-    int opt;
     int n;
     int pipe_fd[2];
-    char buf[POC_BUF_SIZE];
-    char ld_preload[LD_PRELOAD_PATH_MAX_SIZE] = "LD_PRELOAD=";
-    const char *ld_preload_value;
-
-    struct option long_options[] = {
-        {"help",             0, NULL, 'h'},
-        {"no-make-symbolic", 0, NULL, 'n'},
-        {0, 0, 0, 0}  // sentinel
-    };
 
     if (argc < 2) {
         usage(argv[0]);
         return EXIT_FAILURE;
-    }
-
-    // Parse command-line options.
-    while ((opt = getopt_long(argc, argv, "h:n", long_options, NULL)) != EOF) {
-        switch (opt) {
-            case 'n':
-                should_make_symbolic = false;
-                break;
-            default:
-                usage(argv[0]);
-                return EXIT_FAILURE;
-        }
     }
 
     puts("Give me crash input via stdin: ");
@@ -84,9 +58,7 @@ int main(int argc, char *argv[], char *envp[]) {
         return EXIT_FAILURE;
     }
 
-    if (should_make_symbolic) {
-        s2e_make_symbolic(buf, n, "CRAX");
-    }
+    s2e_make_symbolic(buf, n, "CRAX");
 
     if (pipe(pipe_fd) < 0) {
         perror("pipe error");
@@ -96,25 +68,12 @@ int main(int argc, char *argv[], char *envp[]) {
     write(pipe_fd[1], buf, n);
 
     // Prepare the argv for execve().
-    // The command-line arguments starts at `optind` (an extern int defined by getopt).
-    size_t new_argc = argc - optind + 1;
-    char *args[new_argc];
+    char *args[argc - 1];
     int i;
-    for (i = 0; i < new_argc; i++) {
-        args[i] = argv[optind + i];
+    for (i = 0; i < argc - 1; i++) {
+        args[i] = argv[i + 1];
     }
     args[i] = NULL;
-
-    // Prepare the envp for execve().
-    ld_preload_value = getenv("LD_PRELOAD");
-    if (ld_preload_value) {
-       printf("[*] LD_PRELOAD=%s\n", ld_preload_value);
-       strncat(ld_preload, ld_preload_value, sizeof(ld_preload) - strlen(ld_preload));
-       ld_preload[LD_PRELOAD_PATH_MAX_SIZE - 1] = 0;
-    }
-    char *envs[] = {
-        ld_preload
-    };
 
     // Start the target program.
     pid_t pid;
@@ -126,7 +85,7 @@ int main(int argc, char *argv[], char *envp[]) {
             dup2(pipe_fd[0], 0);
             close(pipe_fd[0]);
             close(pipe_fd[1]);
-            execve(args[0], args, (ld_preload_value) ? envs : NULL);
+            execve(args[0], args, NULL);
             break;
         default:  // parent
             close(pipe_fd[0]);

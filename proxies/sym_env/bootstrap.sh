@@ -146,12 +146,15 @@ function execute_target {
     TARGET="$1"
     shift
 
+    # Disable ASLR
+    echo 0 | sudo tee /proc/sys/kernel/randomize_va_space
+
     S2E_SO="${TARGET_TOOLS64_ROOT}/s2e.so"
     # sym_env is dynamically linked, so s2e.so has been preloaded to
     # provide symbolic arguments to the target if required. You can do so by
     # using the ``S2E_SYM_ARGS`` environment variable as required
-    #S2E_SYM_ARGS="" LD_PRELOAD="${S2E_SO}" "${TARGET}" "$@" > /dev/null 2> /dev/null
-    ./sym_env -- ./target < ./poc
+    # S2E_SYM_ARGS="" LD_PRELOAD="${S2E_SO}" "${TARGET}" "$@" > /dev/null 2> /dev/null
+    ./sym_env ./target :: < ./poc
 }
 
 # Nothing more to initialize on Linux

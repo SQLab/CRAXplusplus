@@ -131,7 +131,8 @@ ref<Expr> Ret2stack::analyzeSymbolicBlock(S2EExecutionState &state,
             cb.And(setRipBetween(m, shellcodeAddr));
             exploitConstraint = cb.build();
 
-            state.solver()->mayBeTrue(Query(state.constraints(), exploitConstraint), isTrue);
+            state.solver()->mayBeTrue(
+                    Query(state.constraints(), exploitConstraint), isTrue);
 
             if (isTrue) {
                 r = m;

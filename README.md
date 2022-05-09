@@ -1,6 +1,8 @@
 # CRAXplusplus (CRAX++)
 
-<a href="Documentation/thesis.png"><img src="Documentation/thesis.png" width="25%" align="right"></a>
+<a href="Documentation/figures/thesis.png"><img src="Documentation/figures/thesis.png" width="25%" align="right"></a>
+
+[Docs](Documentation/) | [Slides](https://docs.google.com/presentation/d/18acsxk8jsgTES4ZfwwRgfzmq9T-gO9FZQQjKsLsuzCQ/edit?usp=sharing) | Thesis
 
 **current version: 0.2.1**
 
@@ -8,7 +10,7 @@ CRAXplusplus is an **exploit generator** based on [S2E](http://s2e.systems/). Gi
 
 ## System Architecture
 
-![](Documentation/arch.png)
+![](Documentation/figures/arch.png)
 
 ## Trophies
 
@@ -18,7 +20,7 @@ Experimental Setup:
 * Binaries are concolically executed in S2E guest (Debian 9.2.1 x86_64, 4.9.3-s2e) using libc/ld 2.24
 * All generated exploit scripts are verified in host (Ubuntu 20.04.1 x86_64, 5.11.0-46-generic) using libc/ld 2.24
 
-![](Documentation/evaluation.png)
+![](Documentation/figures/evaluation.png)
 
 ## Quick Start \[WIP]
 

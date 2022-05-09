@@ -54,7 +54,7 @@ ref<Expr> Register::readSymbolic(Register::X64 reg, Expr::Width width, bool verb
         ret = m_state->regs()->read(getOffset(reg), width);
     }
 
-    if (verbose && isa<ConstantExpr>(ret)) {
+    if (isa<ConstantExpr>(ret) && verbose) {
         log<WARN>() << "readSymbolic(" << getName(reg) << "), but register isn't symbolic.\n";
     }
     return ret;
@@ -62,9 +62,9 @@ ref<Expr> Register::readSymbolic(Register::X64 reg, Expr::Width width, bool verb
 
 uint64_t Register::readConcrete(Register::X64 reg, bool verbose) {
     uint64_t ret = 0;
-
-    if (verbose &&
-        !m_state->regs()->read(getOffset(reg), &ret, sizeof(ret), /*concretize=*/false)) {
+    bool success
+        = m_state->regs()->read(getOffset(reg), &ret, sizeof(ret), /*concretize=*/false);
+    if (!success && verbose) {
         log<WARN>() << "Cannot read concrete data from register: " << getName(reg) << "\n";
     }
     return ret;
@@ -72,7 +72,7 @@ uint64_t Register::readConcrete(Register::X64 reg, bool verbose) {
 
 bool Register::writeSymbolic(Register::X64 reg, const ref<Expr> &value, bool verbose) {
     bool success = m_state->regs()->write(getOffset(reg), value);
-    if (verbose && !success) {
+    if (!success && verbose) {
         log<WARN>() << "Cannot write symbolic data to register: " << getName(reg) << "\n";
     }
     return success;
@@ -80,7 +80,7 @@ bool Register::writeSymbolic(Register::X64 reg, const ref<Expr> &value, bool ver
 
 bool Register::writeConcrete(Register::X64 reg, uint64_t value, bool verbose) {
     bool success = m_state->regs()->write(getOffset(reg), &value, sizeof(value));
-    if (verbose && !success) {
+    if (!success && verbose) {
         log<WARN>() << "Cannot write concrete data to register: " << getName(reg) << "\n";
     }
     return success;

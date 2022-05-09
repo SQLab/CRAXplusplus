@@ -32,12 +32,6 @@ std::vector<uint8_t> p64(uint64_t val);
 // Converts a sequence of bytes in little endian to uint64_t.
 uint64_t u64(const std::vector<uint8_t> &bytes);
 
-// This is to avoid "constant expression evaluates to -xx which
-// cannot be narrowed to type 'char' [-Wc++11-narrowing] error".
-inline constexpr uint8_t u8(uint8_t v) {
-    return static_cast<uint8_t>(v);
-}
-
 }  // namespace s2e::plugins::crax
 
 #endif  // S2E_PLUGINS_CRAX_PWNLIB_UTIL_H

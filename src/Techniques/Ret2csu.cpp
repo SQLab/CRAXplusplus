@@ -54,7 +54,8 @@ Ret2csu::Ret2csu()
       m_gadget2CallReg1(),
       m_gadget2CallReg2(),
       m_isTemplateValid(),
-      m_ropSubchainTemplate() {}
+      m_ropSubchainTemplate(),
+      m_libcCsuInitInsns() {}
 
 
 void Ret2csu::initialize() {
@@ -65,10 +66,7 @@ void Ret2csu::initialize() {
 }
 
 bool Ret2csu::checkRequirements() const {
-   //auto symbolMap = g_crax->getExploit().getElf().symbols();
-
-   return Technique::checkRequirements();
-          //symbolMap.find(s_libcCsuInit) != symbolMap.end();
+    return Technique::checkRequirements() && searchLibcCsuInit().size();
 }
 
 void Ret2csu::resolveRequiredGadgets() {
@@ -152,33 +150,37 @@ Ret2csu::getRopPayloadList(uint64_t retAddr,
         ConstantExpr::create(arg3, Expr::Int64));
 }
 
-std::vector<Instruction> Ret2csu::searchLibcCsuInit() {
+std::vector<Instruction> Ret2csu::searchLibcCsuInit() const {
+    if (m_libcCsuInitInsns.size()) {
+        return m_libcCsuInitInsns;
+    }
+
     const Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
     // Let's check if this binary has the symbol "__libc_csu_init".
     auto it = elf.symbols().find(s_libcCsuInit);
     if (it != elf.symbols().end()) {
-        return disas().disasm(s_libcCsuInit);
+        m_libcCsuInitInsns = disas().disasm(s_libcCsuInit);
+        return m_libcCsuInitInsns;
     }
 
     // Not found? Maybe this is a stripped binary. In this case,
     // we need to manually search the binary of __libc_csu_init().
-    std::vector<Instruction> insns;
     uint64_t base = 0;
 
-    static const std::vector<uint8_t> keyOpCodes = {
-        u8('\x48'), u8('\x83'), u8('\xc4'), u8('\x08'),  // add  rsp, 8
-        u8('\x5b'),                                      // pop  rbx
-        u8('\x5d'),                                      // pop  rbp
-        u8('\x41'), u8('\x5c'),                          // pop  r12
-        u8('\x41'), u8('\x5d'),                          // pop  r13
-        u8('\x41'), u8('\x5e'),                          // pop  r14
-        u8('\x41'), u8('\x5f'),                          // pop  r15
-        u8('\xc3')                                       // ret
-    };
+    static const std::string keyOpCodes = 
+        "\x48\x83\xc4\x08"  // add  rsp, 8
+        "\x5b"              // pop  rbx
+        "\x5d"              // pop  rbp
+        "\x41\x5c"          // pop  r12
+        "\x41\x5d"          // pop  r13
+        "\x41\x5e"          // pop  r14
+        "\x41\x5f"          // pop  r15
+        "\xc3";             // ret
 
-    std::vector<uint64_t> possibleBases = mem().search(keyOpCodes);
+    std::vector<uint8_t> bytes(keyOpCodes.begin(), keyOpCodes.end());
+    std::vector<uint64_t> possibleBases = mem().search(bytes);
 
     for (size_t i = 0; i < possibleBases.size() && !base; i++) {
         // Search backward until a 'pop r15' (\x41 \x57) is found.
@@ -200,24 +202,28 @@ std::vector<Instruction> Ret2csu::searchLibcCsuInit() {
     int i = 0;
     while (true) {
         std::optional<Instruction> insn = disas().disasm(base + i);
-        insns.push_back(*insn);
+        m_libcCsuInitInsns.push_back(*insn);
         if (!insn || insn->mnemonic == "ret") {
             break;
         }
         i += insn->size;
     }
 
-    return insns;
+    return m_libcCsuInitInsns;
 }
 
 void Ret2csu::parseLibcCsuInit() {
+    if (m_libcCsuInit) {
+        return;
+    }
+
     const Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
     // Since there are several variants of __libc_csu_init(),
     // we'll manually disassemble it and parse the offsets of its two gadgets.
-    std::vector<Instruction> insns = searchLibcCsuInit();
-    assert(insns.size() && "This binary doesn't have __libc_csu_init?");
+    const std::vector<Instruction> &insns = searchLibcCsuInit();
+    assert(insns.size());
 
     m_libcCsuInit = insns[0].address - elf.getBase();
     log<WARN>() << "Found __libc_csu_init() at " << hexval(m_libcCsuInit) << '\n';
@@ -282,6 +288,10 @@ void Ret2csu::parseLibcCsuInit() {
 }
 
 void Ret2csu::searchGadget2CallTarget(std::string funcName) {
+    if (m_libcCsuInitCallTarget) {
+        return;
+    }
+
     const Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
 
@@ -290,13 +300,13 @@ void Ret2csu::searchGadget2CallTarget(std::string funcName) {
     if (elf.hasSymbol(funcName)) {
         funcAddr = elf.getRuntimeAddress(funcName);
     } else {
-        static const std::vector<uint8_t> keyOpCodes = {
-            u8('\x48'), u8('\x83'), u8('\xec'), u8('\x08'),  // sub    rsp,0x8
-            u8('\x48'), u8('\x83'), u8('\xc4'), u8('\x08'),  // add    rsp,0x8
-            u8('\xc3')                                       // ret
-        };
+        static const std::string keyOpCodes = 
+            "\x48\x83\xec\x08"  // sub  rsp, 0x8
+            "\x48\x83\xc4\x08"  // add  rsp, 0x8
+            "\xc3";             // ret
 
-        std::vector<uint64_t> candidates = mem().search(keyOpCodes);
+        std::vector<uint8_t> bytes(keyOpCodes.begin(), keyOpCodes.end());
+        std::vector<uint64_t> candidates = mem().search(bytes);
         funcAddr = candidates[0];
     }
 

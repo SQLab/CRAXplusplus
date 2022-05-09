@@ -84,7 +84,7 @@ public:
 
 private:
     void parseLibcCsuInit();
-    std::vector<Instruction> searchLibcCsuInit();
+    std::vector<Instruction> searchLibcCsuInit() const;
     void searchGadget2CallTarget(std::string funcName = "_fini");
     void buildRopPayloadTemplate() const;
     void invalidate() { m_isTemplateValid = false; }
@@ -99,8 +99,7 @@ private:
     uint64_t m_arg2;
     uint64_t m_arg3;
 
-    // The following attributes will be initialized in
-    // `Ret2csu::parseLibcCsuInit()` and `Ret2csu::buildAuxiliaryFunction()`.
+    // Initialized in `Ret2csu::parseLibcCsuInit()`.
     uint64_t m_libcCsuInit;
     uint64_t m_libcCsuInitGadget1;
     uint64_t m_libcCsuInitGadget2;
@@ -115,6 +114,7 @@ private:
     // so we'll use a template as a cache, thereby declaring it mutable.
     mutable bool m_isTemplateValid;
     mutable std::vector<RopPayload> m_ropSubchainTemplate;
+    mutable std::vector<Instruction> m_libcCsuInitInsns;
 };
 
 }  // namespace s2e::plugins::crax

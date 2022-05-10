@@ -19,9 +19,9 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
-#include <s2e/Plugins/CRAX/PseudoInputStream.h>
 #include <s2e/Plugins/CRAX/Expr/BinaryExprEval.h>
 #include <s2e/Plugins/CRAX/Modules/IOStates/IOStates.h>
+#include <s2e/Plugins/CRAX/Modules/IOStates/PseudoInputStream.h>
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
 #include "LeakBasedCoreGenerator.h"

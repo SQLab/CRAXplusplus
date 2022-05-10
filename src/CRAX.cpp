@@ -262,7 +262,7 @@ void CRAX::onExecuteInstructionStart(S2EExecutionState *state,
     if (pending.size()) {
         auto it = pending.find(pc);
         if (it != pending.end()) {
-            onExecuteSyscallEnd(state, pc, it->second);
+            onExecuteSyscallEnd(state, *i, it->second);
             pending.erase(pc);
         }
     }
@@ -275,7 +275,7 @@ void CRAX::onExecuteInstructionStart(S2EExecutionState *state,
     }
 
     if (i->mnemonic == "syscall") {
-        onExecuteSyscallStart(state, pc);
+        onExecuteSyscallStart(state, *i);
     }
 
     // Execute instruction hooks installed by the user.
@@ -297,16 +297,17 @@ void CRAX::onExecuteInstructionEnd(S2EExecutionState *state,
 }
 
 void CRAX::onExecuteSyscallStart(S2EExecutionState *state,
-                                 uint64_t pc) {
+                                 const Instruction &i) {
+    constexpr bool verbose = false;
     SyscallCtx syscall;
     syscall.ret = 0;
-    syscall.nr = reg().readConcrete(Register::X64::RAX);
-    syscall.arg1 = reg().readConcrete(Register::X64::RDI);
-    syscall.arg2 = reg().readConcrete(Register::X64::RSI);
-    syscall.arg3 = reg().readConcrete(Register::X64::RDX);
-    syscall.arg4 = reg().readConcrete(Register::X64::R10);
-    syscall.arg5 = reg().readConcrete(Register::X64::R8);
-    syscall.arg6 = reg().readConcrete(Register::X64::R9);
+    syscall.nr = reg().readConcrete(Register::X64::RAX, verbose);
+    syscall.arg1 = reg().readConcrete(Register::X64::RDI, verbose);
+    syscall.arg2 = reg().readConcrete(Register::X64::RSI, verbose);
+    syscall.arg3 = reg().readConcrete(Register::X64::RDX, verbose);
+    syscall.arg4 = reg().readConcrete(Register::X64::R10, verbose);
+    syscall.arg5 = reg().readConcrete(Register::X64::R8, verbose);
+    syscall.arg6 = reg().readConcrete(Register::X64::R9, verbose);
 
     if (m_showSyscalls) {
         log<INFO>() << "syscall: "
@@ -322,21 +323,22 @@ void CRAX::onExecuteSyscallStart(S2EExecutionState *state,
     auto craxState = getPluginState(state);
     auto &pending = craxState->m_pendingOnExecuteSyscallEnd;
 
-    // Schedule the syscall hook to be called
-    // after the instruction at `pc + 2` is executed.
-    // Note: pc == state->regs()->getPc().
-    pending[pc + 2] = syscall;
+    // Schedule the syscall hook to be called before the next instruction is executed.
+    uint64_t nextInsnAddr = i.address + i.size;
+    pending[nextInsnAddr] = syscall;
 
     // Execute syscall hooks installed by the user.
-    beforeSyscall.emit(state, pending[pc + 2]);
+    beforeSyscall.emit(state, pending[nextInsnAddr]);
 }
 
 void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,
-                               uint64_t pc,
+                               const Instruction &i,
                                SyscallCtx &syscall) {
+    constexpr bool verbose = false;
+
     // The kernel has finished serving the system call,
     // and the return value is now placed in RAX.
-    syscall.ret = reg().readConcrete(Register::X64::RAX);
+    syscall.ret = reg().readConcrete(Register::X64::RAX, verbose);
 
     // Execute syscall hooks installed by the user.
     afterSyscall.emit(state, syscall);

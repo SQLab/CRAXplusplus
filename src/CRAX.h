@@ -271,12 +271,7 @@ public:
     sigc::signal<void,
                  S2EExecutionState*,
                  const Instruction&>
-        beforeInstruction;
-
-    sigc::signal<void,
-                 S2EExecutionState*,
-                 const Instruction&>
-        afterInstruction;
+        beforeInstruction, afterInstruction;
 
     sigc::signal<void,
                  S2EExecutionState*,
@@ -347,10 +342,10 @@ private:
                                  uint64_t pc);
 
     void onExecuteSyscallStart(S2EExecutionState *state,
-                               uint64_t pc);
+                               const Instruction &i);
 
     void onExecuteSyscallEnd(S2EExecutionState *state,
-                             uint64_t pc,
+                             const Instruction &i,
                              SyscallCtx &syscall);
 
     void onStateForkDecide(S2EExecutionState *state,

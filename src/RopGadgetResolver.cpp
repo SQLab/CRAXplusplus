@@ -32,6 +32,8 @@ using namespace klee;
 namespace s2e::plugins::crax {
 
 void RopGadgetResolver::buildRopGadgetOutputCacheAsync(const std::vector<const ELF *> &elfFiles) {
+    // Run `ROPgadget` on all the given ELF files in the background
+    // because this process can be time consuming (especially for libc.so.6).
     std::thread([this, elfFiles]() {
         for (const auto elf : elfFiles) {
             subprocess::popen ropGadget("ROPgadget", {"--binary", elf->getFilename()});

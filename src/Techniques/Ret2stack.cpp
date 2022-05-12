@@ -185,11 +185,10 @@ ref<Expr> Ret2stack::injectNopSledBetween(uint64_t lowerbound,
 
 ref<Expr> Ret2stack::setRipBetween(uint64_t lowerbound,
                                    uint64_t upperbound) const {
-    constexpr uint64_t ripBits = 48;
+    ref<Expr> rip = reg().readSymbolic(Register::X64::RIP);
 
-    ref<Expr> rip = reg().readSymbolic(Register::X64::RIP, ripBits);
-    ref<Expr> ripLowerbound = ConstantExpr::create(lowerbound, ripBits);
-    ref<Expr> ripUpperbound = ConstantExpr::create(upperbound, ripBits);
+    ref<Expr> ripLowerbound = ConstantExpr::create(lowerbound, rip->getWidth());
+    ref<Expr> ripUpperbound = ConstantExpr::create(upperbound, rip->getWidth());
 
     return AndExpr::create(UgeExpr::create(rip, ripLowerbound),
                            UleExpr::create(rip, ripUpperbound));

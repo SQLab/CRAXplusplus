@@ -82,6 +82,13 @@ void VirtualMemoryMap::rebuild(S2EExecutionState *state) {
     clear();
     m_memoryMap->iterateRegions(state, pid, memoryMapCb);
 
+    if (empty()) {
+        log<WARN>()
+            << "Unable to build VirtualMemoryMap from S2E's MemoryMap and ModuleMap. "
+            << "(Did the crash take place in a child process?) Aborting...\n";
+        exit(-1);
+    }
+
     // These regions are probed only once.
     probeLibcRegion(state);
     probeStackRegion(state);

@@ -77,9 +77,6 @@ IOStates::IOStates()
     g_crax->afterSyscall.connect(
             sigc::mem_fun(*this, &IOStates::sleepStateHook));
 
-    g_crax->beforeInstruction.connect(
-            sigc::mem_fun(*this, &IOStates::maybeStubOutPrintf));
-
     g_crax->beforeExploitGeneration.connect(
             sigc::mem_fun(*this, &IOStates::beforeExploitGeneration));
 
@@ -365,27 +362,6 @@ void IOStates::maybeInterceptStackCanary(S2EExecutionState *state,
         log<WARN>()
             << '[' << hexval(i.address) << "] "
             << "Intercepted canary: " << hexval(m_canary) << '\n';
-    }
-}
-
-void IOStates::maybeStubOutPrintf(S2EExecutionState *state,
-                                  const Instruction &i) {
-    if (!g_crax->isCallSiteOf(i, "printf")) {
-        return;
-    }
-
-    g_crax->setCurrentState(state);
-
-    auto modState = g_crax->getModuleState(state, this);
-
-    // All required information leaked.
-    if (modState->currentLeakTargetIdx >= m_leakTargets.size()) {
-        log<WARN>()
-            << "Skipping a call site of printf() at " << hexval(i.address) << '\n';
-
-        uint64_t rip = reg().readConcrete(Register::X64::RIP);
-        reg().writeConcrete(Register::X64::RIP, rip + 5);
-        throw CpuExitException();
     }
 }
 

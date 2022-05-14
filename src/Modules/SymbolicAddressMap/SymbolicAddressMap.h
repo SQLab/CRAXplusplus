@@ -42,7 +42,8 @@ namespace s2e::plugins::crax {
 // perform constraint handling ourselves.
 //
 // Reference:
-// [1] Meng-Wei Lin. Exploiting Symbolic Locations for Abnormal Execution Paths (2011)
+// [1] Meng-Wei Lin, Shih-Kung Huang. Exploiting Symbolic Locations for Abnormal
+//     Execution Paths (2011)
 
 class SymbolicAddressMap : public Module {
 public:

@@ -21,10 +21,13 @@
 #ifndef S2E_PLUGINS_CRAX_CODE_SELECTION_H
 #define S2E_PLUGINS_CRAX_CODE_SELECTION_H
 
+#include <llvm/ADT/SmallVector.h>
 #include <s2e/S2EExecutionState.h>
+#include <s2e/Plugins/CRAX/API/Register.h>
 #include <s2e/Plugins/CRAX/Modules/Module.h>
 #include <s2e/Plugins/ExecutionMonitors/FunctionMonitor.h>
 
+#include <map>
 #include <stack>
 #include <string>
 #include <vector>
@@ -41,14 +44,14 @@ namespace s2e::plugins::crax {
 //     Control-Flow Hijacking Attacks (2011)
 
 class CodeSelection : public Module {
-public:
-    struct FuncCtx {
-        std::string symbol;
-        uint64_t rdi;
+    struct ConcretizedRegionDescriptor {
+        llvm::SmallVector<std::pair<uint64_t, klee::ref<klee::Expr>>, 6> exprs;
+
+        // The entire path constraints before concretization.
         klee::ConstraintManager constraints;
-        klee::ref<klee::Expr> expr;
     };
 
+public:
     class State : public ModuleState {
         friend class CodeSelection;
 
@@ -64,30 +67,36 @@ public:
             return new State(*this);
         }
 
-        void onFunctionCall(FuncCtx funcCtx) {
-            m_callStack.push(std::move(funcCtx));
+        void onFunctionCall(ConcretizedRegionDescriptor crd) {
+            m_callStack.push(std::move(crd));
         }
 
-        FuncCtx onFunctionRet() {
-            FuncCtx ret = std::move(m_callStack.top());
+        ConcretizedRegionDescriptor onFunctionRet() {
+            auto ret = std::move(m_callStack.top());
             m_callStack.pop();
             return ret;
         }
 
     private:
-        // Stores function symbols.
-        std::stack<FuncCtx> m_callStack;
+        std::stack<ConcretizedRegionDescriptor> m_callStack;
     };
 
 
     CodeSelection();
     virtual ~CodeSelection() override = default;
 
-    virtual std::string toString() const override {
-        return "CodeSelection";
-    }
+    virtual bool checkRequirements() const override;
+    virtual std::string toString() const override { return "CodeSelection"; }
 
 private:
+    // When calling a glibc function, the arguments may be pointers to
+    // symbolic memory regions.
+    //
+    // Key: function name
+    // Value: which registers (arguments) may point to symbolic regions.
+    using SymMemRegMap = std::map<std::string, llvm::SmallVector<Register::X64, 1>>;
+    SymMemRegMap initSymMemRegMap();
+
     void onFunctionCall(S2EExecutionState *state,
                         const ModuleDescriptorConstPtr &callerModule,
                         const ModuleDescriptorConstPtr &calleeModule,
@@ -100,10 +109,12 @@ private:
                           const ModuleDescriptorConstPtr &retTargetModule,
                           uint64_t retSite);
 
-    uint64_t guestStrlen(S2EExecutionState *state, uint64_t ptr);
+    uint64_t getSymBlockLen(S2EExecutionState *state, uint64_t ptr);
 
-    // The functions to intercept.
+
     std::vector<std::string> m_functions;
+    bool m_autoMode;
+    SymMemRegMap m_symMemRegMap;
 };
 
 }  // namespace s2e::plugins::crax

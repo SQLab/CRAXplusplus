@@ -21,6 +21,8 @@
 #include <s2e/Plugins/CRAX/CRAX.h>
 #include <s2e/Plugins/CRAX/API/VirtualMemoryMap.h>
 
+#include <algorithm>
+
 #include "CodeSelection.h"
 
 using namespace klee;
@@ -29,20 +31,32 @@ namespace s2e::plugins::crax {
 
 CodeSelection::CodeSelection()
     : Module(),
-      m_functions() {
+      m_functions(g_s2e->getConfig()->getStringList(getConfigKey())),
+      m_autoMode(m_functions.empty()),
+      m_symMemRegMap(initSymMemRegMap()) {
     auto functionMonitor = g_s2e->getPlugin<FunctionMonitor>();
+
+    if (!functionMonitor) {
+        log<WARN>() << "CodeSelection requires S2E's FunctionMonitor plugin.\n";
+        exit(1);
+    }
 
     functionMonitor->onCall.connect(
             sigc::mem_fun(*this, &CodeSelection::onFunctionCall));
-
-    std::vector<std::string> funcs
-        = g_s2e->getConfig()->getStringList(getConfigKey());
-
-    for (const auto &f : funcs) {
-        m_functions.push_back(f);
-    }
 }
 
+
+CodeSelection::SymMemRegMap CodeSelection::initSymMemRegMap() {
+    return {
+        { "lstat",  { Register::X64::RDI } },
+        { "perror", { Register::X64::RDI } },
+    };
+}
+
+bool CodeSelection::checkRequirements() const {
+    Exploit &exploit = g_crax->getExploit();
+    return exploit.getElf().plt().size();
+}
 
 void CodeSelection::onFunctionCall(S2EExecutionState *state,
                                    const ModuleDescriptorConstPtr &callerModule,
@@ -50,40 +64,91 @@ void CodeSelection::onFunctionCall(S2EExecutionState *state,
                                    uint64_t callerPc,
                                    uint64_t calleePc,
                                    const FunctionMonitor::ReturnSignalPtr &onRet) {
+    assert(onRet);
+
     if (!callerModule || callerModule->Name != VirtualMemoryMap::s_elfLabel) {
         return;
     }
 
+    g_crax->setCurrentState(state);
+
     Exploit &exploit = g_crax->getExploit();
-    ELF &elf = exploit.getElf();
+    const ELF &elf = exploit.getElf();
 
-    for (const auto &funcSym : m_functions) {
-        auto it = elf.symbols().find(funcSym);
+    llvm::SmallVector<Register::X64, 1> args = {
+        Register::X64::RDI,
+        Register::X64::RSI,
+        Register::X64::RDX,
+        Register::X64::RCX,
+        Register::X64::R8,
+        Register::X64::R9,
+    };
 
-        if (it != elf.symbols().end() && it->second == calleePc) {
-            log<INFO>() << "Temporarily concretizing the region pointed to by RDI\n";
+    bool shouldProceed = false;
+    std::string symbol;
 
-            klee::ConstraintManager constraints = state->constraints();
-
-            // Get the length of symbolic C-string pointed to by RDI.
-            uint64_t rdi = reg(state).readConcrete(Register::X64::RDI);
-            uint64_t len = guestStrlen(state, rdi);
-
-            // Save symbolic expression.
-            ref<Expr> expr = mem(state).readSymbolic(rdi, len * Expr::Int8);
-
-            // Temporarily concretize the string.
-            (void) mem(state).readConcrete(rdi, len, /*concretize=*/true);
-
-            auto modState = g_crax->getModuleState(state, this);
-            modState->onFunctionCall({ funcSym, rdi, constraints, expr });
-
-            if (onRet) {
-                onRet->connect(
-                        sigc::mem_fun(*this, &CodeSelection::onFunctionReturn));
-            }
-            break;
+    if (m_autoMode) {
+        auto it = elf.inversePlt().find(calleePc);
+        shouldProceed = it != elf.inversePlt().end();
+        if (shouldProceed) {
+            symbol = it->second;
         }
+
+    } else {
+        for (const auto &funcSym : m_functions) {
+            auto it = elf.symbols().find(funcSym);
+            if (it != elf.symbols().end() && it->second == calleePc) {
+                shouldProceed = true;
+                symbol = it->first;
+                break;
+            }
+        }
+    }
+
+    if (!shouldProceed) {
+        return;
+    }
+
+    log<WARN>() << "CodeSelection: " << symbol << '\n';
+
+    ConcretizedRegionDescriptor crd;
+
+    auto it = m_symMemRegMap.find(symbol);
+    if (it != m_symMemRegMap.end()) {
+        args = it->second;
+    }
+
+    for (auto arg : args) {
+        uint64_t addr = reg().readConcrete(arg);
+        uint64_t size = getSymBlockLen(state, addr);
+
+        if (size) {
+            log<WARN>()
+                << "Temporarily concretizing the region pointed to by "
+                << reg().getName(arg) << '\n';
+
+            // Save the current path constraints.
+            if (crd.exprs.empty()) {
+                crd.constraints = state->constraints();
+            }
+
+            // Save the expression of this symbolic block.
+            ref<Expr> e = mem().readSymbolic(addr, size * Expr::Int8);
+
+            // Temporarily concretize this symbolic block.
+            static_cast<void>(mem().readConcrete(addr, size, /*concretize=*/true));
+
+            crd.exprs.push_back({ addr, e });
+        }
+    }
+
+    // If any of the arguments points to a symbolic block, then we must
+    // have concretized the block(s). As a result, we need to symbolize
+    // them again later when the libc function is about to return.
+    if (crd.exprs.size()) {
+        auto modState = g_crax->getModuleState(state, this);
+        modState->onFunctionCall(std::move(crd));
+        onRet->connect(sigc::mem_fun(*this, &CodeSelection::onFunctionReturn));
     }
 }
 
@@ -95,35 +160,31 @@ void CodeSelection::onFunctionReturn(S2EExecutionState *state,
         return;
     }
 
+    g_crax->setCurrentState(state);
+
     auto modState = g_crax->getModuleState(state, this);
-    FuncCtx funcCtx = modState->onFunctionRet();
+    auto crd = modState->onFunctionRet();
 
-    // Restore symbolic expressions.
-    log<INFO>() << "Restoring symbolic expressions to: " << hexval(funcCtx.rdi) << '\n';
-    (void) mem(state).writeSymbolic(funcCtx.rdi, funcCtx.expr);
+    for (const auto &entry : crd.exprs) {
+        uint64_t addr = entry.first;
+        ref<Expr> expr = entry.second;
 
-    // Forcibly restore path constraints.
+        // Restore symbolic expressions.
+        log<WARN>() << "Restoring symbolic expressions to: " << hexval(addr) << '\n';
+        static_cast<void>(mem().writeSymbolic(addr, expr));
+    }
+
+    // Forcibly restore path constraints to `state` (deep copy).
     ConstraintManager &constraints = const_cast<ConstraintManager &>(state->constraints());
-    constraints = funcCtx.constraints;
+    constraints = crd.constraints;
 }
 
 
-uint64_t CodeSelection::guestStrlen(S2EExecutionState *state, uint64_t ptr) {
-    uint64_t len = 0;
-    bool ok = false;
-    uint8_t c;
+uint64_t CodeSelection::getSymBlockLen(S2EExecutionState *state, uint64_t ptr) {
+    g_crax->setCurrentState(state);
 
-    do {
-        c = 0;
-        ok = state->mem()->read(ptr++, &c, VirtualAddress, /*addConstraint=*/false);
-        // mem(state).readConcrete(ptr, sizeof(uint8_t), /*concretize=*/false);
-        if (!ok) {
-            break;
-        }
-        if (c) {
-            len++;
-        }
-    } while (c);
+    uint64_t len = 0;
+    for (; mem().isMapped(ptr) && mem().isSymbolic(ptr, 1); ptr++, len++) {}
 
     return len;
 }

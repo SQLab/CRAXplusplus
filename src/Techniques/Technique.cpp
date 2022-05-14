@@ -57,12 +57,11 @@ bool Technique::checkRequirements() const {
 void Technique::resolveRequiredGadgets() {
     Exploit &exploit = g_crax->getExploit();
 
-    for (const auto &entry : m_requiredGadgets) {
-        const ELF &elf = *entry.first;
-        const std::string &gadget = entry.second;
+    for (const auto &[elfPtr, gadgetAsm] : m_requiredGadgets) {
+        const ELF &elf = *elfPtr;
 
-        std::string varName = Exploit::toVarName(elf, entry.second);
-        uint64_t offset = exploit.resolveGadget(elf, gadget);
+        std::string varName = Exploit::toVarName(elf, gadgetAsm);
+        uint64_t offset = exploit.resolveGadget(elf, gadgetAsm);
 
         exploit.registerSymbol(varName, offset);
     }

@@ -203,12 +203,12 @@ std::string GotLeakLibc::getTargetSymbol() const {
 
     assert(elf.plt().size() && "PLT is empty ?_?");
 
-    for (const auto &entry : elf.got()) {
-        uint64_t entryAddr = elf.getBase() + entry.second;
+    for (const auto &[sym, offset] : elf.got()) {
+        uint64_t entryAddr = elf.getBase() + offset;
         uint64_t value = u64(mem().readConcrete(entryAddr, 8));
 
         if (vmmap.getModuleBaseAddress(value) == libc.getBase()) {
-            ret = entry.first;
+            ret = sym;
             break;
         }
     }

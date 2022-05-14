@@ -69,10 +69,9 @@ public:
         : m_moduleState(),
           m_pendingOnExecuteSyscallEnd(r.m_pendingOnExecuteSyscallEnd) {
         // Deep clone modules.
-        for (const auto &entry : r.m_moduleState) {
-            const Module *module = entry.first;
-            std::unique_ptr<ModuleState> newModuleState(entry.second->clone());
-            m_moduleState.insert(std::make_pair(module, std::move(newModuleState)));
+        for (const auto &[mod, modState] : r.m_moduleState) {
+            std::unique_ptr<ModuleState> newModuleState(modState->clone());
+            m_moduleState.insert(std::make_pair(mod, std::move(newModuleState)));
         }
     }
 

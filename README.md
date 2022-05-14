@@ -12,15 +12,15 @@ CRAXplusplus is an **exploit generator** based on [S2E](http://s2e.systems/). Gi
 
 ![](Documentation/figures/arch.png)
 
-## Trophies
-
-Experimental Setup:
-
-* Binaries are compiled as 64-bit ELF with gcc 9.3.0 (Ubuntu 9.3.0-17ubuntu1~20.04)
-* Binaries are concolically executed in S2E guest (Debian 9.2.1 x86_64, 4.9.3-s2e) using libc/ld 2.24
-* All generated exploit scripts are verified in host (Ubuntu 20.04.1 x86_64, 5.11.0-46-generic) using libc/ld 2.24
+## Evaluation
 
 ![](Documentation/figures/evaluation.png)
+
+## Experimental Environment
+
+* Binaries are compiled as 64-bit x86_64 ELF with gcc 9.3.0 (Ubuntu 9.3.0-17ubuntu1~20.04)
+* Binaries are concolically executed in S2E guest (Debian 9.2.1 x86_64, 4.9.3-s2e) using libc/ld 2.24
+* All generated exploit scripts are verified in host (Ubuntu 20.04.1 x86_64, 5.11.0-46-generic) using libc/ld 2.24
 
 ## Quick Start \[WIP]
 

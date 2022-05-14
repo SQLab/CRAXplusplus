@@ -94,7 +94,8 @@ private:
     //
     // Key: function name
     // Value: which registers (arguments) may point to symbolic regions.
-    using SymMemRegMap = std::map<std::string, llvm::SmallVector<Register::X64, 1>>;
+    using Argv = llvm::SmallVector<Register::X64, 1>;
+    using SymMemRegMap = std::map<std::string, Argv>;
     SymMemRegMap initSymMemRegMap();
 
     void onFunctionCall(S2EExecutionState *state,
@@ -109,11 +110,18 @@ private:
                           const ModuleDescriptorConstPtr &retTargetModule,
                           uint64_t retSite);
 
-    uint64_t getSymBlockLen(S2EExecutionState *state, uint64_t ptr);
+    // Checks if `calleePc` points to an entry of the PLT,
+    // and if yes, then place the corresponding symbol in `symbolOut`
+    // so that the caller knows which function in PLT is being called.
+    bool isCallingLibraryFunction(uint64_t calleePc,
+                                  std::string &symbolOut) const;
+
+    Argv decideArgv(const std::string &symbol) const;
+
+    uint64_t getSymBlockLen(S2EExecutionState *state, uint64_t ptr) const;
 
 
     std::vector<std::string> m_functions;
-    bool m_autoMode;
     SymMemRegMap m_symMemRegMap;
 };
 

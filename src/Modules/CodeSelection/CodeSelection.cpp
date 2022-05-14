@@ -21,8 +21,6 @@
 #include <s2e/Plugins/CRAX/CRAX.h>
 #include <s2e/Plugins/CRAX/API/VirtualMemoryMap.h>
 
-#include <algorithm>
-
 #include "CodeSelection.h"
 
 using namespace klee;
@@ -32,7 +30,6 @@ namespace s2e::plugins::crax {
 CodeSelection::CodeSelection()
     : Module(),
       m_functions(g_s2e->getConfig()->getStringList(getConfigKey())),
-      m_autoMode(m_functions.empty()),
       m_symMemRegMap(initSymMemRegMap()) {
     auto functionMonitor = g_s2e->getPlugin<FunctionMonitor>();
 
@@ -48,6 +45,7 @@ CodeSelection::CodeSelection()
 
 CodeSelection::SymMemRegMap CodeSelection::initSymMemRegMap() {
     return {
+        { "printf", { /* check the first six args */ } },
         { "lstat",  { Register::X64::RDI } },
         { "perror", { Register::X64::RDI } },
     };
@@ -72,58 +70,21 @@ void CodeSelection::onFunctionCall(S2EExecutionState *state,
 
     g_crax->setCurrentState(state);
 
-    Exploit &exploit = g_crax->getExploit();
-    const ELF &elf = exploit.getElf();
-
-    llvm::SmallVector<Register::X64, 1> args = {
-        Register::X64::RDI,
-        Register::X64::RSI,
-        Register::X64::RDX,
-        Register::X64::RCX,
-        Register::X64::R8,
-        Register::X64::R9,
-    };
-
-    bool shouldProceed = false;
     std::string symbol;
 
-    if (m_autoMode) {
-        auto it = elf.inversePlt().find(calleePc);
-        shouldProceed = it != elf.inversePlt().end();
-        if (shouldProceed) {
-            symbol = it->second;
-        }
-
-    } else {
-        for (const auto &funcSym : m_functions) {
-            auto it = elf.symbols().find(funcSym);
-            if (it != elf.symbols().end() && it->second == calleePc) {
-                shouldProceed = true;
-                symbol = it->first;
-                break;
-            }
-        }
-    }
-
-    if (!shouldProceed) {
+    if (!isCallingLibraryFunction(calleePc, symbol)) {
         return;
     }
 
-    log<WARN>() << "CodeSelection: " << symbol << '\n';
-
+    log<WARN>() << "CodeSelection: handling " << symbol << "()\n";
     ConcretizedRegionDescriptor crd;
 
-    auto it = m_symMemRegMap.find(symbol);
-    if (it != m_symMemRegMap.end()) {
-        args = it->second;
-    }
-
-    for (auto arg : args) {
-        uint64_t addr = reg().readConcrete(arg);
+    for (auto arg : decideArgv(symbol)) {
+        uint64_t addr = reg().readConcrete(arg, /*verbose=*/false);
         uint64_t size = getSymBlockLen(state, addr);
 
         if (size) {
-            log<WARN>()
+            log<DEBUG>()
                 << "Temporarily concretizing the region pointed to by "
                 << reg().getName(arg) << '\n';
 
@@ -170,7 +131,7 @@ void CodeSelection::onFunctionReturn(S2EExecutionState *state,
         ref<Expr> expr = entry.second;
 
         // Restore symbolic expressions.
-        log<WARN>() << "Restoring symbolic expressions to: " << hexval(addr) << '\n';
+        log<DEBUG>() << "Restoring symbolic expressions to: " << hexval(addr) << '\n';
         static_cast<void>(mem().writeSymbolic(addr, expr));
     }
 
@@ -180,7 +141,69 @@ void CodeSelection::onFunctionReturn(S2EExecutionState *state,
 }
 
 
-uint64_t CodeSelection::getSymBlockLen(S2EExecutionState *state, uint64_t ptr) {
+bool CodeSelection::isCallingLibraryFunction(uint64_t calleePc,
+                                             std::string &symbolOut) const {
+    // TODO:
+    // 0000000000403dc0 <__lstat>:
+    // 403dc0:       f3 0f 1e fa             endbr64
+    // 403dc4:       48 89 f2                mov    rdx,rsi
+    // 403dc7:       48 89 fe                mov    rsi,rdi
+    // 403dca:       bf 01 00 00 00          mov    edi,0x1
+    // 403dcf:       e9 ec d4 ff ff          jmp    4012c0 <__lxstat@plt>
+    //
+    // >>> hex(elf.sym['lstat'])
+    // '0x403dc0'
+    // >>> hex(elf.plt['lstat'])
+    // Traceback (most recent call last):
+    // File "<stdin>", line 1, in <module>
+    // KeyError: 'lstat'
+    // >>> hex(elf.sym['__lxstat'])
+    // '0x4012c4'
+    // >>> hex(elf.plt['__lxstat'])
+    // '0x4012c4'
+
+    Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
+    bool ret = false;
+
+    if (m_functions.size()) {
+        for (const auto &funcSym : m_functions) {
+            auto it = elf.symbols().find(funcSym);
+            if (it != elf.symbols().end() && it->second == calleePc) {
+                ret = true;
+                symbolOut = it->first;
+                break;
+            }
+        }
+    } else {
+        auto it = elf.inversePlt().find(calleePc);
+        if (it != elf.inversePlt().end()) {
+            ret = true;
+            symbolOut = it->second;
+        }
+    }
+
+    return ret;
+}
+
+CodeSelection::Argv CodeSelection::decideArgv(const std::string &symbol) const {
+    // By default, we check the first six function arguments.
+    Argv ret = {
+        Register::X64::RDI,
+        Register::X64::RSI,
+        Register::X64::RDX,
+        Register::X64::RCX,
+        Register::X64::R8,
+        Register::X64::R9,
+    };
+
+    // However, if we already know which arguments are pointers,
+    // then we only need to check those arguments.
+    auto it = m_symMemRegMap.find(symbol);
+    return (it != m_symMemRegMap.end() && it->second.size()) ? it->second : ret;
+}
+
+uint64_t CodeSelection::getSymBlockLen(S2EExecutionState *state, uint64_t ptr) const {
     g_crax->setCurrentState(state);
 
     uint64_t len = 0;

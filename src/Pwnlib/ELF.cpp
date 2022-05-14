@@ -42,26 +42,36 @@ ELF::ELF(const std::string &filename)
       m_symbols(m_elf.attr("symbols").cast<ELF::SymbolMap>()),
       m_plt(m_elf.attr("plt").cast<ELF::SymbolMap>()),
       m_got(m_elf.attr("got").cast<ELF::SymbolMap>()),
+      m_inversePlt(buildInversePlt()),
       m_functions(buildFunctionMap()),
       m_filename(filename),
       m_varPrefix(Exploit::toVarName(std::filesystem::path(filename).filename())),
       m_base() {
     // XXX: This is a workaround for https://github.com/Gallopsled/pwntools/issues/1983
-    for (auto &entry : m_plt) {
-        auto it = m_symbols.find(entry.first);
+    // When this issue is solved, remove all those "& ~0xf".
+    for (auto &[sym, offset] : m_plt) {
+        auto it = m_symbols.find(sym);
         assert(it != m_symbols.end());
         it->second &= ~0xf;
-        entry.second &= ~0xf;
+        offset &= ~0xf;
     }
 }
 
 
+ELF::InverseSymbolMap ELF::buildInversePlt() {
+    InverseSymbolMap ret;
+    for (const auto &[sym, addr] : m_plt) {
+        ret.insert(std::make_pair(addr & ~0xf, sym));
+    }
+    return ret;
+}
+
 ELF::FunctionMap ELF::buildFunctionMap() {
     ELF::FunctionMap ret;
 
-    for (const auto &item : m_elf.attr("functions").cast<pybind11::dict>()) {
-        const auto &name = item.first.cast<std::string>();
-        const auto &func = item.second.cast<pybind11::object>();
+    for (const auto &[k, v] : m_elf.attr("functions").cast<pybind11::dict>()) {
+        const auto &name = k.cast<std::string>();
+        const auto &func = v.cast<pybind11::object>();
 
         ret[name] = {
             func.attr("name").cast<std::string>(),

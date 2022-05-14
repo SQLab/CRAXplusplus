@@ -36,6 +36,7 @@ class Exploit;
 class ELF {
 public:
     using SymbolMap = std::map<std::string, uint64_t>;
+    using InverseSymbolMap = std::map<uint64_t, std::string>;
     using FunctionMap = std::map<std::string, Function>;
 
     struct Checksec {
@@ -51,6 +52,7 @@ public:
     const SymbolMap &symbols() const { return m_symbols; }
     const SymbolMap &plt() const { return m_plt; }
     const SymbolMap &got() const { return m_got; }
+    const InverseSymbolMap &inversePlt() const { return m_inversePlt; }
     const FunctionMap &functions() const { return m_functions; }
     uint64_t bss() const;
 
@@ -75,12 +77,14 @@ public:
     const Checksec checksec;
 
 private:
+    InverseSymbolMap buildInversePlt();
     FunctionMap buildFunctionMap();
 
     pybind11::object m_elf;
     SymbolMap m_symbols;
     SymbolMap m_plt;
     SymbolMap m_got;
+    InverseSymbolMap m_inversePlt;
     FunctionMap m_functions;
 
     std::string m_filename;

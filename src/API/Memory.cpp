@@ -32,9 +32,7 @@ bool Memory::isSymbolic(uint64_t virtAddr, uint64_t size) const {
     return m_state->mem()->symbolic(virtAddr, size);
 }
 
-ref<Expr> Memory::readSymbolic(uint64_t virtAddr, uint64_t size) const {
-    // XXX: check `size`.
-    // See: klee/include/klee/Expr.h
+ref<Expr> Memory::readSymbolic(uint64_t virtAddr, Expr::Width size) const {
     return m_state->mem()->read(virtAddr, size);
 }
 

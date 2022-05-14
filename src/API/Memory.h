@@ -42,7 +42,8 @@ public:
     bool isSymbolic(uint64_t virtAddr, uint64_t size) const;
 
     // Read symbolic data from memory.
-    klee::ref<klee::Expr> readSymbolic(uint64_t virtAddr, uint64_t size) const;
+    klee::ref<klee::Expr> readSymbolic(uint64_t virtAddr,
+                                       klee::Expr::Width size) const;
 
     // Read concrete data from memory.
     std::vector<uint8_t> readConcrete(uint64_t virtAddr,

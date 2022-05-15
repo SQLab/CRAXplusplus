@@ -347,7 +347,6 @@ void CRAX::onExecuteSyscallEnd(S2EExecutionState *state,
 void CRAX::onStateForkDecide(S2EExecutionState *state,
                              const ref<Expr> &condition,
                              bool &allowForking) {
-    // `allowForking` is true by default.
     if (!m_concolicMode) {
         return;
     }
@@ -389,8 +388,8 @@ std::string CRAX::getBelongingSymbol(uint64_t instructionAddr) const {
     const ELF &elf = m_exploit.getElf();
     instructionAddr -= elf.getBase();
 
-    ELF::SymbolMap __s = elf.symbols();
-    std::vector<std::pair<std::string, uint64_t>> syms(__s.begin(), __s.end());
+    std::vector<std::pair<std::string, uint64_t>> syms(
+            elf.symbols().begin(), elf.symbols().end());
 
     std::sort(syms.begin(),
               syms.end(),

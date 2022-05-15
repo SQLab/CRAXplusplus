@@ -156,14 +156,14 @@ private:
 
 
     // Called at input states.
-    [[nodiscard]]
     std::array<std::vector<uint64_t>, IOStates::LeakType::LAST>
     analyzeLeak(S2EExecutionState *inputState, uint64_t buf, uint64_t len);
 
     // Called at output states.
-    [[nodiscard]]
     std::vector<IOStates::OutputStateInfo>
     detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len);
+
+    bool hasLeakedAllRequiredInfo(S2EExecutionState *state) const;
 
     LeakType getLeakType(const std::string &image) const;
 

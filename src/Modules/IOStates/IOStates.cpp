@@ -112,14 +112,19 @@ IOStates::IOStates()
 }
 
 bool IOStates::checkRequirements() const {
-    auto modState = g_crax->getModuleState(g_crax->getCurrentState(), this);
+    S2EExecutionState *state = g_crax->getCurrentState();
+
+    auto modState = g_crax->getModuleState(state, this);
     modState->dump();
 
-    if (modState->currentLeakTargetIdx < m_leakTargets.size()) {
-        log<WARN>() << "Some required information cannot be leaked, skipping current state...\n";
-        return false;
+    if (hasLeakedAllRequiredInfo(state)) {
+        return true;
     }
-    return true;
+
+    log<WARN>()
+        << "Some required information cannot be leaked, "
+        << "skipping current state...\n";
+    return false;
 }
 
 std::unique_ptr<CoreGenerator> IOStates::makeCoreGenerator() const {
@@ -175,11 +180,11 @@ void IOStates::inputStateHookTopHalf(S2EExecutionState *inputState,
     }
 
     g_crax->setCurrentState(inputState);
-    auto bufInfo = analyzeLeak(inputState, syscall.arg2, syscall.arg3);
-
     auto modState = g_crax->getModuleState(inputState, this);
 
-    if (modState->currentLeakTargetIdx >= m_leakTargets.size()) {
+    auto bufInfo = analyzeLeak(inputState, syscall.arg2, syscall.arg3);
+
+    if (hasLeakedAllRequiredInfo(inputState)) {
         //log<WARN>() << "No more leak targets :^)\n";
         return;
     }
@@ -303,7 +308,7 @@ void IOStates::outputStateHook(S2EExecutionState *outputState,
     OutputStateInfo stateInfo;
     stateInfo.isInteresting = false;
 
-    if (outputStateInfoList.size()) {
+    if (outputStateInfoList.size() && !hasLeakedAllRequiredInfo(outputState)) {
         stateInfo.isInteresting = true;
         stateInfo.bufIndex = outputStateInfoList.front().bufIndex;
         stateInfo.baseOffset = outputStateInfoList.front().baseOffset;
@@ -495,6 +500,11 @@ IOStates::detectLeak(S2EExecutionState *outputState, uint64_t buf, uint64_t len)
         }
     }
     return leakInfo;
+}
+
+bool IOStates::hasLeakedAllRequiredInfo(S2EExecutionState *state) const {
+    auto modState = g_crax->getModuleState(state, this);
+    return modState->currentLeakTargetIdx >= m_leakTargets.size();
 }
 
 IOStates::LeakType IOStates::getLeakType(const std::string &image) const {

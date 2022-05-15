@@ -19,7 +19,6 @@
 // SOFTWARE.
 
 #include <s2e/Plugins/CRAX/CRAX.h>
-#include <s2e/Plugins/CRAX/API/VirtualMemoryMap.h>
 
 #include "CodeSelection.h"
 
@@ -72,11 +71,11 @@ void CodeSelection::onFunctionCall(S2EExecutionState *state,
 
     std::string symbol;
 
-    if (!isCallingLibraryFunction(calleePc, symbol)) {
+    if (!isCallingRegisteredLibraryFunction(calleePc, symbol)) {
         return;
     }
 
-    log<WARN>() << "CodeSelection: handling " << symbol << "()\n";
+    log<WARN>() << "CodeSelection: " << symbol << "(): temporarily concretizing arguments\n";
     ConcretizedRegionDescriptor crd;
 
     for (auto arg : decideArgv(symbol)) {
@@ -86,7 +85,7 @@ void CodeSelection::onFunctionCall(S2EExecutionState *state,
         if (size) {
             log<DEBUG>()
                 << "Temporarily concretizing the region pointed to by "
-                << reg().getName(arg) << '\n';
+                << reg().getName(arg) << ", size = " << size << '\n';
 
             // Save the current path constraints.
             if (crd.exprs.empty()) {
@@ -99,7 +98,7 @@ void CodeSelection::onFunctionCall(S2EExecutionState *state,
             // Temporarily concretize this symbolic block.
             static_cast<void>(mem().readConcrete(addr, size, /*concretize=*/true));
 
-            crd.exprs.push_back({ addr, e });
+            crd.exprs.push_back(std::make_pair(addr, e));
         }
     }
 
@@ -126,23 +125,19 @@ void CodeSelection::onFunctionReturn(S2EExecutionState *state,
     auto modState = g_crax->getModuleState(state, this);
     auto crd = modState->onFunctionRet();
 
-    for (const auto &entry : crd.exprs) {
-        uint64_t addr = entry.first;
-        ref<Expr> expr = entry.second;
-
+    for (const auto &[addr, expr] : crd.exprs) {
         // Restore symbolic expressions.
         log<DEBUG>() << "Restoring symbolic expressions to: " << hexval(addr) << '\n';
         static_cast<void>(mem().writeSymbolic(addr, expr));
     }
 
     // Forcibly restore path constraints to `state` (deep copy).
-    ConstraintManager &constraints = const_cast<ConstraintManager &>(state->constraints());
-    constraints = crd.constraints;
+    const_cast<ConstraintManager &>(state->constraints()) = crd.constraints;
 }
 
 
-bool CodeSelection::isCallingLibraryFunction(uint64_t calleePc,
-                                             std::string &symbolOut) const {
+bool CodeSelection::isCallingRegisteredLibraryFunction(uint64_t calleePc,
+                                                       std::string &symbolOut) const {
     // TODO:
     // 0000000000403dc0 <__lstat>:
     // 403dc0:       f3 0f 1e fa             endbr64

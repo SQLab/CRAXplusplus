@@ -47,7 +47,7 @@ class CodeSelection : public Module {
     struct ConcretizedRegionDescriptor {
         llvm::SmallVector<std::pair<uint64_t, klee::ref<klee::Expr>>, 6> exprs;
 
-        // The entire path constraints before concretization.
+        // The path constraints before concretization.
         klee::ConstraintManager constraints;
     };
 
@@ -110,11 +110,8 @@ private:
                           const ModuleDescriptorConstPtr &retTargetModule,
                           uint64_t retSite);
 
-    // Checks if `calleePc` points to an entry of the PLT,
-    // and if yes, then place the corresponding symbol in `symbolOut`
-    // so that the caller knows which function in PLT is being called.
-    bool isCallingLibraryFunction(uint64_t calleePc,
-                                  std::string &symbolOut) const;
+    bool isCallingRegisteredLibraryFunction(uint64_t calleePc,
+                                            std::string &symbolOut) const;
 
     Argv decideArgv(const std::string &symbol) const;
 

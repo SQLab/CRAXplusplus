@@ -1,12 +1,8 @@
 # CRAXplusplus (CRAX++)
 
-<a href="Documentation/figures/thesis.png"><img src="Documentation/figures/thesis.png" width="25%" align="right"></a>
-
-[Docs](Documentation/) | [Slides](https://docs.google.com/presentation/d/18acsxk8jsgTES4ZfwwRgfzmq9T-gO9FZQQjKsLsuzCQ/edit?usp=sharing) | Thesis
-
 **current version: 0.2.1**
 
-CRAXplusplus is an **exploit generator** based on [S2E](http://s2e.systems/). Given a x86_64 binary program and a PoC input, our system leverages dynamic symbolic execution (i.e. [concolic execution](https://en.wikipedia.org/wiki/Concolic_testing)) to collect the path constraints determined by the PoC input, add exploit constraints to the crashing states, and query the constraint solver for exploit script generation. Our system supports custom exploitation techniques and modules with the aim of maximizing its extensibility. We implement several binary exploitation techniques in our system, and design two ROP payload chaining algorithms to build ROP payload from multiple techniques. In addition, we implement two modules: IOStates and DynamicRop. The former adapts the methodology of [LAEG](#reference) to the multi-path execution environment in S2E, and the latter enables our system to dynamically perform ROP inside S2E as it adds exploit constraints. Our results show that provided the target binary contains an adequate amount of input and output states to perform information leak, CRAXplusplus can still generate a working exploit script even when all the exploit mitigations are enabled at the same time, and even in the presence of basic input transformations.
+Being inspired by [AFL++](https://github.com/AFLplusplus/AFLplusplus), the exploit generator CRAX++ is [CRAX](https://github.com/SQLab/CRAX) with x86_64 ROP techniques, s2e 2.0 upgrade, code selection, I/O states, dynamic ROP, and more. Given a x86_64 binary program and a PoC input, our system leverages dynamic symbolic execution (i.e. [concolic execution](https://en.wikipedia.org/wiki/Concolic_testing)) to collect the path constraints determined by the PoC input, add exploit constraints to the crashing states, and query the constraint solver for exploit script generation. Our system supports custom exploitation techniques and modules with the aim of maximizing its extensibility. We implement several binary exploitation techniques in our system, and design two ROP payload chaining algorithms to build ROP payload from multiple techniques. 
 
 ## System Architecture
 
@@ -58,7 +54,9 @@ This project is impossible without:
 
 [2] Shih-Kun Huang et al. “Crax: Software crash analysis for automatic exploit generation by modeling attacks as symbolic continuations”. In: 2012 IEEE Sixth International Conference on Software Security and Reliability. IEEE. 2012, pp. 78–87. [[Paper](https://ir.nctu.edu.tw/bitstream/11536/24012/1/000332520700022.pdf)] [[Repo](https://github.com/SQLab/CRAX/tree/workable)] [[Article](https://skhuang.web.nctu.edu.tw/research/)]
 
-[3] Mow Wei Loon and Hsiao Hsu-Chun. “Bypassing ASLR with Dynamic Binary Analysis for Automated Exploit Generation” (2021). [[Paper](https://www.airitilibrary.com/Publication/alDetailedMesh1?DocID=U0001-0508202117214500)]
+[3] Mow Wei-Loon and Hsiao Hsu-Chun. “Bypassing ASLR with Dynamic Binary Analysis for Automated Exploit Generation” (2021). [[Thesis](https://hdl.handle.net/11296/8498eg)]
+
+[4] Wang Guan-Zhong and Huang Shih-Kun. "CRAXplusplus: Modular Exploit Generator using Symbolic Execution" (2022). [[Thesis](https://etd.lib.nctu.edu.tw/cgi-bin/gs32/tugsweb.cgi?o=dnctucdr&s=id%3D%22GT073095510040%22.&searchmode=basic)] [[Slides](https://docs.google.com/presentation/d/18acsxk8jsgTES4ZfwwRgfzmq9T-gO9FZQQjKsLsuzCQ/edit?usp=sharing)]
 
 ## License
 

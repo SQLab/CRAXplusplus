@@ -47,9 +47,11 @@ void CoreGenerator::handleStage1(const std::vector<RopPayload> &ropPayload) {
         process.toDeclStmt(),
     });
 
-    // If the proxy in use is SYM_STDIN, then we have to explicitly
+    // If the proxy in use is SYM_STDIN or SYM_SOCKET, then we have to explicitly
     // send our payload to the stdin of the target process.
-    if (g_crax->getProxy() == CRAX::Proxy::SYM_STDIN) {
+    auto proxyType = g_crax->getProxy().getType();
+    if (proxyType == Proxy::Type::SYM_STDIN ||
+        proxyType == Proxy::Type::SYM_SOCKET) {
         exploit.writelines({
             "proc.send(payload)",
             "time.sleep(0.2)"

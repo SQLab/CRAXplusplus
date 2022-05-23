@@ -33,6 +33,7 @@
 #include <s2e/Plugins/CRAX/Techniques/Technique.h>
 #include <s2e/Plugins/CRAX/Exploit.h>
 #include <s2e/Plugins/CRAX/ExploitGenerator.h>
+#include <s2e/Plugins/CRAX/Proxy.h>
 
 #include <pybind11/embed.h>
 
@@ -116,16 +117,6 @@ public:
         LAST
     };
 
-    enum class Proxy {
-        NONE,
-        SYM_ARG,
-        SYM_ENV,
-        SYM_FILE,
-        SYM_STDIN,
-        LAST
-    };
-
-
     CRAX(S2E *s2e);
 
     void initialize();
@@ -193,7 +184,7 @@ public:
     void setExploitForm(ExploitForm exploitForm) { m_exploitForm = exploitForm; }
 
     [[nodiscard]]
-    Proxy getProxy() { return m_proxy; }
+    Proxy &getProxy() { return m_proxy; }
 
     [[nodiscard]]
     Register &reg(S2EExecutionState *state = nullptr) {
@@ -297,12 +288,6 @@ public:
     // Embedded Python interpreter from pybind11 library.
     static pybind11::scoped_interpreter s_pybind11;
     static pybind11::module s_pwnlib;
-
-    // Proxy binary names.
-    static const std::string s_symArg;
-    static const std::string s_symEnv;
-    static const std::string s_symFile;
-    static const std::string s_symStdin;
 
 private:
     // Allow the guest to communicate with this plugin using s2e_invoke_plugin

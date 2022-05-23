@@ -45,10 +45,11 @@ std::optional<Instruction> Disassembler::disasm(uint64_t pc) const {
 std::vector<Instruction> Disassembler::disasm(const std::string &symbol) const {
     // The object `f` holds the information about the function `symbol`,
     // e.g., offset within ELF, size, etc.
-    const auto &elf = g_crax->getExploit().getElf();
+    const ELF &elf = g_crax->getExploit().getElf();
     Function f = elf.functions().at(symbol);
-    std::vector<uint8_t> code = mem().readConcrete(elf.getBase() + f.address, f.size);
-    std::vector<Instruction> insns = disasm(code, elf.getBase() + f.address);
+
+    std::vector<uint8_t> code = mem().readConcrete(elf.getBase() + f.offset, f.size);
+    std::vector<Instruction> insns = disasm(code, elf.getBase() + f.offset);
 
     assert(insns.size());
     return insns;

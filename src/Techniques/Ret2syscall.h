@@ -56,6 +56,8 @@ private:
     std::vector<RopPayload> getRopPayloadListUsingGotHijackingRop() const;
 
     uint8_t getLibcReadSyscallOffsetLsb() const;
+    RopPayload getDup2RopPayload(int socketFd) const;
+    RopPayload getPollRopPayload() const;
 
     // The location of the syscall gadget.
     ref<Expr> m_syscallGadget;

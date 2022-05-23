@@ -27,7 +27,7 @@ namespace s2e::plugins::crax {
 
 struct Function {
     std::string name;
-    uint64_t address;
+    uint64_t offset;
     uint64_t size;
 };
 

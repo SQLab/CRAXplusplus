@@ -47,11 +47,6 @@ CRAX *g_crax = nullptr;
 S2E_DEFINE_PLUGIN(CRAX, "Modular Exploit Generation System", "",
                   "LinuxMonitor", "MemoryMap", "ModuleMap");
 
-const std::string CRAX::s_symArg = "sym_arg";
-const std::string CRAX::s_symEnv = "sym_env";
-const std::string CRAX::s_symFile = "sym_file";
-const std::string CRAX::s_symStdin = "sym_stdin";
-
 pybind11::scoped_interpreter CRAX::s_pybind11;
 pybind11::module CRAX::s_pwnlib(pybind11::module::import("pwnlib.elf"));
 
@@ -69,7 +64,7 @@ CRAX::CRAX(S2E *s2e)
       m_showSyscalls(CRAX_CONFIG_GET_BOOL(".showSyscalls", true)),
       m_concolicMode(CRAX_CONFIG_GET_BOOL(".concolicMode", false)),
       m_exploitForm(CRAX::ExploitForm::SCRIPT),
-      m_proxy(CRAX::Proxy::NONE),
+      m_proxy(),
       m_register(),
       m_memory(),
       m_disassembler(),
@@ -168,20 +163,8 @@ void CRAX::onProcessLoad(S2EExecutionState *state,
 
     log<WARN>() << "onProcessLoad: " << imageFileName << '\n';
 
-    if (m_proxy == CRAX::Proxy::NONE) {
-        // For SYM_ARG and SYM_ENV, the stage1 payload is sent as
-        // command-line argument(s) and environment variable(s).
-        if (imageFileName == s_symArg) {
-            m_proxy = Proxy::SYM_ARG;
-            g_crax->getExploit().getProcess().getArgv().push_back("payload");
-        } else if (imageFileName == s_symEnv) {
-            m_proxy = Proxy::SYM_ENV;
-            g_crax->getExploit().getProcess().getEnv().insert({"'placeholder'", "payload"});
-        } else if (imageFileName == s_symFile) {
-            m_proxy = Proxy::SYM_FILE;
-        } else if (imageFileName == s_symStdin) {
-            m_proxy = Proxy::SYM_STDIN;
-        }
+    if (m_proxy.getType() == Proxy::Type::NONE) {
+        m_proxy.maybeDetectProxy(imageFileName);
     }
 
     // If the user provides "./target" instead of "target" as the elf filename,

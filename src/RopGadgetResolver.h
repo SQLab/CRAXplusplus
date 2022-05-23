@@ -27,6 +27,8 @@
 #include <map>
 #include <shared_mutex>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace s2e::plugins::crax {
 
@@ -39,16 +41,28 @@ public:
 
     // Given a list of ELF objects, for each ELF, cache the output of
     // `ROPgadget <elf>` in m_ropGadgetOutputCache.
+    //
+    // NOTE: We cache the output of `ROPgadget <elf>` at the beginning,
+    // and doResolveGadgets() is blocked until the output cache has been fully built.
     void buildRopGadgetOutputCacheAsync(const std::vector<const ELF *> &elfFiles);
 
     // Look for an exact match of the gadget specified by `gadgetAsm` within `elf`.
     // If found, then the offset of the gadget will be returned, and zero otherwise.
-    //
-    // NOTE: by default, we cache the output of `ROPgadget <elf>` at the beginning,
-    // and resolveGadget() will block until the output cacue has been fully built.
-    uint64_t resolveGadget(const ELF &elf, const std::string &gadgetAsm) const;
+    uint64_t resolveGadget(const ELF &elf,
+                           const std::string &gadgetAsm) const;
+
+    std::vector<uint64_t> resolveGadgets(const ELF &elf,
+                                         const std::string &gadgetAsm) const;
 
 private:
+    std::vector<uint64_t> doResolveGadgets(const ELF &elf,
+                                           const std::string &gadgetAsm,
+                                           bool exactMatch) const;
+
+    uint64_t processMatch(const ELF &elf,
+                          const std::string_view &asmStr,
+                          const std::string_view &offStr) const;
+
     // Resolving gadgets in libc.so.6 or some huge shared objects
     // can take a lot of time, so we use a cache to avoid repeated
     // gadget resolution. In addition, concurrent access from

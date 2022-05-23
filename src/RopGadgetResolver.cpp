@@ -22,7 +22,6 @@
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 #include <s2e/Plugins/CRAX/Utils/Subprocess.h>
 
-#include <string_view>
 #include <thread>
 
 #include "RopGadgetResolver.h"
@@ -46,13 +45,33 @@ void RopGadgetResolver::buildRopGadgetOutputCacheAsync(const std::vector<const E
     }).detach();
 }
 
-uint64_t RopGadgetResolver::resolveGadget(const ELF &elf, const std::string &gadgetAsm) const {
+uint64_t RopGadgetResolver::resolveGadget(const ELF &elf,
+                                          const std::string &gadgetAsm) const {
+    std::vector<uint64_t> offsets = doResolveGadgets(elf, gadgetAsm, true);
+
+    if (offsets.empty()) { 
+        log<WARN>() << "Cannot resolve gadget: " << gadgetAsm << "\n";
+    }
+
+    return offsets.size() ? offsets[0] : 0;
+}
+
+std::vector<uint64_t> RopGadgetResolver::resolveGadgets(const ELF &elf,
+                                                        const std::string &gadgetAsm) const {
+    return doResolveGadgets(elf, gadgetAsm, false);
+}
+
+std::vector<uint64_t> RopGadgetResolver::doResolveGadgets(const ELF &elf,
+                                                          const std::string &gadgetAsm,
+                                                          bool exactMatch) const {
     while (!m_hasBuiltRopGadgetOutputCache) {}
 
     // If we have an exact match in m_ropGadgetCache, use it.
     if (auto cachedAddr = m_ropGadgetCache.lookup(&elf, gadgetAsm)) {
-        return cachedAddr;
+        return { cachedAddr };
     }
+
+    std::vector<uint64_t> ret;
 
     // If we have already run `ROPgadget` on the given ELF file, reuse the cached output.
     std::string *output = nullptr;
@@ -73,23 +92,31 @@ uint64_t RopGadgetResolver::resolveGadget(const ELF &elf, const std::string &gad
         size_t firstSpaceIdx = line.find_first_of(" ");
         size_t asmBeginIdx = firstSpaceIdx + 3;  // skips " : "
 
-        std::string_view addrStr = std::string_view(line).substr(0, firstSpaceIdx);
+        std::string_view offStr = std::string_view(line).substr(0, firstSpaceIdx);
         std::string_view asmStr = std::string_view(line).substr(asmBeginIdx);
 
-        // Look for an exact match.
-        // Example entry:
-        // 0x000000000040117d : pop rbp ; ret
-        if (asmStr == gadgetAsm) {
-            uint64_t addr = std::stoull(std::string(addrStr), nullptr, 0);
-            m_ropGadgetCache.insert(&elf, gadgetAsm, addr);
-
-            log<INFO>() << format("Resolved gadget: [0x%x] %s\n", addr, asmStr.data());
-            return addr;
+        if (exactMatch && asmStr == gadgetAsm) {
+            ret.push_back(processMatch(elf, asmStr, offStr));
+            break;
+        } else if (!exactMatch && asmStr.find(gadgetAsm) != asmStr.npos) {
+            ret.push_back(processMatch(elf, asmStr, offStr));
         }
     }
 
-    log<WARN>() << "Cannot resolve gadget: " << gadgetAsm << "\n";
-    return 0;
+    return ret;
+}
+
+uint64_t RopGadgetResolver::processMatch(const ELF &elf,
+                                         const std::string_view &asmStr,
+                                         const std::string_view &offStr) const {
+    // Example entry:
+    // 0x000000000040117d : pop rbp ; ret
+    uint64_t offset = std::stoull(std::string(offStr), nullptr, 0);
+
+    // Also cache the offset.
+    m_ropGadgetCache.insert(&elf, std::string(asmStr), offset);
+
+    return offset;
 }
 
 }  // namespace s2e::plugins::crax

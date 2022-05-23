@@ -37,13 +37,20 @@ public:
             const std::string &libcFilename);
 
     // Get a decl statement. This is used for exploit script generation.
-    // e.g., "proc = process(...)"
+    // e.g., "proc = process(...)", "proc = remote(...)".
     std::string toDeclStmt() const;
 
     Argv &getArgv() { return m_argv; }
     Env &getEnv() { return m_env; }
     bool isAslrEnabled() const { return m_isAslrEnabled; }
-    void setAslrEnabled(bool enabled) { m_isAslrEnabled = enabled; }
+    bool isRemoteMode() const { return m_isRemoteMode; }
+    bool isTcp() const { return m_isTcp; }
+
+    void setAslrEnabled(bool isAslrEnabled) { m_isAslrEnabled = isAslrEnabled; }
+    void setRemoteMode(bool isRemoteMode) { m_isRemoteMode = isRemoteMode; }
+    void setDestAddr(const std::string &destAddr) { m_destAddr = destAddr; }
+    void setDestPort(int destPort) { m_destPort = destPort; }
+    void setTcp(bool isTcp) { m_isTcp = isTcp; }
 
 private:
     Argv createDefaultArgv(const std::string &ldFilename,
@@ -51,12 +58,22 @@ private:
 
     Env createDefaultEnv(const std::string &libcFilename) const;
 
+    std::string toDeclStmtLocal() const;
+    std::string toDeclStmtRemote() const;
+
     std::string argvToString() const;
     std::string envToString() const;
+
 
     Argv m_argv;
     Env m_env;
     bool m_isAslrEnabled;
+    bool m_isRemoteMode;
+
+    // Remote mode.
+    std::string m_destAddr;
+    int m_destPort;
+    bool m_isTcp;
 };
 
 }  // namespace s2e::plugins::crax

@@ -31,7 +31,10 @@ Process::Process(const std::string &ldFilename,
                  const std::string &libcFilename)
     : m_argv(createDefaultArgv(ldFilename, elfFilename)),
       m_env(createDefaultEnv(libcFilename)),
-      m_isAslrEnabled(true) {}
+      m_isAslrEnabled(true),
+      m_isRemoteMode(),
+      m_destAddr(),
+      m_destPort() {}
 
 Process::Argv Process::createDefaultArgv(const std::string &ldFilename,
                                          const std::string &elfFilename) const {
@@ -50,12 +53,23 @@ Process::Env Process::createDefaultEnv(const std::string &libcFilename) const {
 }
 
 std::string Process::toDeclStmt() const {
+    return !m_isRemoteMode ? toDeclStmtLocal() : toDeclStmtRemote();
+}
+
+std::string Process::toDeclStmtLocal() const {
     std::string strArgv = argvToString();
     std::string strEnv = envToString();
     std::string strAslr = m_isAslrEnabled ? "True" : "False";
 
     return format("proc = process(argv=%s, env=%s, aslr=%s)",
             strArgv.c_str(), strEnv.c_str(), strAslr.c_str());
+}
+
+std::string Process::toDeclStmtRemote() const {
+    std::string protocol = m_isTcp ? "tcp" : "udp";
+
+    return format("proc = remote('%s', %d, typ='%s')",
+            m_destAddr.c_str(), m_destPort, protocol.c_str());
 }
 
 std::string Process::argvToString() const {

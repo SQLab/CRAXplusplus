@@ -110,20 +110,23 @@ std::vector<uint64_t> Memory::search(const std::vector<uint8_t> &needle) const {
             continue;
         }
 
-        // Read the region concretely into `haystack`,
-        // and use kmp algorithm to search all the occurences of `needle`.
-        std::vector<uint8_t> haystack = readConcrete(start, end - start, /*concretize=*/false);
+        // Read the region concretely into `haystack`.
+        std::vector<uint8_t> haystack
+            = readConcrete(start, end - start, /*concretize=*/false);
 
-        auto its = boost::algorithm::knuth_morris_pratt_search(haystack.begin(),
-                                                               haystack.end(),
-                                                               needle.begin(),
-                                                               needle.end());
+        // Use KMP algorithm to search all the occurences of `needle` in `haystack`.
+        auto [it1, it2] 
+            = boost::algorithm::knuth_morris_pratt_search(haystack.begin(),
+                                                          haystack.end(),
+                                                          needle.begin(),
+                                                          needle.end());
 
-        if (its.first == haystack.end() && its.second == haystack.end()) {
+        // If not found, then skip this region.
+        if (it1 == haystack.end() && it2 == haystack.end()) {
             continue;
         }
 
-        ret.push_back((its.first - haystack.begin()) + start);
+        ret.push_back((it1 - haystack.begin()) + start);
     }
 
     return ret;

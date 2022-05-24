@@ -28,6 +28,7 @@ namespace s2e::plugins::crax {
 
 // This logging module provides straightforward logging APIs with
 // C++-style streams. There are three severity levels: INFO, DEBUG and WARN.
+// Note: these interfaces are not thread safe.
 enum LogLevel {
     INFO,
     DEBUG,

@@ -73,27 +73,13 @@ std::string Process::toDeclStmtRemote() const {
 }
 
 std::string Process::argvToString() const {
-    std::string ret;
-    ret += '[';
-    for (auto it = m_argv.begin(); it != m_argv.end(); it++) {
-        ret += *it;
-        if (std::next(it) != m_argv.end()) {
-            ret += ", ";
-        }
-    }
-    return ret + ']';
+    auto elementToString = [](auto it) { return *it; };
+    return toString(m_argv.begin(), m_argv.end(), '[', ']', elementToString);
 }
 
 std::string Process::envToString() const {
-    std::string ret;
-    ret += '{';
-    for (auto it = m_env.begin(); it != m_env.end(); it++) {
-        ret += it->first + ": " + it->second;
-        if (std::next(it) != m_env.end()) {
-            ret += ", ";
-        }
-    }
-    return ret + '}';
+    auto elementToString = [](auto it) { return it->first + ": " + it->second; };
+    return toString(m_env.begin(), m_env.end(), '{', '}', elementToString);
 }
 
 }  // namespace s2e::plugins::crax

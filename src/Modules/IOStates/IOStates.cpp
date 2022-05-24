@@ -22,6 +22,7 @@
 #include <s2e/Plugins/CRAX/API/Disassembler.h>
 #include <s2e/Plugins/CRAX/Modules/IOStates/LeakBasedCoreGenerator.h>
 #include <s2e/Plugins/CRAX/Pwnlib/Util.h>
+#include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 #include <s2e/Plugins/CRAX/Utils/VariantOverload.h>
 
 #include <unistd.h>
@@ -139,34 +140,43 @@ std::vector<IOStates::StateInfo> IOStates::initUserSpecifiedStateInfoList() {
         return {};
     }
 
+    // Remove the square brackets.
+    str.erase(0, 1);
+    str.pop_back();
+
     // Initialize user-specified state info list from the config.
     log<INFO>() << "User-specified StateInfoList: " << str << '\n';
     std::vector<StateInfo> ret;
 
     // Parse the string into state info list.
-    for (const auto &s : split(str, ',')) {
-        if (s[0] == 'i') {
-            assert(s.size() > 1);
-            InputStateInfo stateInfo;
-            stateInfo.offset = std::stoull(s.substr(1));
-            ret.push_back(std::move(stateInfo));
-
-        } else if (s[0] == 'o') {
-            OutputStateInfo stateInfo;
-            stateInfo.isInteresting = false;
-            if (s.size() > 1) {
-                stateInfo.bufIndex = std::stoull(s.substr(1));
+    for (const auto &s : split(str, ", ")) {
+        switch (s[0]) {
+            case 'i': {
+                assert(s.size() > 1);
+                InputStateInfo stateInfo;
+                stateInfo.offset = std::stoull(s.substr(1));
+                ret.push_back(std::move(stateInfo));
+                break;
             }
-            ret.push_back(std::move(stateInfo));
-
-        } else if (s[0] == 's') {
-            assert(s.size() > 1);
-            SleepStateInfo stateInfo;
-            stateInfo.sec = std::stoull(s.substr(1));
-            ret.push_back(std::move(stateInfo));
-
-        } else {
-            pabort("Corrupted stateInfoList provided.");
+            case 'o': {
+                OutputStateInfo stateInfo;
+                stateInfo.isInteresting = false;
+                if (s.size() > 1) {
+                    stateInfo.bufIndex = std::stoull(s.substr(1));
+                }
+                ret.push_back(std::move(stateInfo));
+                break;
+            }
+            case 's': {
+                assert(s.size() > 1);
+                SleepStateInfo stateInfo;
+                stateInfo.sec = std::stoull(s.substr(1));
+                ret.push_back(std::move(stateInfo));
+                break;
+            }
+            default:
+                log<WARN>() << "Corrupted stateInfoList in s2e-config.lua\n";
+                exit(1);
         }
     }
 
@@ -521,36 +531,32 @@ IOStates::LeakType IOStates::getLeakType(const std::string &image) const {
 
 
 void IOStates::State::dump() const {
-    auto &os = log<WARN>();
-    os << "Dumping IOStates: [";
-    os << toString();
-    os << "]\n";
+    log<WARN>() << "Dumping IOStates: " << toString() << '\n';
 }
 
 std::string IOStates::State::toString() const {
-    std::string ret;
-
-    for (size_t i = 0; i < stateInfoList.size(); i++) {
-        std::visit(overload {
-            [&ret](const InputStateInfo &stateInfo) {
-                ret += 'i' + std::to_string(stateInfo.offset);
-            },
-            [&ret](const OutputStateInfo &stateInfo) {
-                ret += 'o';
-                if (stateInfo.isInteresting) {
-                    ret += std::to_string(stateInfo.bufIndex);
-                }
-            },
-            [&ret](const SleepStateInfo &stateInfo) {
-                ret += 's' + std::to_string(stateInfo.sec);
+    auto visitor = overload {
+        [](const InputStateInfo &stateInfo) {
+            return std::string("i") + std::to_string(stateInfo.offset);
+        },
+        [](const OutputStateInfo &stateInfo) {
+            std::string ret = "o";
+            if (stateInfo.isInteresting) {
+                ret += std::to_string(stateInfo.bufIndex);
             }
-        }, stateInfoList[i]);
-
-        if (i != stateInfoList.size() - 1) {
-            ret += ',';
+            return ret;
+        },
+        [](const SleepStateInfo &stateInfo) {
+            return std::string("i") + std::to_string(stateInfo.sec);
         }
-    }
-    return ret;
+    };
+
+    auto elementToString = [visitor](auto it) {
+        return std::visit(visitor, *it);
+    };
+
+    return ::s2e::plugins::crax::toString(
+            stateInfoList.begin(), stateInfoList.end(), '[', ']', elementToString);
 }
 
 }  // namespace s2e::plugins::crax

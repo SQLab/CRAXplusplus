@@ -22,6 +22,7 @@
 #define S2E_PLUGINS_CRAX_STRING_UTIL_H
 
 #include <cstring>
+#include <iterator>
 #include <memory>
 #include <istream>
 #include <sstream>
@@ -64,6 +65,24 @@ std::string streamToString(const T &s) {
     std::stringstream ss;
     ss << s.rdbuf();
     return ss.str();
+}
+
+template <typename InputIt, typename ElementToString>
+std::string toString(InputIt first,
+                     InputIt last,
+                     char left,
+                     char right,
+                     ElementToString f) {
+    std::string ret;
+    ret += left;
+    for (auto it = first; it != last; it++) {
+        ret += f(it);
+        if (std::next(it) != last) {
+            ret += ", ";
+        }
+    }
+    ret += right;
+    return ret;
 }
 
 

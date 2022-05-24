@@ -168,13 +168,11 @@ std::map<uint64_t, uint64_t> Memory::getSymbolicMemory() const {
 }
 
 const VirtualMemoryMap &Memory::vmmap() const {
-    m_vmmap.rebuild(m_state);
-    return m_vmmap;
+    return m_vmmap.rebuild(m_state);
 }
 
 void Memory::showMapInfo() const {
-    m_vmmap.rebuild(m_state);
-    m_vmmap.dump(m_state);
+    m_vmmap.dump();
 }
 
 

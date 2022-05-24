@@ -64,11 +64,11 @@ public:
     reverse_iterator rend() { return reverse_iterator(begin()); }
 
     void initialize();
-    void rebuild(S2EExecutionState *state);
-    void dump(S2EExecutionState *state);
+    VirtualMemoryMap &rebuild(S2EExecutionState *state);
 
     uint64_t getModuleBaseAddress(uint64_t address) const;
     uint64_t getModuleEndAddress(uint64_t address) const;
+    void dump();
 
     static const std::string s_elfLabel;
     static const std::string s_libcLabel;

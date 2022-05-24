@@ -48,7 +48,7 @@ void VirtualMemoryMap::initialize() {
 }
 
 
-void VirtualMemoryMap::rebuild(S2EExecutionState *state) {
+VirtualMemoryMap &VirtualMemoryMap::rebuild(S2EExecutionState *state) {
     uint64_t pid = g_crax->getTargetProcessPid();
     assert(pid && "Target process not running (pid hasn't been intercepted yet)! "
                   "You're probably trying to rebuild vmmap too early");
@@ -103,6 +103,8 @@ void VirtualMemoryMap::rebuild(S2EExecutionState *state) {
     fillLibcRegions(state);
     fillRemainingSharedLibsRegions(state);
     fillStackRegion(state);
+
+    return *this;
 }
 
 
@@ -244,27 +246,6 @@ void VirtualMemoryMap::fillStackRegion(S2EExecutionState *state) {
     insert(m_stackRegion.first, m_stackRegion.second, std::move(region));
 }
 
-void VirtualMemoryMap::dump(S2EExecutionState *state) {
-    auto &os = log<WARN>(state);
-    os << "Dumping memory map...\n"
-        << "--------------- [VMMAP] ---------------\n"
-        << "Start\t\tEnd\t\tPerm\tModule\n";
-
-    foreach2 (it, begin(), end()) {
-        uint64_t start = it.start();
-        uint64_t end = it.stop() + 1;
-        RegionDescriptorPtr region = *it;
-
-        os << hexval(start) << '\t'
-            << hexval(end) << '\t'
-            << (region->r ? 'r' : '-')
-            << (region->w ? 'w' : '-')
-            << (region->x ? 'x' : '-') << '\t'
-            << region->moduleName
-            << '\n';
-    }
-}
-
 uint64_t VirtualMemoryMap::getModuleBaseAddress(uint64_t address) const {
     assert(!empty());
 
@@ -317,6 +298,27 @@ uint64_t VirtualMemoryMap::getModuleEndAddress(uint64_t address) const {
                       [&moduleName](const auto &r) { return r->moduleName != moduleName; });
 
     return std::prev(it).stop();
+}
+
+void VirtualMemoryMap::dump() {
+    auto &os = log<WARN>();
+    os << "Dumping memory map...\n"
+        << "--------------- [VMMAP] ---------------\n"
+        << "Start\t\tEnd\t\tPerm\tModule\n";
+
+    foreach2 (it, begin(), end()) {
+        uint64_t start = it.start();
+        uint64_t end = it.stop() + 1;
+        RegionDescriptorPtr region = *it;
+
+        os << hexval(start) << '\t'
+            << hexval(end) << '\t'
+            << (region->r ? 'r' : '-')
+            << (region->w ? 'w' : '-')
+            << (region->x ? 'x' : '-') << '\t'
+            << region->moduleName
+            << '\n';
+    }
 }
 
 }  // namespace s2e::plugins::crax

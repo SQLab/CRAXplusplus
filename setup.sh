@@ -48,6 +48,18 @@ function install_libc_and_ld_for_project() {
             "$S2E_ROOT/projects/$1/ld-2.24.so"
 }
 
+function prepare_proxy() {
+    # $1: project name (e.g. sym_stdin)
+    if [ -d "$S2E_ROOT"/projects/$1 ]; then
+        echo -e "[*] Installing config and scripts for $1..."
+        install_crax_config_for_project "$1"
+        install_crax_scripts_for_project "$1"
+        install_libc_and_ld_for_project "$1"
+    else
+        echo -e "${YELLOW}[!] Skipping $1 (not found)${RESET}"
+    fi
+}
+
 
 
 if [ "`pwd`" != $CRAX_ROOT ]; then
@@ -76,44 +88,10 @@ fi
 cp -ar "$CRAX_SRC" "$S2E_SRC"/libs2eplugins/src/s2e/Plugins/CRAX
 
 
-if [ -d "$S2E_ROOT"/projects/sym_stdin ]; then
-    echo -e "[*] Installing config and scripts for sym_stdin..."
-    install_crax_config_for_project "sym_stdin"
-    install_crax_scripts_for_project "sym_stdin"
-    install_libc_and_ld_for_project "sym_stdin"
-else
-    echo -e "${YELLOW}[!] Skipping sym_stdin (not found)${RESET}"
-fi
-
-
-if [ -d "$S2E_ROOT"/projects/sym_file ]; then
-    echo -e "[*] Installing config and scripts for sym_file..."
-    install_crax_config_for_project "sym_file"
-    install_crax_scripts_for_project "sym_file"
-    install_libc_and_ld_for_project "sym_file"
-else
-    echo -e "${YELLOW}[!] Skipping sym_file (not found)${RESET}"
-fi
-
-
-if [ -d "$S2E_ROOT"/projects/sym_arg ]; then
-    echo -e "[*] Installing config and scripts for sym_arg..."
-    install_crax_config_for_project "sym_arg"
-    install_crax_scripts_for_project "sym_arg"
-    install_libc_and_ld_for_project "sym_arg"
-else
-    echo -e "${YELLOW}[!] Skipping sym_arg (not found)${RESET}"
-fi
-
-
-if [ -d "$S2E_ROOT"/projects/sym_env ]; then
-    echo -e "[*] Installing config and scripts for sym_env..."
-    install_crax_config_for_project "sym_env"
-    install_crax_scripts_for_project "sym_env"
-    install_libc_and_ld_for_project "sym_env"
-else
-    echo -e "${YELLOW}[!] Skipping sym_env (not found)${RESET}"
-fi
-
+prepare_proxy sym_arg
+prepare_proxy sym_env
+prepare_proxy sym_file
+prepare_proxy sym_socket
+prepare_proxy sym_stdin
 
 echo -e "${GREEN}[*] Success! Now you can run 's2e build' again.${RESET}"

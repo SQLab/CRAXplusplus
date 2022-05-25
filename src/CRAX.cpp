@@ -19,7 +19,6 @@
 // SOFTWARE.
 
 #include <s2e/S2E.h>
-#include <s2e/ConfigFile.h>
 
 #include <filesystem>
 
@@ -84,11 +83,10 @@ void CRAX::initialize() {
 
     // Run `ROPgadget <elf>` on the following ELF files in a worker thread
     // and cache their outputs.
-    std::vector<const ELF *> elfFiles = {
+    m_exploitGenerator.getRopGadgetResolver().buildCacheAsync({
         &m_exploit.getElf(),
-        &m_exploit.getLibc()
-    };
-    m_exploitGenerator.getRopGadgetResolver().buildRopGadgetOutputCacheAsync(elfFiles);
+        &m_exploit.getLibc(),
+    });
 
     // Initialize modules.
     for (const auto &name : CRAX_CONFIG_GET_STRING_LIST(".modules")) {

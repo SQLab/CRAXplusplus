@@ -44,7 +44,7 @@ public:
     //
     // NOTE: We cache the output of `ROPgadget <elf>` at the beginning,
     // and doResolveGadgets() is blocked until the output cache has been fully built.
-    void buildRopGadgetOutputCacheAsync(const std::vector<const ELF *> &elfFiles);
+    void buildCacheAsync(const std::vector<const ELF *> &elfFiles);
 
     // Look for an exact match of the gadget specified by `gadgetAsm` within `elf`.
     // If found, then the offset of the gadget will be returned, and zero otherwise.

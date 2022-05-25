@@ -49,6 +49,21 @@
 #define DEFAULT_LIBC_FILENAME "/lib/x86_64-linux-gnu/libc.so.6"
 #define DEFAULT_LD_FILENAME "/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"
 
+#define __CRAX_CONFIG_GET_T(Type, key, defaultValue) \
+    (g_s2e->getConfig()->get##Type(getConfigKey() + key, defaultValue))
+
+#define CRAX_CONFIG_GET_BOOL(key, defaultValue) \
+    __CRAX_CONFIG_GET_T(Bool, key, defaultValue)
+
+#define CRAX_CONFIG_GET_INT(key, defaultValue) \
+    __CRAX_CONFIG_GET_T(Int, key, defaultValue)
+
+#define CRAX_CONFIG_GET_STRING(key, defaultValue) \
+    __CRAX_CONFIG_GET_T(String, key, defaultValue)
+
+#define CRAX_CONFIG_GET_STRING_LIST(key) \
+    (g_s2e->getConfig()->getStringList(getConfigKey() + key))
+
 namespace s2e::plugins::crax {
 
 // A plugin state contains per-state information of a plugin,

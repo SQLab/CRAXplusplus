@@ -25,20 +25,7 @@
 
 #include "CRAX.h"
 
-#define __CRAX_CONFIG_GET_T(Type, key, defaultValue) \
-    (g_s2e->getConfig()->get##Type(getConfigKey() + key, defaultValue))
-
-#define CRAX_CONFIG_GET_BOOL(key, defaultValue) \
-    __CRAX_CONFIG_GET_T(Bool, key, defaultValue)
-
-#define CRAX_CONFIG_GET_INT(key, defaultValue) \
-    __CRAX_CONFIG_GET_T(Int, key, defaultValue)
-
-#define CRAX_CONFIG_GET_STRING(key, defaultValue) \
-    __CRAX_CONFIG_GET_T(String, key, defaultValue)
-
 using namespace klee;
-
 
 namespace s2e::plugins::crax {
 
@@ -104,20 +91,15 @@ void CRAX::initialize() {
     m_exploitGenerator.getRopGadgetResolver().buildRopGadgetOutputCacheAsync(elfFiles);
 
     // Initialize modules.
-    ConfigFile *cfg = s2e()->getConfig();
-    ConfigFile::string_list moduleNames = cfg->getStringList(getConfigKey() + ".modules");
-
-    foreach2 (it, moduleNames.begin(), moduleNames.end()) {
-        log<INFO>() << "Creating module: " << *it << '\n';
-        m_modules.push_back(Module::create(*it));
+    for (const auto &name : CRAX_CONFIG_GET_STRING_LIST(".modules")) {
+        log<INFO>() << "Creating module: " << name << '\n';
+        m_modules.push_back(Module::create(name));
     }
 
     // Initialize techniques.
-    ConfigFile::string_list techniqueNames = cfg->getStringList(getConfigKey() + ".techniques");
-
-    foreach2 (it, techniqueNames.begin(), techniqueNames.end()) {
-        log<INFO>() << "Creating technique: " << *it << '\n';
-        m_techniques.push_back(Technique::create(*it));
+    for (const auto &name : CRAX_CONFIG_GET_STRING_LIST(".techniques")) {
+        log<INFO>() << "Creating technique: " << name << '\n';
+        m_techniques.push_back(Technique::create(name));
     }
 }
 

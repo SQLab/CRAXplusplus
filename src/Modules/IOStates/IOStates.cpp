@@ -58,8 +58,8 @@ IOStates::IOStates()
     : Module(),
       m_leakTargets(),
       m_canary(),
-      m_userSpecifiedCanary(g_s2e->getConfig()->getInt(getConfigKey() + ".canary", 0)),
-      m_userSpecifiedElfBase(g_s2e->getConfig()->getInt(getConfigKey() + ".elfBase", 0)),
+      m_userSpecifiedCanary(CRAX_CONFIG_GET_INT(".canary", 0)),
+      m_userSpecifiedElfBase(CRAX_CONFIG_GET_INT(".elfBase", 0)),
       m_userSpecifiedStateInfoList(initUserSpecifiedStateInfoList()) {
     const ELF &elf = g_crax->getExploit().getElf();
 
@@ -134,7 +134,7 @@ std::unique_ptr<CoreGenerator> IOStates::makeCoreGenerator() const {
 
 
 std::vector<IOStates::StateInfo> IOStates::initUserSpecifiedStateInfoList() {
-    std::string str = g_s2e->getConfig()->getString(getConfigKey() + ".stateInfoList");
+    std::string str = CRAX_CONFIG_GET_STRING(".stateInfoList", "");
 
     if (str.empty()) {
         return {};

@@ -28,7 +28,7 @@ namespace s2e::plugins::crax {
 
 CodeSelection::CodeSelection()
     : Module(),
-      m_functions(g_s2e->getConfig()->getStringList(getConfigKey())),
+      m_functions(CRAX_CONFIG_GET_STRING_LIST(getConfigKey())),
       m_symMemRegMap(initSymMemRegMap()) {
     auto functionMonitor = g_s2e->getPlugin<FunctionMonitor>();
 

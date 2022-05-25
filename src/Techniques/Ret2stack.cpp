@@ -47,8 +47,7 @@ Ret2stack::Ret2stack()
 
 
 std::vector<uint8_t> Ret2stack::initShellcode() {
-    std::string filename
-        = g_s2e->getConfig()->getString(getConfigKey() + ".shellcodeFile", "");
+    std::string filename = CRAX_CONFIG_GET_STRING(".shellcodeFile", "");
 
     // The user doesn't specify a path to custom shellcode, so use the default one.
     if (filename.empty() || !std::filesystem::exists(filename)) {

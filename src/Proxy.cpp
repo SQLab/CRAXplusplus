@@ -88,8 +88,7 @@ void Proxy::loadSymArgConfig() {
 }
 
 void Proxy::loadSymEnvConfig() {
-    m_payloadEnvKey
-        = g_s2e->getConfig()->getString(getConfigKey() + ".payloadEnvKey", "placeholder");
+    m_payloadEnvKey = CRAX_CONFIG_GET_STRING(".payloadEnvKey", "placeholder");
 }
 
 void Proxy::loadSymFileConfig() {
@@ -97,11 +96,11 @@ void Proxy::loadSymFileConfig() {
 }
 
 void Proxy::loadSymSocketConfig() {
-    m_destAddr = g_s2e->getConfig()->getString(getConfigKey() + ".destAddr", "");
-    m_destPort = g_s2e->getConfig()->getInt(getConfigKey() + ".destPort", 0);
-    m_isTcp = g_s2e->getConfig()->getBool(getConfigKey() + ".tcp", true);
-    m_socketFd = g_s2e->getConfig()->getInt(getConfigKey() + ".socketFd", 0);
-    m_isBlockingSocket = g_s2e->getConfig()->getBool(getConfigKey() + ".blocking", 0);
+    m_destAddr = CRAX_CONFIG_GET_STRING(".destAddr", "");
+    m_destPort = CRAX_CONFIG_GET_INT(".destPort", 0);
+    m_isTcp = CRAX_CONFIG_GET_BOOL(".tcp", true);
+    m_socketFd = CRAX_CONFIG_GET_INT(".socketFd", 0);
+    m_isBlockingSocket = CRAX_CONFIG_GET_BOOL(".blocking", 0);
 }
 
 void Proxy::loadSymStdinConfig() {

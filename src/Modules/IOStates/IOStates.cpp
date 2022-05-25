@@ -537,17 +537,13 @@ void IOStates::State::dump() const {
 std::string IOStates::State::toString() const {
     auto visitor = overload {
         [](const InputStateInfo &stateInfo) {
-            return std::string("i") + std::to_string(stateInfo.offset);
+            return "i" + std::to_string(stateInfo.offset);
         },
         [](const OutputStateInfo &stateInfo) {
-            std::string ret = "o";
-            if (stateInfo.isInteresting) {
-                ret += std::to_string(stateInfo.bufIndex);
-            }
-            return ret;
+            return "o" + (stateInfo.isInteresting ? std::to_string(stateInfo.bufIndex) : "");
         },
         [](const SleepStateInfo &stateInfo) {
-            return std::string("i") + std::to_string(stateInfo.sec);
+            return "s" + std::to_string(stateInfo.sec);
         }
     };
 

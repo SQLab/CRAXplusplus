@@ -51,7 +51,7 @@ std::vector<std::string> split(const std::string &s, const std::string &delim) {
     return tokens;
 }
 
-std::string join(const std::vector<std::string> &strings, const char delim) {
+std::string join(const std::vector<std::string> &strings, const std::string &delim) {
     std::stringstream ss;
     for (size_t i = 0; i < strings.size(); i++) {
         ss << strings[i];

@@ -86,7 +86,7 @@ void IOStateInfoVisitor::operator()(const InputStateInfo &stateInfo) {
         llvm::ArrayRef<uint8_t> bytes = inputStream.read(stateInfo.offset);
         std::string byteString = toByteString(bytes.begin(), bytes.end());
 
-        exploit.writeline(format("proc.send(b'%s')", byteString.c_str()));
+        exploit.writeline(format("proc.send(%s)", byteString.c_str()));
         return;
     }
 

@@ -32,6 +32,20 @@
 
 namespace s2e::plugins::crax {
 
+std::vector<std::string> split(const std::string &s, const char delim);
+std::vector<std::string> split(const std::string &s, const std::string &delim);
+
+std::string join(const std::vector<std::string> &strings, const std::string &delim);
+std::string replace(std::string s, const std::string &keyword, const std::string &newword);
+std::string slice(std::string s, size_t start, size_t end = std::string::npos);  // [start, end)
+std::string strip(std::string s);
+std::string ljust(std::string s, size_t size, char c);
+
+bool startsWith(const std::string &s, const std::string &prefix);
+bool endsWith(const std::string &s, const std::string &suffix);
+bool isNumString(const std::string &s);
+
+
 template <typename... Args>
 std::string format(const std::string &fmt, Args &&...args) {
   // std::snprintf(dest, n, fmt, ...) returns the number of chars
@@ -47,16 +61,43 @@ std::string format(const std::string &fmt, Args &&...args) {
           std::forward<Args>(args)...) > 0) ? std::string(buf.get()) : "";
 }
 
-// A byte string is a sequence of bytes, such as b'\xef\xbe\xad\xde'
-// which represents 0xdeadbeef.
-// input:  {0xef, 0xbe, 0xad, 0xde}
-// output: \xef\xbe\xad\xde
+// Given a sequence of bytes, convert them to python3 byte strings.
 template <typename InputIt>
 std::string toByteString(InputIt first, InputIt last) {
-    std::string ret;
+    std::string ret = "b'";
+    uint8_t byte = 0;
+    size_t combo = 0;
+    bool isPrevStringClosed = false;
+
     for (auto it = first; it != last; it++) {
-        ret += format("\\x%02x", *it);
+        byte = *it;
+        combo = 1;
+
+        while (std::next(it) != last && *it == *std::next(it)) {
+            combo++;
+            it++;
+        }
+
+        if (combo == 1) {
+            ret += format("\\x%02x", byte);
+            isPrevStringClosed = false;
+        } else {
+            if (!isPrevStringClosed && ret.size() > 2) {
+                ret += "' + b'";
+            }
+            ret += format("\\x%02x' * %d", byte, combo);
+            isPrevStringClosed = true;
+            if (std::next(it) != last) {
+                ret += " + b'";
+                isPrevStringClosed = false;
+            }
+        }
     }
+
+    if (!isPrevStringClosed) {
+        ret += '\'';
+    }
+
     return ret;
 }
 
@@ -84,20 +125,6 @@ std::string toString(InputIt first,
     ret += right;
     return ret;
 }
-
-
-std::vector<std::string> split(const std::string &s, const char delim);
-std::vector<std::string> split(const std::string &s, const std::string &delim);
-
-std::string join(const std::vector<std::string> &strings, const char delim);
-std::string replace(std::string s, const std::string &keyword, const std::string &newword);
-std::string slice(std::string s, size_t start, size_t end = std::string::npos);  // [start, end)
-std::string strip(std::string s);
-std::string ljust(std::string s, size_t size, char c);
-
-bool startsWith(const std::string &s, const std::string &prefix);
-bool endsWith(const std::string &s, const std::string &suffix);
-bool isNumString(const std::string &s);
 
 }  // namespace s2e::plugins::crax
 

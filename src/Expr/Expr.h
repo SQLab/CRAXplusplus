@@ -331,8 +331,7 @@ public:
     }
 
     std::string toString() const {
-        std::string byteString = toByteString(m_bytes.begin(), m_bytes.end());
-        return format("b'%s'", byteString.c_str());
+        return toByteString(m_bytes.begin(), m_bytes.end());
     }
 
 private:

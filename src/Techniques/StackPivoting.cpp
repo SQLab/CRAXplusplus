@@ -212,7 +212,10 @@ std::vector<RopPayload> AdvancedStackPivoting::getRopPayloadList() const {
 
 void AdvancedStackPivoting::maybeInterceptReadCallSites(S2EExecutionState *state,
                                                         const Instruction &i) {
-    if (g_crax->isCallSiteOf(i, "read")) {
+    const Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
+
+    if (elf.isCallSiteOf(i, "read")) {
         uint64_t buf = reg().readConcrete(Register::X64::RSI);
         uint64_t len = reg().readConcrete(Register::X64::RDX);
         m_readCallSites.insert({i.address, buf, len});
@@ -278,11 +281,18 @@ void AdvancedStackPivoting::initDynamicRopConstraintsOnce() const {
 
 uint64_t AdvancedStackPivoting::determineRetAddr(uint64_t readCallSiteAddr,
                                                  int &rbpOffset) const {
-    std::string symbol = g_crax->getBelongingSymbol(readCallSiteAddr);
+    const Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
+
+    std::string symbol = elf.getBelongingSymbol(readCallSiteAddr - elf.getBase());
+    if (symbol.empty()) {
+        return 0;
+    }
+
     uint64_t symbolAddr = g_crax->getExploit().getElf().getRuntimeAddress(symbol);
     assert(symbolAddr <= readCallSiteAddr);
 
-    log<WARN>() << hexval(readCallSiteAddr) << " is within " << symbol << "(" << hexval(symbolAddr) << ")\n";
+    //log<WARN>() << hexval(readCallSiteAddr) << " is within " << symbol << "(" << hexval(symbolAddr) << ")\n";
 
     // Disassemble the instructions between symbolAddr and readCallSiteAddr.
     std::vector<uint8_t> code = mem().readConcrete(symbolAddr, readCallSiteAddr - symbolAddr);

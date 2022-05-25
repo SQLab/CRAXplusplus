@@ -416,8 +416,11 @@ void IOStates::onStateForkModuleDecide(S2EExecutionState *state,
     std::optional<Instruction> i2 = disas().disasm(rip + i1->size);
     assert(i2 && "Disassemble failed? (i2)");
 
+    const Exploit &exploit = g_crax->getExploit();
+    const ELF &elf = exploit.getElf();
+
     // Look ahead the next instruction.
-    if (!g_crax->isCallSiteOf(*i2, "__stack_chk_fail")) {
+    if (!elf.isCallSiteOf(*i2, "__stack_chk_fail")) {
         allowForking = false;
         return;
     }

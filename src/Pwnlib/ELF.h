@@ -21,6 +21,7 @@
 #ifndef S2E_PLUGINS_CRAX_PWNLIB_ELF_H
 #define S2E_PLUGINS_CRAX_PWNLIB_ELF_H
 
+#include <s2e/Plugins/CRAX/API/Disassembler.h>
 #include <s2e/Plugins/CRAX/Pwnlib/Function.h>
 
 #include <pybind11/embed.h>
@@ -49,19 +50,22 @@ public:
 
     explicit ELF(const std::string &filename); 
 
+    uint64_t getRuntimeAddress(uint64_t offset) const;
+    uint64_t getRuntimeAddress(const std::string &symbol) const;
+    uint64_t rebaseAddress(uint64_t address, uint64_t newBase) const;
+    std::string getBelongingSymbol(uint64_t instructionAddr) const;
+    bool isCallSiteOf(const Instruction &i, const std::string &symbol) const;
+
+    inline bool hasSymbol(const std::string &symbol) const {
+        return m_symbols.find(symbol) != m_symbols.end();
+    }
+
     const SymbolMap &symbols() const { return m_symbols; }
     const SymbolMap &plt() const { return m_plt; }
     const SymbolMap &got() const { return m_got; }
     const InverseSymbolMap &inversePlt() const { return m_inversePlt; }
     const FunctionMap &functions() const { return m_functions; }
     uint64_t bss() const;
-
-    uint64_t getRuntimeAddress(uint64_t offset) const;
-    uint64_t getRuntimeAddress(const std::string &symbol) const;
-    uint64_t rebaseAddress(uint64_t address, uint64_t newBase) const;
-    inline bool hasSymbol(const std::string &symbol) const {
-        return m_symbols.find(symbol) != m_symbols.end();
-    }
 
     const std::string &getFilename() const { return m_filename; }
     const std::string &getVarPrefix() const { return m_varPrefix; }

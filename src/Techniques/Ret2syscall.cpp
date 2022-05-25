@@ -306,7 +306,7 @@ RopPayload Ret2syscall::getPollRopPayload() const {
         std::vector<uint8_t> code = mem().readConcrete(addr, func.size);
 
         for (auto i : disas().disasm(code, func.offset)) {
-            if (g_crax->isCallSiteOf(i, "poll")) {
+            if (elf.isCallSiteOf(i, "poll")) {
                 log<WARN>() << "Polling socket via " << symbol << '\n';
                 return ret2csu->getRopPayloadList(
                     BaseOffsetExpr::create<BaseType::SYM>(elf, symbol),

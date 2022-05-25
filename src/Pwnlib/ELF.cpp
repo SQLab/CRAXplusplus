@@ -24,6 +24,7 @@
 #include <s2e/Plugins/CRAX/Utils/StringUtil.h>
 
 #include <cassert>
+#include <exception>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -82,9 +83,6 @@ ELF::FunctionMap ELF::buildFunctionMap() {
     return ret;
 }
 
-uint64_t ELF::bss() const {
-    return m_elf.attr("bss").call().cast<uint64_t>();
-}
 
 uint64_t ELF::getRuntimeAddress(uint64_t offset) const {
     assert((!checksec.hasPIE || m_base) && "PIE enabled, but `m_base` uninitialized!");
@@ -98,6 +96,62 @@ uint64_t ELF::getRuntimeAddress(const std::string &symbol) const {
 uint64_t ELF::rebaseAddress(uint64_t address, uint64_t newBase) const {
     assert(address >= m_base);
     return newBase + address - m_base;
+}
+
+std::string ELF::getBelongingSymbol(uint64_t offset) const {
+    std::vector<std::pair<std::string, uint64_t>> syms(
+            m_symbols.begin(), m_symbols.end());
+
+    std::sort(syms.begin(),
+              syms.end(),
+              [](const auto &p1, const auto &p2) { return p1.second < p2.second; });
+
+    if (offset < syms.front().second) {
+        log<WARN>()
+            << "Unable to find which symbol " << hexval(offset)
+            << " belongs to.\n";
+        return "";
+    }
+
+    // Use binary search to find out which symbol `offset` belongs to.
+    int l = 0;
+    int r = syms.size() - 1;
+
+    while (l < r) {
+        int m = l + (r - l) / 2;
+        uint64_t addr = syms[m].second;
+        if (addr < offset) {
+            l = m + 1;
+        } else {
+            r = m - 1;
+        }
+    }
+
+    if (offset < syms[l].second) {
+        l--;
+    }
+    return syms[l].first;
+}
+
+bool ELF::isCallSiteOf(const Instruction &i, const std::string &symbol) const {
+    if (i.mnemonic != "call" || !hasSymbol(symbol)) {
+        return false;
+    }
+
+    const uint64_t addr = getRuntimeAddress(symbol);
+    uint64_t operand = 0;
+    try {
+        operand = std::stoull(i.opStr, nullptr, 16);
+    } catch (const std::invalid_argument &e) {
+        // This can happen when `i` is something like `call r13`,
+        // which is legit, so let's just silently swallow the exception.
+    }
+    return addr == operand;
+}
+
+
+uint64_t ELF::bss() const {
+    return m_elf.attr("bss").call().cast<uint64_t>();
 }
 
 const Exploit &ELF::getExploit() const {

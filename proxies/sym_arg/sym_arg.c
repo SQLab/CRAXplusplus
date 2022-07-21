@@ -46,9 +46,11 @@ int main(int argc, char *argv[], char *envp[]) {
 
     // Prepare the argv for execve().
     char *args[argc - 1];
-    args[0] = argv[1];
-    args[1] = argv[2];
-    args[2] = NULL;
+    int i;
+    for (i = 0; i < argc - 1; i++) {
+        args[i] = argv[i + 1];
+    }
+    args[i] = NULL;
 
     s2e_make_symbolic(args[1], strlen(args[1]), "CRAX");
 

@@ -44,9 +44,8 @@ CodeSelection::CodeSelection()
 
 CodeSelection::SymMemRegMap CodeSelection::initSymMemRegMap() {
     return {
-        { "printf", { /* check the first six args */ } },
-        { "lstat",  { Register::X64::RDI } },
-        { "perror", { Register::X64::RDI } },
+        { "lstat",   { Register::X64::RDI } },
+        { "perror",  { Register::X64::RDI } },
     };
 }
 
@@ -195,7 +194,7 @@ CodeSelection::Argv CodeSelection::decideArgv(const std::string &symbol) const {
     // However, if we already know which arguments are pointers,
     // then we only need to check those arguments.
     auto it = m_symMemRegMap.find(symbol);
-    return (it != m_symMemRegMap.end() && it->second.size()) ? it->second : ret;
+    return it != m_symMemRegMap.end() ? it->second : ret;
 }
 
 uint64_t CodeSelection::getSymBlockLen(S2EExecutionState *state, uint64_t ptr) const {

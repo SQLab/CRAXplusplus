@@ -25,10 +25,10 @@ index 933ae3e..087d621 100644
  
  add_subdirectory(src)
 diff --git a/libs2eplugins/src/CMakeLists.txt b/libs2eplugins/src/CMakeLists.txt
-index e3b2d37..00a0f20 100644
+index e3b2d37..973c267 100644
 --- a/libs2eplugins/src/CMakeLists.txt
 +++ b/libs2eplugins/src/CMakeLists.txt
-@@ -23,6 +23,38 @@ PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/s2e/Plug
+@@ -23,6 +23,39 @@ PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/s2e/Plug
  add_library(
      s2eplugins
  
@@ -61,13 +61,14 @@ index e3b2d37..00a0f20 100644
 +    s2e/Plugins/CRAX/CoreGenerator.cpp
 +    s2e/Plugins/CRAX/Exploit.cpp
 +    s2e/Plugins/CRAX/ExploitGenerator.cpp
++    s2e/Plugins/CRAX/Proxy.cpp
 +    s2e/Plugins/CRAX/RopGadgetResolver.cpp
 +    s2e/Plugins/CRAX/RopPayloadBuilder.cpp
 +
      # Core plugins
      s2e/Plugins/Core/BaseInstructions.cpp
      s2e/Plugins/Core/HostFiles.cpp
-@@ -163,7 +195,7 @@ set(WERROR_FLAGS "-Werror -Wno-zero-length-array -Wno-c99-extensions          \
+@@ -163,7 +196,7 @@ set(WERROR_FLAGS "-Werror -Wno-zero-length-array -Wno-c99-extensions          \
                    -Wno-zero-length-array")
  
  set(COMMON_FLAGS "-D__STDC_FORMAT_MACROS -D_GNU_SOURCE -DNEED_CPU_H  -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -DTARGET_PHYS_ADDR_BITS=64")

@@ -49,7 +49,7 @@ pluginsConfig.BaseInstructions = {
 add_plugin("HostFiles")
 pluginsConfig.HostFiles = {
     baseDirs = {
-        "/home/aesophor/s2e/projects/sym_stdin",
+        os.getenv("HOME") .. "/s2e/projects/sym_stdin",
     },
     allowWrite = true,
 }
@@ -63,8 +63,8 @@ pluginsConfig.HostFiles = {
 add_plugin("Vmi")
 pluginsConfig.Vmi = {
     baseDirs = {
-        "/home/aesophor/s2e/projects/sym_stdin",
-        "/home/aesophor/s2e/images/debian-9.2.1-x86_64/guestfs",
+        os.getenv("HOME") .. "/s2e/projects/sym_stdin",
+        os.getenv("HOME") .. "/s2e/images/debian-9.2.1-x86_64/guestfs",
     },
 }
 

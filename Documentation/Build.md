@@ -8,8 +8,19 @@ S2E officially supports 64-bit Ubuntu (18.04, 20.04 LTS), older or later version
 
 You need to manually install some additional tools or packages before building CRAX++.
 * [pwntools](https://github.com/Gallopsled/pwntools) (4.7.0)
+```
+sudo -H python3 -m pip install pwntools==4.7.0
+```
+
 * [pybind11-dev](https://github.com/pybind/pybind11) (2.4.3-2build2)
+```
+sudo apt-get install pybind11-dev=2.4.3-2build2
+```
+
 * [ROPgadget](https://github.com/JonathanSalwan/ROPgadget) (6.6)
+```
+sudo -H python3 -m pip install ROPgadget==6.6
+```
 
 ## Building S2E Manually
 
@@ -78,23 +89,20 @@ cd ~/s2e/source/CRAXplusplus/proxies/sym_file && make
 
 Create an S2E project with our concolic execution proxy, `sym_stdin`.
 ```
-cd ~/s2e/source/s2e/proxies/sym_stdin
-make
 cd ~/s2e
 s2e new_project --image debian-9.2.1-x86_64 ~/s2e/source/CRAXplusplus/proxies/sym_stdin/sym_stdin
 ```
 
-Run `setup.sh`. This applies several patches to the S2E source tree, and places some symlinks in your S2E project.
+Run `setup.sh`. This applies several patches to the S2E source tree, places some symlinks in your S2E project, and merges the source code of CRAX++ into S2E source tree.
 ```
 cd ~/s2e/source/CRAXplusplus
 ./setup.sh
 ```
 
-Merge the source code of CRAX++ into S2E source tree, and rebuild S2E.
+Rebuild S2E.
 ```
-rm -rf ~/s2e/source/s2e/libs2eplugins/src/s2e/Plugins/CRAX
-cp -ar ~/s2e/source/CRAXplusplus/src ~/s2e/source/s2e/libs2eplugins/src/s2e/Plugins/CRAX
 cd ~/s2e
+rm -rf build/stamps/libs2e-release-*
 s2e build
 ```
 
@@ -141,7 +149,7 @@ Modify `s2e-config.template.lua` and tailor the exploitation techniques to your 
 techniques = {
     "Ret2csu",
     "BasicStackPivot",
-    "GotPartialOverwrite",
+    "Ret2syscall",
 },
 ```
 

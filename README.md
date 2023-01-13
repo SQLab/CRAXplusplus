@@ -2,7 +2,11 @@
 
 **current version: 0.2.1**
 
-Being inspired by [AFL++](https://github.com/AFLplusplus/AFLplusplus), the exploit generator CRAX++ is [CRAX](https://github.com/SQLab/CRAX) with x86_64 ROP techniques, s2e 2.0 upgrade, code selection, I/O states, dynamic ROP, and more. Given a x86_64 binary program and a PoC input, our system leverages dynamic symbolic execution (i.e. [concolic execution](https://en.wikipedia.org/wiki/Concolic_testing)) to collect the path constraints determined by the PoC input, add exploit constraints to the crashing states, and query the constraint solver for exploit script generation. Our system supports custom exploitation techniques and modules with the aim of maximizing its extensibility. We implement several binary exploitation techniques in our system, and design two ROP payload chaining algorithms to build ROP payload from multiple techniques. 
+Being inspired by [AFL++](https://github.com/AFLplusplus/AFLplusplus), the exploit generator CRAX++ is [CRAX](https://github.com/SQLab/CRAX) with x86_64 ROP techniques, s2e 2.0 upgrade, code selection, I/O states, dynamic ROP, and more. Given a x86_64 binary program and a PoC input, our system leverages dynamic symbolic execution (i.e. [concolic execution](https://en.wikipedia.org/wiki/Concolic_testing)) to collect the path constraints determined by the PoC input, add exploit constraints to the crashing states, and query the constraint solver for exploit script generation. Our system supports custom exploitation techniques and modules with the aim of maximizing its extensibility. We implement several binary exploitation techniques in our system, and design two ROP payload chaining algorithms to build ROP payload from multiple techniques.
+
+## Conference Talk
+
+* HITCON 2022 [[YouTube](https://www.youtube.com/watch?v=94gi0jyUFLA)] [[Slides](https://hitcon.org/2022/slides/CRAX++-Modular-Exploit-Generator-using-Dynamic-Symbolic-Execution.pdf)]
 
 ## System Architecture
 
@@ -54,9 +58,9 @@ This project is impossible without:
 
 [2] Shih-Kun Huang et al. “Crax: Software crash analysis for automatic exploit generation by modeling attacks as symbolic continuations”. In: 2012 IEEE Sixth International Conference on Software Security and Reliability. IEEE. 2012, pp. 78–87. [[Paper](https://ir.nctu.edu.tw/bitstream/11536/24012/1/000332520700022.pdf)] [[Repo](https://github.com/SQLab/CRAX/tree/workable)] [[Article](https://skhuang.web.nctu.edu.tw/research/)]
 
-[3] Mow Wei-Loon and Hsiao Hsu-Chun. “Bypassing ASLR with Dynamic Binary Analysis for Automated Exploit Generation” (2021). [[Thesis](https://hdl.handle.net/11296/8498eg)]
+[3] W.-L. Mow, S.-K. Huang, H.-C. Hsiao. "LAEG: Leak-based AEG using Dynamic Binary Analysis to Defeat ASLR". In The 6th International Workshop on Privacy, data Assurance, Security Solutions for Internet of Things, June 2022. [[Paper](https://ieeexplore.ieee.org/document/9888796)]
 
-[4] Wang Guan-Zhong and Huang Shih-Kun. "CRAXplusplus: Modular Exploit Generator using Symbolic Execution" (2022). [[Thesis](https://etd.lib.nctu.edu.tw/cgi-bin/gs32/tugsweb.cgi?o=dnctucdr&s=id%3D%22GT073095510040%22.&searchmode=basic)] [[Slides](https://docs.google.com/presentation/d/18acsxk8jsgTES4ZfwwRgfzmq9T-gO9FZQQjKsLsuzCQ/edit?usp=sharing)]
+[4] Wang Guan-Zhong and Huang Shih-Kun. "CRAXplusplus: Modular Exploit Generator using Symbolic Execution" (2022). [[Thesis](https://hdl.handle.net/11296/vzv74u)] [[Slides](https://hitcon.org/2022/slides/CRAX++-Modular-Exploit-Generator-using-Dynamic-Symbolic-Execution.pdf)]
 
 ## License
 
